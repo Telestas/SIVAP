@@ -1,0 +1,56 @@
+# ── Python / FastAPI ──────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# ── Flutter / Dart ────────────────────────────────
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+.flutter-plugins
+.flutter-plugins-dependencies
+**/ios/Pods/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/ephemeral/
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+*.jks
+*.keystore
+
+# ── Secretos y configuración local ────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ── Datos clínicos / exportaciones ────────────────
+# Nunca versionar datos de pacientes ni datasets exportados
+*.xlsx
+*.csv
+*.sqlite
+*.db
+*.db-journal
+data/
+exports/
+
+# ── Editores / SO ─────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,90 @@
+# Panel web de SIVAP y proxy hacia la api.
+#
+# TLS es obligatorio (CLAUDE.md §5): por aquí pasan nombres, carnés de
+# identidad y datos clínicos. El servidor en claro solo existe para redirigir.
+#
+# `${SIVAP_DOMINIO}` lo sustituye nginx al arrancar (plantilla en
+# /etc/nginx/templates). No hay que editar este archivo para cambiar el
+# dominio: se cambia en .env.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${SIVAP_DOMINIO};
+
+    # Único contenido servido sin cifrar.
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${SIVAP_DOMINIO};
+
+    ssl_certificate     /etc/nginx/tls/sivap.crt;
+    ssl_certificate_key /etc/nginx/tls/sivap.key;
+
+    # Solo TLS 1.2 y 1.3. Las versiones anteriores están rotas.
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    root /srv/sivap;
+    index index.html;
+
+    # ── Cabeceras de seguridad ───────────────────────────────────────
+    # El panel no carga nada de fuera: ni tipografías, ni scripts, ni imágenes
+    # remotas. Las fuentes van empaquetadas dentro de la propia app, así que
+    # una política estricta no rompe nada y cierra la puerta a inyecciones.
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'" always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    server_tokens off;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml application/wasm;
+    gzip_min_length 1024;
+
+    # ── API del estudio ──────────────────────────────────────────────
+    # Mientras el backend no exista, estas rutas devuelven 502. Es lo correcto:
+    # mejor un error claro que fingir que responden.
+    location /api/ {
+        proxy_pass         http://api:8000/;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # Una sincronización desde un teléfono con mala cobertura puede tardar.
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+
+        # Un lote de sincronización con varias visitas y firmas no cabe en el
+        # megabyte que trae nginx por defecto.
+        client_max_body_size 25m;
+    }
+
+    # ── Compilación Flutter ──────────────────────────────────────────
+    # Los archivos con huella en el nombre no cambian nunca: se cachean fuerte.
+    location ~* \.(?:js|css|wasm|woff2?|ttf|png|svg)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # index.html nunca se cachea: es lo que apunta a la versión nueva tras un
+    # despliegue. Si se cacheara, el navegador seguiría abriendo la vieja.
+    location = /index.html {
+        add_header Cache-Control "no-store";
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

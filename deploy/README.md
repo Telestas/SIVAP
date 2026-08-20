@@ -8,8 +8,9 @@ servicio `api` está descrito pero el backend aún no existe (ver
 
 ```bash
 cd deploy
-cp .env.example .env      # y rellenar las tres contraseñas
-docker compose up -d      # base + panel web
+cp .env.example .env                              # y rellenar las contraseñas
+./tls/generar-certificado.sh sivap.hospital.local # certificado, una sola vez
+docker compose up -d                              # base + panel web
 ```
 
 El panel queda en `https://` + lo que hayas puesto en `SIVAP_DOMINIO`.
@@ -22,22 +23,28 @@ docker compose --profile completo up -d
 
 ## El certificado
 
-Caddy emite el certificado con su propia autoridad (`tls internal`), porque en
-una red de hospital normalmente no hay dominio público ni acceso a Let's
-Encrypt. **Cada dispositivo que abra el panel tiene que instalar esa autoridad
-una vez**, o el navegador avisará de sitio no seguro:
+En una red de hospital no suele haber dominio público ni acceso a Let's
+Encrypt, así que el certificado se genera con una autoridad propia del estudio.
+`tls/generar-certificado.sh` la crea y firma con ella el certificado del
+servidor. Detalle en [tls/README.md](tls/README.md).
 
-```bash
-docker compose cp web:/data/caddy/pki/authorities/local/root.crt ./sivap-ca.crt
-```
+**Cada dispositivo que abra el panel tiene que instalar `tls/ca.crt` una vez**,
+o el navegador avisará de sitio no seguro. Es el precio de no tener dominio
+público, y lo pagaría igual cualquier otro servidor web.
 
-Ese archivo se instala como certificado raíz de confianza en cada equipo o
-teléfono. Está en el volumen `datos_caddy`: si se borra ese volumen, Caddy
-genera una autoridad nueva y hay que repetir la instalación en todas partes.
+Dos cosas que hay que tener presentes y que no avisan solas:
 
-Si el servidor sí tiene nombre público y los puertos 80 y 443 abiertos desde
-internet, quitar `tls internal` del `Caddyfile` y Caddy pedirá un certificado
-real solo. Es preferible, si es posible.
+- El certificado del servidor **caduca al año**. Cuando pase, el panel deja de
+  abrir. Renovarlo es volver a correr el guion, que reutiliza la autoridad —así
+  que no hay que reinstalar nada en los dispositivos— y recrear el contenedor.
+- `tls/ca.key` es la clave de la autoridad del estudio. **No sale del
+  servidor.** Quien la tenga puede emitir certificados válidos para cualquier
+  dispositivo donde se haya instalado `ca.crt`.
+
+Si el servidor sí llega a tener nombre público y los puertos 80 y 443 abiertos,
+lo correcto es pasar a Let's Encrypt (con certbot o acme.sh): certificado
+reconocido por todos los navegadores, sin instalar nada en los dispositivos, y
+renovación automática.
 
 ## Advertencia sobre el panel web
 
@@ -68,6 +75,7 @@ Cifrarlo antes de moverlo a ningún sitio.
 ## Lo que falta en este borrador
 
 - El `Dockerfile` de la api, cuando exista el backend.
+- Renovación del certificado sin intervención manual (hoy hay que acordarse).
 - Migraciones de la base en el arranque de la api.
 - Copias de seguridad automáticas, en vez del comando manual de arriba.
 - Límites de recursos por contenedor.

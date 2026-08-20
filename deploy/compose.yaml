@@ -51,14 +51,20 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       SIVAP_SECRET_KEY: ${SIVAP_SECRET_KEY:?falta SIVAP_SECRET_KEY}
       SIVAP_ENTORNO: ${SIVAP_ENTORNO:-produccion}
-    networks: [interna, publica]
-    # Igual que la base: no publica puertos. Se llega por el proxy, con TLS.
+    # Solo en la red interna: no publica puertos y tampoco tiene salida a
+    # internet. Se llega a ella por el proxy, con TLS. Si algún día necesita
+    # salir (correo, por ejemplo), habrá que añadirla a `publica`.
+    networks: [interna]
     profiles: [completo]
 
   # ── Panel web + TLS ──────────────────────────────────────────────
   #
-  # Caddy sirve la compilación web de Flutter y hace de proxy hacia `api`.
+  # nginx sirve la compilación web de Flutter y hace de proxy hacia `api`.
   # Termina TLS, que es una restricción no negociable (CLAUDE.md §5).
+  #
+  # El certificado NO lo genera este servicio: se crea antes, una vez, con
+  # ./tls/generar-certificado.sh. Si falta, nginx no arranca — y es lo
+  # correcto: arrancar sin certificado significaría servir esto en claro.
   web:
     build:
       context: ..
@@ -66,22 +72,23 @@ services:
     restart: unless-stopped
     environment:
       SIVAP_DOMINIO: ${SIVAP_DOMINIO:-sivap.local}
+      # nginx sustituye las variables de las plantillas solo si están
+      # declaradas aquí.
+      NGINX_ENVSUBST_TEMPLATE_SUFFIX: .template
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./web/Caddyfile:/etc/caddy/Caddyfile:ro
-      # Certificados y clave privada de la CA interna de Caddy. Sin este
-      # volumen, cada reinicio genera una CA nueva y hay que volver a
-      # instalarla en todos los dispositivos.
-      - datos_caddy:/data
-      - config_caddy:/config
+      - ./tls:/etc/nginx/tls:ro
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks: [interna, publica]
 
 volumes:
   datos_postgres:
-  datos_caddy:
-  config_caddy:
 
 networks:
   interna:

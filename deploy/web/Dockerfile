@@ -1,4 +1,4 @@
-# Compilación web de SIVAP servida por Caddy.
+# Compilación web de SIVAP servida por nginx.
 #
 # El contexto de build es la raíz del repositorio (ver compose.yaml), para que
 # esta imagen pueda leer `app/`.
@@ -40,9 +40,16 @@ RUN flutter create --platforms=web . \
     && flutter build web --release
 
 # ── Etapa 2: servir ──────────────────────────────────────────────────
-FROM caddy:2-alpine
+FROM nginx:1.27-alpine
 
 COPY --from=build /src/build/web /srv/sivap
 
-# El Caddyfile llega montado desde compose para poder ajustarlo sin
-# recompilar la imagen.
+# nginx sustituye las variables de las plantillas de este directorio al
+# arrancar, y deja el resultado en /etc/nginx/conf.d/.
+COPY deploy/web/nginx.conf.template /etc/nginx/templates/sivap.conf.template
+
+# La configuración por defecto sirve su propia página en el puerto 80 y
+# chocaría con la nuestra.
+RUN rm -f /etc/nginx/conf.d/default.conf
+
+EXPOSE 80 443

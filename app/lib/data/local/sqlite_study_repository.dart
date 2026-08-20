@@ -5,10 +5,10 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../core/ids.dart';
 import '../../domain/models/audit_entry.dart';
 import '../../domain/models/consent.dart';
+import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/protocolo.dart';
 import '../../domain/models/role.dart';
-import '../../domain/models/visit.dart';
 import '../../domain/repositories/study_repository.dart';
 import '../allocation/allocation_strategy.dart';
 import 'db/sivap_database.dart';
@@ -18,8 +18,7 @@ import 'seed_data.dart';
 /// Implementación de [StudyRepository] sobre la base local cifrada.
 ///
 /// Las operaciones son síncronas porque `package:sqlite3` lo es: la apertura de
-/// la base es lo único asíncrono, y ocurre una vez al arrancar. Las pantallas
-/// no cambian.
+/// la base es lo único asíncrono, y ocurre una vez al arrancar.
 class SqliteStudyRepository implements StudyRepository {
   SqliteStudyRepository(this._base, {required AllocationSequence secuencia}) {
     _asegurarSecuencia(secuencia);
@@ -55,7 +54,6 @@ class SqliteStudyRepository implements StudyRepository {
     );
   }
 
-  /// Reconstruye la secuencia activa desde la base, con su contador.
   ({AllocationSequence secuencia, int consumidas}) _secuenciaActiva() {
     final fila = _db
         .select('SELECT * FROM secuencia_aleatorizacion WHERE activa = 1;')
@@ -65,7 +63,7 @@ class SqliteStudyRepository implements StudyRepository {
       secuencia: AllocationSequence(
         valores: [
           for (final c in codigo.split(''))
-            c == '1' ? Protocolo.nuevo : Protocolo.vigente
+            c == '1' ? Protocolo.b : Protocolo.a
         ],
         etiqueta: fila['etiqueta'] as String,
         origen: OrigenSecuencia.values
@@ -85,6 +83,13 @@ class SqliteStudyRepository implements StudyRepository {
 
   // ── Lectura ────────────────────────────────────────────────────
 
+  static const _sqlPaciente = '''
+    SELECT p.*, i.nombre, i.carne_identidad, i.numero_historia_clinica,
+           i.telefono, i.direccion
+    FROM pacientes p
+    JOIN identidad i ON i.paciente_id = p.id
+  ''';
+
   @override
   List<Patient> pacientes({String? recolectorId}) {
     final filas = recolectorId == null
@@ -101,13 +106,6 @@ class SqliteStudyRepository implements StudyRepository {
     return filas.isEmpty ? null : _leerPaciente(filas.first);
   }
 
-  static const _sqlPaciente = '''
-    SELECT p.*, i.nombre, i.carne_identidad, i.numero_historia_clinica,
-           i.telefono, i.direccion
-    FROM pacientes p
-    JOIN identidad i ON i.paciente_id = p.id
-  ''';
-
   Patient _leerPaciente(Row f) => Patient(
         id: f['id'] as String,
         nombre: f['nombre'] as String,
@@ -117,8 +115,8 @@ class SqliteStudyRepository implements StudyRepository {
         numeroHistoriaClinica: f['numero_historia_clinica'] as String,
         telefono: f['telefono'] as String,
         direccion: f['direccion'] as String,
-        protocolo:
-            Protocolo.values.firstWhere((p) => p.name == f['protocolo'] as String),
+        protocolo: Protocolo.values
+            .firstWhere((p) => p.name == f['protocolo'] as String),
         bloqueAleatorizacion: f['secuencia_etiqueta'] as String,
         asignadoEn: DateTime.parse(f['asignado_en'] as String),
         recolectorId: f['recolector_id'] as String,
@@ -127,27 +125,38 @@ class SqliteStudyRepository implements StudyRepository {
       );
 
   @override
-  List<Visit> visitasDe(String patientId) => _db
-      .select('SELECT * FROM visitas WHERE paciente_id = ? ORDER BY dia;',
+  List<EventoClinico> eventosDe(String patientId) => _db
+      .select(
+          'SELECT * FROM eventos WHERE paciente_id = ? '
+          'ORDER BY fecha_ocurrencia, tipo, ocurrencia;',
           [patientId])
-      .map(_leerVisita)
+      .map(_leerEvento)
       .toList();
 
   @override
-  Visit? visita(String patientId, int dia) {
-    final filas = _db.select(
-        'SELECT * FROM visitas WHERE paciente_id = ? AND dia = ?;',
-        [patientId, dia]);
-    return filas.isEmpty ? null : _leerVisita(filas.first);
+  EventoClinico? evento(String id) {
+    final filas = _db.select('SELECT * FROM eventos WHERE id = ?;', [id]);
+    return filas.isEmpty ? null : _leerEvento(filas.first);
   }
 
-  Visit _leerVisita(Row f) => Visit(
+  @override
+  EventoClinico? borradorAbierto(String patientId, TipoEvento tipo) {
+    final filas = _db.select(
+      "SELECT * FROM eventos WHERE paciente_id = ? AND tipo = ? "
+      "AND estado = 'borrador';",
+      [patientId, tipo.name],
+    );
+    return filas.isEmpty ? null : _leerEvento(filas.first);
+  }
+
+  EventoClinico _leerEvento(Row f) => EventoClinico(
         id: f['id'] as String,
         patientId: f['paciente_id'] as String,
-        dia: f['dia'] as int,
-        fechaProgramada: DateTime.parse(f['fecha_programada'] as String),
-        status:
-            VisitStatus.values.firstWhere((s) => s.name == f['estado'] as String),
+        tipo: TipoEvento.values.firstWhere((t) => t.name == f['tipo'] as String),
+        ocurrencia: f['ocurrencia'] as int,
+        fechaOcurrencia: DateTime.parse(f['fecha_ocurrencia'] as String),
+        estado: EstadoEvento.values
+            .firstWhere((e) => e.name == f['estado'] as String),
         sync: SyncStatus.values.firstWhere((s) => s.name == f['sync'] as String),
         valores: _leerValores(f['id'] as String),
         recolectorId: f['recolector_id'] as String,
@@ -157,13 +166,14 @@ class SqliteStudyRepository implements StudyRepository {
         correcciones: f['correcciones'] as int,
       );
 
-  Map<String, Object?> _leerValores(String visitaId) {
+  Map<String, Object?> _leerValores(String eventoId) {
     final filas = _db.select(
-        'SELECT campo, tipo, valor FROM visita_valores WHERE visita_id = ?;',
-        [visitaId]);
+        'SELECT campo, tipo, valor FROM evento_valores WHERE evento_id = ?;',
+        [eventoId]);
     return {
       for (final f in filas)
-        f['campo'] as String: _decodificar(f['tipo'] as String, f['valor'] as String?)
+        f['campo'] as String:
+            _decodificar(f['tipo'] as String, f['valor'] as String?)
     };
   }
 
@@ -198,17 +208,19 @@ class SqliteStudyRepository implements StudyRepository {
         motivo: f['motivo'] as String,
       );
 
+  static const _sqlConValores =
+      'AND EXISTS (SELECT 1 FROM evento_valores v WHERE v.evento_id = eventos.id)';
+
   @override
   int get registrosEnCola => _db
-      .select("SELECT count(*) c FROM visitas WHERE sync != 'sincronizado' "
-          'AND EXISTS (SELECT 1 FROM visita_valores v WHERE v.visita_id = visitas.id);')
+      .select("SELECT count(*) c FROM eventos WHERE sync != 'sincronizado' "
+          '$_sqlConValores;')
       .first['c'] as int;
 
   @override
   int get dispositivosConCola => _db
-      .select('SELECT count(DISTINCT recolector_id) c FROM visitas '
-          "WHERE sync != 'sincronizado' "
-          'AND EXISTS (SELECT 1 FROM visita_valores v WHERE v.visita_id = visitas.id);')
+      .select('SELECT count(DISTINCT recolector_id) c FROM eventos '
+          "WHERE sync != 'sincronizado' $_sqlConValores;")
       .first['c'] as int;
 
   // ── Escritura ──────────────────────────────────────────────────
@@ -267,23 +279,8 @@ class SqliteStudyRepository implements StudyRepository {
         [id, nombre, carneIdentidad, numeroHistoriaClinica, telefono, direccion],
       );
 
-      for (final dia in config.definicionFormulario.diasVisita) {
-        _db.execute(
-          'INSERT INTO visitas (id, paciente_id, dia, fecha_programada, estado, '
-          'sync, recolector_id) VALUES (?, ?, ?, ?, ?, ?, ?);',
-          [
-            Ids.nuevo('v'),
-            id,
-            dia,
-            DateTime(ahora.year, ahora.month, ahora.day + dia - 1)
-                .toIso8601String(),
-            VisitStatus.programada.name,
-            SyncStatus.local.name,
-            autor.id,
-          ],
-        );
-      }
-
+      // Sin calendario que pre-crear: los eventos aparecen cuando ocurren
+      // (CLAUDE.md §4).
       return paciente(id)!;
     });
   }
@@ -311,7 +308,8 @@ class SqliteStudyRepository implements StudyRepository {
     return _enTransaccion(() {
       _db.execute(
         'INSERT INTO consentimientos (id, paciente_id, version_documento, '
-        'codigo_cei, firmado_en, testigo_id, firma_json) VALUES (?, ?, ?, ?, ?, ?, ?);',
+        'codigo_cei, firmado_en, testigo_id, firma_json) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?);',
         [
           consent.id,
           patientId,
@@ -329,81 +327,131 @@ class SqliteStudyRepository implements StudyRepository {
   }
 
   @override
-  Visit guardarBorrador({
+  EventoClinico guardarBorrador({
     required Investigador autor,
     required String patientId,
-    required int dia,
+    required TipoEvento tipo,
+    required DateTime fechaOcurrencia,
     required Map<String, Object?> valores,
   }) =>
       _escribir(
         autor: autor,
         patientId: patientId,
-        dia: dia,
+        tipo: tipo,
+        fechaOcurrencia: fechaOcurrencia,
         valores: valores,
-        estado: VisitStatus.enCaptura,
+        estado: EstadoEvento.borrador,
         sync: SyncStatus.local,
       );
 
   @override
-  Visit cerrarVisita({
+  EventoClinico registrarEvento({
     required Investigador autor,
     required String patientId,
-    required int dia,
+    required TipoEvento tipo,
+    required DateTime fechaOcurrencia,
     required Map<String, Object?> valores,
   }) =>
       _escribir(
         autor: autor,
         patientId: patientId,
-        dia: dia,
+        tipo: tipo,
+        fechaOcurrencia: fechaOcurrencia,
         valores: valores,
-        estado: VisitStatus.enviada,
+        estado: EstadoEvento.registrado,
         sync: SyncStatus.enCola,
       );
 
-  Visit _escribir({
+  EventoClinico _escribir({
     required Investigador autor,
     required String patientId,
-    required int dia,
+    required TipoEvento tipo,
+    required DateTime fechaOcurrencia,
     required Map<String, Object?> valores,
-    required VisitStatus estado,
+    required EstadoEvento estado,
     required SyncStatus sync,
   }) {
-    if (!autor.role.puedeCapturarVisitas) {
-      throw PermissionDenied(autor.role, 'capturar visitas');
+    if (!autor.role.puedeCapturarEventos) {
+      throw PermissionDenied(autor.role, 'capturar eventos clínicos');
     }
     final p = paciente(patientId)!;
     if (!p.tieneConsentimiento) {
       throw StateError(
-          'No se pueden capturar visitas de ${p.nombre} sin consentimiento registrado.');
+          'No se pueden capturar eventos de ${p.nombre} sin consentimiento '
+          'registrado.');
     }
-    final actual = visita(patientId, dia)!;
-    // Restricción CLAUDE.md §2: lo ya enviado no se sobrescribe por esta vía.
-    if (actual.status.esInmutable) throw SilentEditRejected(actual.id);
+    // Un hito no repetible que ya se registró no se duplica: se corrige, y la
+    // corrección deja rastro (CLAUDE.md §3).
+    if (!tipo.repetible && _yaRegistrado(patientId, tipo)) {
+      throw EventoNoRepetible(tipo);
+    }
 
     return _enTransaccion(() {
-      _db.execute(
-        'UPDATE visitas SET estado = ?, sync = ?, fecha_captura = ? WHERE id = ?;',
-        [estado.name, sync.name, DateTime.now().toIso8601String(), actual.id],
-      );
-      _db.execute('DELETE FROM visita_valores WHERE visita_id = ?;', [actual.id]);
-      for (final e in valores.entries) {
-        if (e.value == null) continue;
-        final (tipo, texto) = _codificar(e.value!);
+      final abierto = borradorAbierto(patientId, tipo);
+      final id = abierto?.id ?? Ids.nuevo('e');
+
+      if (abierto == null) {
         _db.execute(
-          'INSERT INTO visita_valores (visita_id, campo, tipo, valor) '
-          'VALUES (?, ?, ?, ?);',
-          [actual.id, e.key, tipo, texto],
+          'INSERT INTO eventos (id, paciente_id, tipo, ocurrencia, '
+          'fecha_ocurrencia, estado, sync, recolector_id, fecha_captura) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
+          [
+            id,
+            patientId,
+            tipo.name,
+            _siguienteOcurrencia(patientId, tipo),
+            fechaOcurrencia.toIso8601String(),
+            estado.name,
+            sync.name,
+            autor.id,
+            DateTime.now().toIso8601String(),
+          ],
+        );
+      } else {
+        _db.execute(
+          'UPDATE eventos SET estado = ?, sync = ?, fecha_ocurrencia = ?, '
+          'fecha_captura = ? WHERE id = ?;',
+          [
+            estado.name,
+            sync.name,
+            fechaOcurrencia.toIso8601String(),
+            DateTime.now().toIso8601String(),
+            id,
+          ],
         );
       }
-      return visita(patientId, dia)!;
+
+      _db.execute('DELETE FROM evento_valores WHERE evento_id = ?;', [id]);
+      for (final e in valores.entries) {
+        if (e.value == null) continue;
+        final (tipoValor, texto) = _codificar(e.value!);
+        _db.execute(
+          'INSERT INTO evento_valores (evento_id, campo, tipo, valor) '
+          'VALUES (?, ?, ?, ?);',
+          [id, e.key, tipoValor, texto],
+        );
+      }
+      return evento(id)!;
     });
   }
 
+  bool _yaRegistrado(String patientId, TipoEvento tipo) =>
+      (_db.select(
+              "SELECT count(*) c FROM eventos WHERE paciente_id = ? "
+              "AND tipo = ? AND estado = 'registrado';",
+              [patientId, tipo.name]).first['c'] as int) >
+      0;
+
+  int _siguienteOcurrencia(String patientId, TipoEvento tipo) =>
+      (_db.select(
+              'SELECT count(*) c FROM eventos WHERE paciente_id = ? AND tipo = ?;',
+              [patientId, tipo.name]).first['c'] as int) +
+      1;
+
   @override
-  Visit corregirVisitaEnviada({
+  EventoClinico corregirEventoRegistrado({
     required Investigador autor,
-    required String patientId,
-    required int dia,
+    required String eventoId,
     required String campo,
     required Object? valorNuevo,
     required String motivo,
@@ -415,46 +463,47 @@ class SqliteStudyRepository implements StudyRepository {
       throw ArgumentError.value(motivo, 'motivo',
           'Una corrección sin motivo es una edición silenciosa: no se admite.');
     }
-    final actual = visita(patientId, dia)!;
-    final p = paciente(patientId)!;
+    final actual = evento(eventoId)!;
+    final p = paciente(actual.patientId)!;
     final anterior = actual.valores[campo];
 
     return _enTransaccion(() {
-      _db.execute('DELETE FROM visita_valores WHERE visita_id = ? AND campo = ?;',
-          [actual.id, campo]);
+      _db.execute('DELETE FROM evento_valores WHERE evento_id = ? AND campo = ?;',
+          [eventoId, campo]);
       if (valorNuevo != null) {
-        final (tipo, texto) = _codificar(valorNuevo);
+        final (tipoValor, texto) = _codificar(valorNuevo);
         _db.execute(
-          'INSERT INTO visita_valores (visita_id, campo, tipo, valor) '
+          'INSERT INTO evento_valores (evento_id, campo, tipo, valor) '
           'VALUES (?, ?, ?, ?);',
-          [actual.id, campo, tipo, texto],
+          [eventoId, campo, tipoValor, texto],
         );
       }
       _db.execute(
-        // Vuelve a la cola: el servidor debe recibir la versión corregida
-        // junto con su entrada de auditoría.
-        'UPDATE visitas SET sync = ?, correcciones = correcciones + 1 WHERE id = ?;',
-        [SyncStatus.enCola.name, actual.id],
+        // Vuelve a la cola: el servidor debe recibir la versión corregida junto
+        // con su entrada de auditoría.
+        'UPDATE eventos SET sync = ?, correcciones = correcciones + 1 '
+        'WHERE id = ?;',
+        [SyncStatus.enCola.name, eventoId],
       );
       _db.execute(
-        'INSERT INTO auditoria (id, ocurrido_en, autor_id, autor_nombre, entidad, '
-        'entidad_id, descripcion_objetivo, campo, valor_anterior, valor_nuevo, motivo) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+        'INSERT INTO auditoria (id, ocurrido_en, autor_id, autor_nombre, '
+        'entidad, entidad_id, descripcion_objetivo, campo, valor_anterior, '
+        'valor_nuevo, motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
         [
           Ids.nuevo('a'),
           DateTime.now().toIso8601String(),
           autor.id,
           autor.nombre,
-          AuditEntity.visita.name,
-          actual.id,
-          '${p.apellidos} · D$dia',
+          AuditEntity.evento.name,
+          eventoId,
+          '${p.apellidos} · ${actual.referenciaCorta}',
           campo,
           anterior?.toString(),
           valorNuevo?.toString(),
           motivo.trim(),
         ],
       );
-      return visita(patientId, dia)!;
+      return evento(eventoId)!;
     });
   }
 
@@ -473,9 +522,10 @@ class SqliteStudyRepository implements StudyRepository {
     }
   }
 
-  /// Los valores de visita son heterogéneos porque los campos son
-  /// configurables: no se puede fijar una columna por tipo de antemano.
+  /// Los valores son heterogéneos porque los campos son configurables: no se
+  /// puede fijar una columna por tipo de antemano.
   static (String tipo, String texto) _codificar(Object valor) => switch (valor) {
+        bool b => ('booleano', b ? '1' : '0'),
         num n => ('numero', n.toString()),
         List l => ('lista', jsonEncode(l.map((e) => e.toString()).toList())),
         _ => ('texto', valor.toString()),
@@ -484,6 +534,7 @@ class SqliteStudyRepository implements StudyRepository {
   static Object? _decodificar(String tipo, String? texto) {
     if (texto == null) return null;
     return switch (tipo) {
+      'booleano' => texto == '1',
       'numero' => num.tryParse(texto),
       'lista' => (jsonDecode(texto) as List).cast<String>(),
       _ => texto,
@@ -511,7 +562,6 @@ class SqliteStudyRepository implements StudyRepository {
     final hay = _db.select('SELECT count(*) c FROM pacientes;').first['c'] as int;
     if (hay > 0) return;
 
-    final dias = config.definicionFormulario.diasVisita;
     _enTransaccion(() {
       for (final d in Demo.pacientes) {
         _db.execute(
@@ -533,12 +583,14 @@ class SqliteStudyRepository implements StudyRepository {
         );
         _db.execute(
           'INSERT INTO identidad (paciente_id, nombre, carne_identidad, '
-          'numero_historia_clinica, telefono, direccion) VALUES (?, ?, ?, ?, ?, ?);',
+          'numero_historia_clinica, telefono, direccion) '
+          'VALUES (?, ?, ?, ?, ?, ?);',
           [d.id, d.nombre, d.carneIdentidad, d.hc, d.telefono, d.direccion],
         );
         _db.execute(
           'INSERT INTO consentimientos (id, paciente_id, version_documento, '
-          'codigo_cei, firmado_en, testigo_id, firma_json) VALUES (?, ?, ?, ?, ?, ?, ?);',
+          'codigo_cei, firmado_en, testigo_id, firma_json) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?);',
           [
             'c-demo-${d.id}',
             d.id,
@@ -550,35 +602,36 @@ class SqliteStudyRepository implements StudyRepository {
           ],
         );
 
-        for (var i = 0; i < dias.length; i++) {
-          final visitaId = _idVisitaDemo(d.id, dias[i]);
-          final fecha = DateTime(
-              d.enroladoEn.year, d.enroladoEn.month, d.enroladoEn.day + dias[i] - 1);
+        final porTipo = <TipoEvento, int>{};
+        for (final ev in d.eventos) {
+          final ocurrencia = (porTipo[ev.tipo] = (porTipo[ev.tipo] ?? 0) + 1);
+          final id = idEventoDemo(d.id, ev.tipo, ocurrencia);
+          final fecha =
+              d.enroladoEn.add(Duration(days: ev.diaDesdeEnrolamiento));
           _db.execute(
-            'INSERT INTO visitas (id, paciente_id, dia, fecha_programada, estado, '
-            'sync, recolector_id, fecha_captura) VALUES (?, ?, ?, ?, ?, ?, ?, ?);',
+            'INSERT INTO eventos (id, paciente_id, tipo, ocurrencia, '
+            'fecha_ocurrencia, estado, sync, recolector_id, fecha_captura) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
             [
-              visitaId,
+              id,
               d.id,
-              dias[i],
+              ev.tipo.name,
+              ocurrencia,
               fecha.toIso8601String(),
-              d.estados[i].name,
-              (d.estados[i] == VisitStatus.enviada ? d.sync : SyncStatus.local).name,
+              (ev.borrador ? EstadoEvento.borrador : EstadoEvento.registrado).name,
+              (ev.borrador ? SyncStatus.local : d.sync).name,
               d.recolectorId,
-              d.estados[i] == VisitStatus.programada
-                  ? null
-                  : DateTime(fecha.year, fecha.month, fecha.day, 9, 30)
-                      .toIso8601String(),
+              DateTime(fecha.year, fecha.month, fecha.day, 9, 30)
+                  .toIso8601String(),
             ],
           );
-          if (d.estados[i] == VisitStatus.programada) continue;
-          for (final e in Demo.valores(i).entries) {
+          for (final e in ev.valores.entries) {
             if (e.value == null) continue;
-            final (tipo, texto) = _codificar(e.value!);
+            final (tipoValor, texto) = _codificar(e.value!);
             _db.execute(
-              'INSERT INTO visita_valores (visita_id, campo, tipo, valor) '
+              'INSERT INTO evento_valores (evento_id, campo, tipo, valor) '
               'VALUES (?, ?, ?, ?);',
-              [visitaId, e.key, tipo, texto],
+              [id, e.key, tipoValor, texto],
             );
           }
         }
@@ -586,17 +639,17 @@ class SqliteStudyRepository implements StudyRepository {
 
       for (final a in Demo.auditoria) {
         _db.execute(
-          'INSERT INTO auditoria (id, ocurrido_en, autor_id, autor_nombre, entidad, '
-          'entidad_id, descripcion_objetivo, campo, valor_anterior, valor_nuevo, '
-          'motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+          'INSERT INTO auditoria (id, ocurrido_en, autor_id, autor_nombre, '
+          'entidad, entidad_id, descripcion_objetivo, campo, valor_anterior, '
+          'valor_nuevo, motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
           [
             Ids.nuevo('a'),
             a.ocurridoEn.toIso8601String(),
             a.autor.id,
             a.autor.nombre,
-            a.entidad.name,
-            a.dia == null ? a.pacienteId : _idVisitaDemo(a.pacienteId, a.dia!),
-            a.descripcionObjetivo,
+            AuditEntity.evento.name,
+            idEventoDemo(a.pacienteId, a.tipo, a.ocurrencia),
+            '${Demo.porId(a.pacienteId).apellidos} · ${a.tipo.etiqueta}',
             a.campo,
             a.valorAnterior,
             a.valorNuevo,
@@ -614,6 +667,7 @@ class SqliteStudyRepository implements StudyRepository {
     });
   }
 
-  static String _idVisitaDemo(String pacienteId, int dia) =>
-      'v-$pacienteId-$dia';
+  static String idEventoDemo(
+          String pacienteId, TipoEvento tipo, int ocurrencia) =>
+      'e-$pacienteId-${tipo.name}-$ocurrencia';
 }

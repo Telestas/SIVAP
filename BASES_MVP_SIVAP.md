@@ -1,167 +1,313 @@
-# SIVAP — Bases del MVP
-## Sistema de Validación de Protocolo (Estudio de Cohorte)
+# Bases del MVP — Sistema de captura del ensayo LIVERE
 
-> Nombre de trabajo: **SIVAP** (Sistema de Validación de Protocolos). Provisional — cambiar aquí y en CLAUDE.md si se elige otro.
+> **Revisión del 20 ago 2026.** Reescrito contra las fuentes reales: protocolo
+> LIVERE 2026, proyecto de investigación y Anexo 4 (formulario de recolección).
+> Sustituye la versión anterior, que asumía un estudio de cohorte con visitas en
+> días 1, 3, 5, 10 y 14. Ese modelo era una suposición y era incorrecto.
 
----
-
-## 1. Contexto y propósito
-
-Equipo de médicos investigadores de un hospital cubano, ejecutando una investigación de iniciativa del propio servicio, sin acceso a bioestadista, informático o desarrollador dedicado.
-
-**Objetivo del estudio**: validar un protocolo clínico nuevo frente al protocolo vigente ("viejo"), mediante un estudio de cohorte, con recolección de datos en visitas fijas: Día 1, 3, 5, 10, 14 (índices ajustables si el estudio lo requiere, ver sección 5).
-
-**Objetivo del software**: automatizar el proceso desde el enrolamiento del paciente hasta la recolección estructurada de datos, funcionando en condiciones de conectividad inestable, y consolidando todo en un dataset exportable para análisis estadístico.
+> **Repositorio público.** Este documento describe el diseño metodológico, no a las
+> personas. Sin nombres de investigadores ni de centros: esa información vive en el
+> expediente del estudio.
 
 ---
 
-## 2. Alcance del MVP (lo que SÍ entra en la primera versión)
+## 1. Contexto
 
-- Registro de investigadores con roles (ver sección 4).
-- Enrolamiento de paciente: ficha de identidad + datos de contacto.
-- Asignación de protocolo (viejo/nuevo) mediante **aleatorización simple generada por computadora** desde una semilla registrada, consumida en orden (ver sección 6 — módulo desacoplado).
-- Captura de consentimiento informado dentro del sistema (firma digital, fecha, versión del documento — ver sección 7).
-- Formularios de visita (Día 1, 3, 5, 10, 14) según **definición configurable de campos** (ver sección 5) — no hardcodeados, porque el equipo indicó que el formulario podría ajustarse durante el estudio.
-- Trabajo 100% offline en la app móvil, con sincronización a la nube cuando haya conexión.
-- Exportación del dataset consolidado a Excel (.xlsx), en formato apto para análisis estadístico posterior.
-- Registro de auditoría (audit trail): ninguna visita ya enviada se edita directamente; toda corrección queda con valor original, autor, fecha y motivo.
+Equipo de médicos investigadores de medicina intensiva, en tres centros de La Habana,
+ejecutando un ensayo clínico sin financiamiento dedicado, sin bioestadista ni
+desarrollador en plantilla.
 
-## 2.1 Fuera de alcance del MVP (fase posterior)
+**Estudio**: LIVERE (LIberación segura de la VEntilación mecánica en entornos de
+REcursos limitados). Ensayo clínico controlado, aleatorizado, multicéntrico,
+prospectivo y longitudinal. Compara la aplicación del protocolo LIVERE frente al
+manejo convencional en la liberación de la ventilación mecánica invasiva.
 
+**Desenlace principal**: extubación fallida (reintubación en ≤72 h).
+
+**Qué resuelve el software**: automatizar el proceso desde la asignación aleatoria
+del paciente hasta la recolección estructurada de datos a lo largo de todo el proceso
+de liberación y sus 28 días de seguimiento post-egreso, operando sin conexión y
+consolidando un dataset exportable para análisis estadístico.
+
+**Qué NO resuelve**: la validez metodológica del estudio. El cálculo de tamaño
+muestral, la aprobación ética y el descegamiento final ocurren fuera del sistema.
+
+---
+
+## 2. Alcance del MVP
+
+**Entra**
+
+- Registro de investigadores con rol e institución.
+- Enrolamiento: verificación de elegibilidad, captura de consentimiento informado,
+  asignación de rama por secuencia pre-generada.
+- Captura de datos por evento clínico (§5), con formularios definidos como datos.
+- Trabajo 100 % offline, sincronización posterior.
+- Auditoría de correcciones (valor anterior, autor, fecha, motivo).
+- Exportación a `.xlsx`: dataset clínico y ficha de identidad en archivos separados,
+  con la rama como A/B.
+
+**No entra en el MVP** (evaluar para fase posterior)
+
+- Corriente cualitativa: encuestas Likert al personal, entrevistas semiestructuradas,
+  checklist de adherencia con auditoría interna. Decisión pendiente (CLAUDE.md §6 de
+  pendientes).
 - Dashboards de seguimiento en tiempo real.
-- Soporte multi-estudio (esto se piensa para una única investigación por ahora; si el equipo hace varias investigaciones a la vez, se evalúa después).
-- Notificaciones automáticas de visitas próximas/vencidas.
-- Reportes estadísticos dentro de la propia app (el análisis se hace fuera, con el Excel exportado).
+- Notificaciones automáticas.
+- Análisis estadístico dentro de la app. Se hace fuera, con el `.xlsx`.
+- Soporte para otros estudios del grupo.
 
 ---
 
-## 3. Arquitectura propuesta
+## 3. Arquitectura
 
 | Componente | Tecnología | Justificación |
 |---|---|---|
-| App móvil + web | Flutter | Un solo código base, cliente pidió multiplataforma |
-| Almacenamiento local (offline) | SQLite + SQLCipher, SQL escrito a mano | Persistencia cifrada en reposo, con esquema legible sin generadores de código (decidido 20 ago 2026, en vez de Drift o Isar) |
-| Backend | FastAPI | Ligero, rápido de mantener sin equipo dedicado |
-| Base de datos central | PostgreSQL | Consolidación de todos los investigadores/pacientes |
-| Sync | Cola local con timestamp + resolución "último gana" + log de auditoría | Volumen de 4–10 investigadores no requiere algo más complejo |
-| Exportación | openpyxl (backend) | Generación de .xlsx desde los datos consolidados |
-| Cifrado | En reposo (dispositivo y servidor) y en tránsito (TLS) | Datos de salud identificables (nombre + contacto) |
+| App móvil + web | Flutter | Un solo código base, multiplataforma |
+| Almacenamiento local | SQLite + SQLCipher | Persistencia cifrada, offline real |
+| Backend | FastAPI | Ligero de mantener sin equipo dedicado |
+| Base central | PostgreSQL | Consolidación multicéntrica |
+| Sync | Cola local con timestamp, "último gana" + auditoría | Volumen del estudio no requiere más |
+| Exportación | openpyxl | `.xlsx` desde datos consolidados |
+| Cifrado | En reposo y en tránsito (TLS) | Datos de salud |
+
+**Dimensionamiento**: tres centros, equipo de al menos nueve investigadores
+declarados en el proyecto, más personal de UCI de cada centro. Revisar el supuesto de
+concurrencia antes de fijar la estrategia de sync definitiva.
 
 ---
 
-## 4. Roles de usuario
+## 4. Roles y separación de funciones
 
-| Rol | Ficha del paciente | Registros de visita | Usuarios/dataset |
+El diseño de LIVERE exige separar cuatro funciones por razones metodológicas, no de
+permisos. Quien selecciona pacientes debe estar cegado a la secuencia; quien evalúa
+desenlaces, cegado a la rama.
+
+| Rol | Qué hace | Qué ve | Cegado a |
 |---|---|---|---|
-| **Observador** | Solo lectura | Solo lectura | Ve todo, no modifica nada |
-| **Recolector de campo** | Crea pacientes nuevos (enrolamiento) | Crea y registra visitas de sus pacientes. No edita una visita ya enviada ni la ficha tras creada | No gestiona usuarios |
-| **Administrador / Investigador principal** | Crear, editar (con historial), eliminar | Crear, editar (con historial), eliminar cualquier visita | Gestiona usuarios, ve todo el dataset, exporta a Excel |
+| **Reclutador** | Verifica elegibilidad, registra consentimiento, enrola | Criterios de inclusión/exclusión, ficha, resultado de la asignación una vez consumida | La secuencia y qué rama viene después |
+| **Aplicador** | Ejecuta el protocolo asignado y captura los eventos clínicos | Protocolo A o B, formularios de fase de sus pacientes | Cuál rama corresponde a LIVERE |
+| **Evaluador de desenlaces** | Registra reintubación, eventos adversos, egreso, mortalidad | Datos clínicos del paciente | La rama asignada |
+| **Investigador principal** | Administra el estudio, gestiona usuarios, exporta | Todo el sistema, en A/B | Nadie: es el único no cegado, y aun así el sistema no almacena la correspondencia |
 
-**Regla no negociable**: ninguna edición sobre un dato ya enviado ocurre "en silencio". Toda corrección genera una entrada de auditoría (valor anterior, valor nuevo, autor, fecha/hora, motivo).
+**Observador** (opcional): solo lectura de la cohorte completa en A/B. Útil para
+monitoreo institucional y auditoría externa.
+
+**Reglas transversales**
+
+- El aplicador no edita un registro ya enviado. Toda corrección la realiza el
+  investigador principal, y siempre con entrada de auditoría y motivo.
+- Ningún rol puede consultar qué rama viene a continuación en la secuencia.
+- Ningún rol accede a la correspondencia A/B → LIVERE/control: no está en el sistema.
+
+> **Pendiente de decisión**: si un mismo médico puede acumular roles (frecuente en
+> equipos pequeños), y si eso compromete el cegamiento. Corresponde a la
+> investigadora principal, no al desarrollo.
 
 ---
 
-## 5. Formularios de visita — PENDIENTE DE CONFIRMACIÓN
+## 5. Modelo de captura: eventos clínicos
 
-> Esta sección queda como **plantilla de ejemplo**. Reemplazar con el listado real de variables por visita en cuanto el equipo lo comparta (Word, PDF, foto de planilla, o texto directo).
+**No hay visitas en días fijos.** La recolección sigue la trayectoria del paciente por
+el proceso de liberación. Algunos eventos se repiten un número indeterminado de veces.
 
-Ejemplo de estructura esperada por visita:
-
-| Campo | Tipo de dato | Obligatorio | Rango/validación |
+| Evento | Cuándo | Repetible | Notas |
 |---|---|---|---|
-| Fecha de la visita | Fecha | Sí | No anterior al enrolamiento |
-| Signos vitales (TA, FC, FR, Temp) | Numérico | Sí | Rangos clínicos por definir |
-| Síntomas presentes | Selección múltiple | Sí | Catálogo por definir |
-| Valores de laboratorio | Numérico | Depende de la visita | Por definir |
-| Observaciones del investigador | Texto libre | No | — |
+| Enrolamiento | Al cumplir criterios de inclusión | No | Módulo 1 del Anexo 4 |
+| Fase 1 — Estratificación de riesgo | Primeras 24 h de VMI | No | Todos los pacientes ventilados la completan |
+| Fase 2 — Cribado | Desde 24–48 h | **Sí, diariamente** | Se repite hasta cumplir criterios o hasta que el paciente salga del proceso |
+| Fase 3 — Evaluación diaria | Tras superar el cribado | **Sí, diariamente** | Detención de sedación, evaluación de ventilación espontánea |
+| Fase 3 — PVE | Al concluir evaluación diaria con éxito | **Sí, 1 a 4+ intentos** | Cada intento registra monitorización al inicio y al final |
+| Traqueostomía | Si procede | No | Cambia la trayectoria del paciente |
+| Extubación | Tras PVE exitosa | No | Módulo 3 del Anexo 4 |
+| Soporte post-extubación | Inmediato a la extubación | No | HFNC / VNI / ambos |
+| Reintubación | ≤72 h post-extubación | No | **Desenlace principal** |
+| Egreso de UCI | Al alta de la unidad | No | Estado vivo/fallecido |
+| Seguimiento post-egreso | Hasta 28 días | No | Mortalidad a 7, 14, 28 días |
 
-Cada campo se define como un registro configurable (nombre, tipo, obligatoriedad, validación) para que un ajuste de protocolo no requiera recompilar la app — solo actualizar la definición en el backend.
+**Implicación de modelado**: un evento necesita tipo, número de ocurrencia (para los
+repetibles), fecha real de ocurrencia (no programada) y estado. Un índice entero de
+"día de visita" no puede representar esto.
 
----
+**Implicación de interfaz**: la pantalla del paciente es una línea de tiempo por
+fases con eventos acumulables, no un juego de pestañas fijas.
 
-## 6. Módulo de asignación de protocolo (aleatorización)
-
-**Estado**: **decidido por el equipo (20 ago 2026)**.
-
-El sistema implementa **aleatorización simple generada por computadora**. Cómo funciona, en concreto:
-
-1. Antes de enrolar al primer paciente, el investigador principal fija una **semilla** (un número) y una **longitud** de secuencia holgada frente al tamaño previsto de la cohorte.
-2. El sistema genera de una vez la secuencia completa: un **código binario** donde `0` = protocolo vigente (rama control) y `1` = protocolo nuevo. Cada posición se sortea de forma independiente.
-3. Cada paciente enrolado consume la siguiente posición, en orden estricto. El investigador no ve qué rama toca antes de enrolar, y no puede modificarla.
-4. La semilla, la longitud y el código binario quedan **en el acta del estudio**.
-
-### Cómo verificar la aleatorización sin fiarse de la app
-
-El generador no es el del lenguaje de programación, sino uno fijado en el
-código del proyecto (**splitmix32**), precisamente para que la secuencia no
-dependa de qué versión de qué herramienta se usó. Cualquiera puede
-reimplementarlo y comprobar el resultado. La especificación completa, sobre
-enteros de 32 bits sin signo:
-
-```
-estado = semilla
-repetir para cada asignación:
-    estado = (estado + 0x9E3779B9) mod 2^32
-    z = estado
-    z = ((z XOR (z >>> 16)) * 0x21F0AAAD) mod 2^32
-    z = ((z XOR (z >>> 15)) * 0x735A2D97) mod 2^32
-    z = z XOR (z >>> 15)
-    bit = z AND 1          # 1 = protocolo nuevo, 0 = protocolo vigente
-```
-
-Vectores de comprobación, para saber que la reimplementación es correcta:
-
-| Semilla | Primeros bits |
-|---|---|
-| 12345 | `1101101100000100` (16) |
-| 987 | `10111100101110101111001101000111` (32) |
-
-Con eso, un revisor externo con Python o R regenera la secuencia del estudio
-desde la semilla del acta y la compara contra las asignaciones registradas,
-paciente a paciente, sin tener que confiar en el software.
-
-Por qué la semilla: es lo que convierte el azar en algo verificable. Un revisor, un comité o el propio equipo pueden regenerar la secuencia con esa semilla y comprobar, paciente a paciente, que las asignaciones registradas son exactamente las que la secuencia dictaba. Sin semilla registrada, "fue aleatorio" es una afirmación que nadie puede comprobar.
-
-Nota metodológica: la aleatorización simple **no garantiza un reparto 50/50**. Con 60 pacientes es normal terminar 33/27 o similar. Eso es correcto y esperado; forzar el equilibrio exacto dejaría de ser aleatorización simple. Si el desequilibrio llegara a preocupar al equipo, la alternativa es aleatorización por bloques.
-
-Esta pieza se construye **desacoplada** del resto del sistema: si más adelante se decide pasar a bloques, a estratificación, o a una asignación que dependa de criterios clínicos (edad, diagnóstico, gravedad), se reemplaza el módulo sin rediseñar el resto de la aplicación.
-
-**No implementado y explícitamente descartado para el MVP**: que el investigador elija manualmente el protocolo al crear el paciente sin una regla objetiva detrás — esto introduce sesgo de selección y compromete la validez del estudio como ensayo aleatorizado.
+**Trayectorias incompletas**: un paciente puede salir del proceso en cualquier fase
+—traqueostomía, fallecimiento, traslado—. El modelo admite esas trayectorias sin
+marcarlas como error: un evento que no ocurrió simplemente no existe.
 
 ---
 
-## 7. Consentimiento informado
+## 6. Campos del formulario (Anexo 4)
 
-Estado actual: existe borrador, pendiente de aprobación por el Comité de Ética de la Investigación (CEI).
+Fuente: `Anexo 4 — Formulario de Recolección de Datos Clínicos, Ensayo LIVERE`.
+Estos son los campos reales; sustituyen íntegramente a los de demostración.
 
-El sistema no puede usarse para reclutar pacientes reales hasta que el CEI apruebe protocolo y consentimiento. El MVP incluye una pantalla de captura de consentimiento (firma digital, fecha, versión del documento aprobado) para trazabilidad, activable una vez exista la aprobación formal.
+### Módulo 1 — Datos generales del paciente
+
+| Campo | Tipo | Categorías / notas |
+|---|---|---|
+| Código del paciente | Autogenerado | Correlativo, es el identificador del estudio |
+| Teléfonos de contacto | Texto | Hasta dos |
+| Protocolo aplicado | Asignado | **A** o **B** — nunca elegido por el investigador |
+| Institución | Selección única | Multicéntrico (CLAUDE.md restricción 8) |
+| Edad | Número | Años |
+| Sexo | Selección única | Masculino / Femenino |
+| IMC | Selección única | <18,5 (BP) · 18,5–24,9 (NP) · 25–29,9 (SP) · 30–39,9 (Obeso) · >40 (Superobeso) |
+| Fecha de ingreso a UCI | Fecha | |
+| Causa de intubación y VMI | Selección única | Respiratoria · Neurológica · Cardiovascular · Metabólica · Anestésica/quirúrgica · Paro cardiorrespiratorio · Shock |
+| Comorbilidades relevantes | Selección múltiple | HTA · DM · CI · IC · ERC · EPOC · AB · ECV previa |
+
+### Módulo 2 — Datos ventilatorios
+
+| Campo | Tipo | Categorías / notas |
+|---|---|---|
+| Fecha de inicio de VMI | Fecha | |
+| Fecha de primera evaluación (Fase 1) | Fecha | |
+| FiO₂ en primera evaluación | Número | |
+| PEEP en primera evaluación | Número | cmH₂O |
+| Fecha de cumplimiento de criterios de cribado (Fase 2) | Fecha | |
+| Detención diaria de sedación | Sí/No + duración | Horas o minutos |
+| Evaluación diaria de ventilación espontánea | Sí/No + duración | >15 min · 10–15 min · <10 min |
+| Fecha de primera PVE | Fecha | |
+| Método de PVE empleado | Selección única | Tubo en T · PSV · PSV+PEEP · CPAP |
+| **Monitorización al inicio de la PVE** | Grupo | RSBI (>105 · ≤105 · ≤58), frecuencia respiratoria, Vt (ml), VM (L), Pplateau (cmH₂O), driving pressure (cmH₂O) |
+| **Monitorización al final de la PVE** | Grupo | Mismos campos que al inicio |
+| Resultado de PVE | Selección única | Éxito · Fallo |
+| Duración de la PVE | Selección única | <30 min · 30–60 min · 60–120 min |
+| Total de PVE intentadas | Selección única | 1 · 2 · 3 · 4 o más |
+| ¿Traqueostomía? | Sí/No + fecha | |
+
+> El bloque de PVE se repite por intento (§5). El campo "total de PVE intentadas" del
+> Anexo 4 es derivable del número de eventos registrados; conviene calcularlo, no
+> pedirlo dos veces.
+
+### Módulo 3 — Evaluación para extubación
+
+| Campo | Tipo | Categorías / notas |
+|---|---|---|
+| Fecha de PVE exitosa | Fecha | |
+| Fecha de extubación | Fecha | |
+| ¿Test de fuga? | Sí/No | |
+| Resultado del test de fuga | Selección única | Con fuga · Sin fuga |
+| Tiempo entre PVE exitosa y extubación | Duración | Horas / minutos |
+| Duración total de VMI | Número | Días |
+
+### Módulo 4 — Desenlaces clínicos
+
+| Campo | Tipo | Categorías / notas |
+|---|---|---|
+| ¿Soporte post-extubación? | Sí/No | |
+| Tipo de soporte | Selección única | HFNC · VNI · VNI+HFNC |
+| **¿Reintubación en ≤72 h?** | Sí/No | **Desenlace principal** |
+| Causa de reintubación | Selección única | Inestabilidad hemodinámica · Laringoespasmo · Broncoaspiración · Estridor · Fallo respiratorio agudo · Deterioro neurológico · Otra |
+| Eventos adversos post-extubación | Selección múltiple | Ninguna · Laringoespasmo · Broncoaspiración · Estridor · Fallo respiratorio agudo |
+| Duración de estancia en UCI | Número | Días |
+| Estado al egreso de UCI | Selección única | Vivo · Fallecido |
+| Fallecimiento posterior al egreso | Selección única | Primeros 7 días · 8–14 días · 15–28 días · No fallecimiento a 28 días |
+
+### Variables derivadas (no se capturan, se calculan)
+
+Definidas en la matriz de operacionalización del proyecto: días libres de VMI, días
+libres de UCI, tiempo de traqueostomía 1 (intubación → traqueostomía), tiempo de
+traqueostomía 2 (traqueostomía → separación/decanulación), tipo de destete (simple ·
+dificultoso · prolongado), reingreso en UCI ≤72 h.
+
+> **Pendiente**: la sección "Información general para llenado del formulario" del
+> Anexo 4 está vacía en el documento recibido. Si existe, define validaciones.
 
 ---
 
-## 8. Datos personales y separación ficha/clínica
+## 7. Elegibilidad
 
-Dado que se manejará nombre y contacto completos del paciente:
+**Inclusión**
+- Adultos (>18 años) en VMI. **Umbral en disputa**: el protocolo dice >24 h, el
+  proyecto >48 h. Resolver antes de programar el filtro.
+- Estabilidad hemodinámica y parámetros compatibles con inicio de liberación.
+- Consentimiento libre e informado firmado.
 
-- La **ficha de identidad** (nombre, contacto) se almacena separada de los **datos clínicos del estudio**, vinculadas solo por un ID interno.
-- Esto permite exportar el dataset clínico para análisis (bioestadista, publicación) sin exponer identidad, sin rediseñar nada.
-- Cifrado obligatorio de la base local (dispositivo) y en el servidor.
+**Exclusión**
+- Trastornos neuromusculares graves
+- Contraindicaciones para aplicar el protocolo
+- Decisión de cuidados paliativos · estadio terminal · orden de no reanimación
+- Glasgow ≤8 puntos
+- Negativa del paciente o su representante
+- Imposibilidad de seguimiento por traslado
+- Participación simultánea en otro ensayo que interfiera con los desenlaces
+
+**Muestra**: consecutiva. **Sin cálculo formal de tamaño muestral** — pendiente del
+bioestadista (CLAUDE.md, pendientes §2).
 
 ---
 
-## 9. Condición de fallo
+## 8. Asignación de rama
+
+Aleatorización **simple**, individual, sin bloques ni estratos. Secuencia generada por
+computadora antes del primer enrolamiento, consumida en orden. Semilla custodiada
+fuera del sistema (CLAUDE.md restricción 7).
+
+La implementación actual (`allocation_strategy.dart`) cumple con esto y es
+verificable: SplitMix32 con algoritmo fijado en el propio código, vectores de prueba,
+y regeneración desde semilla para auditoría externa. **Se conserva.** Lo único que
+cambia es el nombre de las ramas: `nuevo/vigente` → `A/B`.
+
+> El proyecto describe sobres físicos sellados y numerados. Decidir si la app los
+> reemplaza o coexisten (CLAUDE.md, pendientes §7).
+
+**Nota sobre aleatorización simple**: no equilibra las ramas por construcción. Con 60
+pacientes es normal terminar 33/27. Si el desequilibrio importa, la decisión es pasar
+a bloques, y eso es otra implementación de `AllocationStrategy`, no un parche.
+
+---
+
+## 9. Consentimiento informado
+
+Existe en el Anexo 3 del proyecto, en dos documentos: información general y
+consentimiento propiamente dicho. Se captura en el sistema con versión del documento,
+fecha y firma.
+
+El sistema no admite enrolamiento real hasta el flag de aprobación del CEI de cada
+institución participante.
+
+---
+
+## 10. Exportación
+
+Dos archivos separados:
+
+1. **Dataset clínico**: código de paciente, institución, rama (A/B), todos los eventos
+   y sus valores. Sin identidad. Es el que recibe el bioestadista.
+2. **Ficha de identidad**: código de paciente ↔ teléfonos de contacto. Acceso
+   restringido al investigador principal.
+
+El dataset clínico **nunca** sale desciegado. La correspondencia A/B se aplica fuera
+del sistema, una vez, al cierre del estudio.
+
+Formato tabular apto para análisis en SPSS o R: una fila por evento (formato largo),
+con las variables derivadas calculadas.
+
+---
+
+## 11. Condición de fallo
 
 Este diseño asume:
-- Que la aleatorización es simple (no por bloques ni estratificada), decidido por el equipo — si más adelante se pidiera estratificación, el módulo de asignación (sección 6) debe ajustarse **antes** de enrolar pacientes, nunca a mitad del estudio.
-- Que la semilla de aleatorización se fija una vez y queda registrada. Cambiarla con pacientes ya enrolados invalida la trazabilidad de las asignaciones previas.
-- Que 4–10 investigadores en paralelo es el volumen real — un crecimiento significativo del equipo requeriría revisar la estrategia de sync.
-- Que el CEI aprobará el consentimiento en un plazo razonable — el sistema puede construirse en paralelo, pero no reclutar pacientes reales hasta esa aprobación.
+
+- Que la aleatorización final será **simple**. Si el bioestadista pide bloques o
+  estratificación por centro (razonable en multicéntrico), el módulo de asignación
+  debe ajustarse antes de enrolar.
+- Que el cegamiento es de **seleccionadores, evaluadores y analistas**. Si el CEI o el
+  bioestadista exigen el "triple ciego" que menciona el resumen del proyecto, hay que
+  revisar qué ve el aplicador.
+- Que los eventos del §5 cubren la trayectoria completa. Si la práctica revela hitos
+  no contemplados, el modelo de eventos los admite sin refactor — esa es la razón de
+  no usar un índice de día.
+- Que el CEI aprobará en un plazo razonable. El sistema puede construirse en paralelo,
+  pero no enrolar.
 
 ---
 
-## 10. Próximos pasos
+## 12. Próximos pasos
 
-1. Confirmar campos exactos por visita (sección 5).
-2. ~~Confirmar el método de aleatorización~~ — **hecho** (sección 6). Queda fijar la semilla y la longitud de la secuencia del estudio real, y dejarlas en el acta.
-3. Definir nombre final del proyecto.
-4. Generar `CLAUDE.md` (constitución del repositorio) y prompts secuenciados por hito para Claude Code.
-
+Ver `docs/REENCAMINAMIENTO.md` para el plan de corrección ordenado por riesgo.
+Resumen: visibilidad del repositorio → cegamiento → modelo por eventos → campos
+reales → ficha mínima e institución → roles. Todo ello **antes** del backend.

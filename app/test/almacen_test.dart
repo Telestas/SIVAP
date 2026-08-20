@@ -32,11 +32,39 @@ void main() {
   });
 
   group('datos de demostración', () {
-    test('cada paciente tiene un estado por día del estudio', () {
-      final dias = Seed.formulario.diasVisita.length;
-
+    test('todo evento de muestra tiene formulario definido', () {
       for (final p in Demo.pacientes) {
-        expect(p.estados.length, dias, reason: p.nombre);
+        for (final e in p.eventos) {
+          expect(Seed.formulario.tieneFormulario(e.tipo), isTrue,
+              reason: '${p.id} · ${e.tipo.name}');
+        }
+      }
+    });
+
+    test('los valores de muestra usan claves que la definición declara', () {
+      // Si una clave no existe en la definición, ese dato no se vería en
+      // pantalla ni saldría en la exportación: sería un dato perdido.
+      for (final p in Demo.pacientes) {
+        for (final e in p.eventos) {
+          final claves = Seed.formulario
+              .para(e.tipo)!
+              .campos
+              .map((c) => c.key)
+              .toSet();
+          for (final clave in e.valores.keys) {
+            expect(claves, contains(clave),
+                reason: '${e.tipo.name} no declara «$clave»');
+          }
+        }
+      }
+    });
+
+    test('un hito no repetible no aparece dos veces en un paciente', () {
+      for (final p in Demo.pacientes) {
+        final noRepetibles =
+            p.eventos.where((e) => !e.tipo.repetible).map((e) => e.tipo).toList();
+        expect(noRepetibles.length, noRepetibles.toSet().length,
+            reason: p.id);
       }
     });
 
@@ -72,3 +100,5 @@ void main() {
 // 5. Enrolar, cerrar la app, reabrir y enrolar otra vez: el segundo paciente
 //    debe recibir la posición siguiente de la secuencia, no la primera.
 //    Es el fallo más grave que podría tener la persistencia.
+// 6. Abrir dos borradores del mismo hito para el mismo paciente: el índice
+//    parcial `idx_un_borrador_por_tipo` debe impedirlo.

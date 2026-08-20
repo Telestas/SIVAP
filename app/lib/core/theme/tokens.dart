@@ -65,14 +65,17 @@ class T {
   static const neutralLine = Color(0xFFDFE2E5);
   static const neutralFg = Color(0xFF4A5158);
 
-  // ── Ramas del estudio ──────────────────────────────────────────
-  // El color codifica la rama en toda la app; no reasignar por estética.
-  static const nuevoBg = Color(0xFFE2F0ED);
-  static const nuevoFg = Color(0xFF0F4F49);
-  static const nuevoLine = Color(0xFFC9E2DD);
-  static const vigenteBg = Color(0xFFE8EEF7);
-  static const vigenteFg = Color(0xFF2C4A75);
-  static const vigenteLine = Color(0xFFCDDAEB);
+  // ── Ramas del ensayo ───────────────────────────────────────────
+  //
+  // Dos colores para distinguir A de B de un vistazo. Nada más: ni el nombre
+  // del token ni el color sugieren cuál rama es la del protocolo en estudio,
+  // porque el sistema no lo sabe (CLAUDE.md §2).
+  static const ramaABg = Color(0xFFE2F0ED);
+  static const ramaAFg = Color(0xFF0F4F49);
+  static const ramaALine = Color(0xFFC9E2DD);
+  static const ramaBBg = Color(0xFFE8EEF7);
+  static const ramaBFg = Color(0xFF2C4A75);
+  static const ramaBLine = Color(0xFFCDDAEB);
 
   // ── Panel de administración (barra lateral oscura) ─────────────
   static const sidebar = Color(0xFF16181A);

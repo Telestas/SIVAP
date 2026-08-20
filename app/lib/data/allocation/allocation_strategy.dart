@@ -17,7 +17,7 @@ import '../../domain/models/protocolo.dart';
 /// z = ((z XOR (z >>> 16)) * 0x21F0AAAD) mod 2^32
 /// z = ((z XOR (z >>> 15)) * 0x735A2D97) mod 2^32
 /// z = z XOR (z >>> 15)
-/// bit = z AND 1        // 1 = protocolo nuevo, 0 = protocolo vigente
+/// bit = z AND 1        // 1 = Protocolo B, 0 = Protocolo A
 /// ```
 ///
 /// Vectores de verificación (los comprueba `test/restricciones_test.dart`):
@@ -76,8 +76,8 @@ class AllocationSequence {
   }) {
     final azar = SplitMix32(semilla);
     return AllocationSequence(
-      valores: List.unmodifiable(List.generate(longitud,
-          (_) => azar.siguienteBit() ? Protocolo.nuevo : Protocolo.vigente)),
+      valores: List.unmodifiable(List.generate(
+          longitud, (_) => azar.siguienteBit() ? Protocolo.b : Protocolo.a)),
       etiqueta: etiqueta ?? 'semilla $semilla',
       origen: OrigenSecuencia.generadaPorComputadora,
       generadaEn: ahora,
@@ -109,19 +109,22 @@ class AllocationSequence {
 
   int get longitud => valores.length;
 
-  /// La secuencia como código binario: `0` = protocolo vigente (control),
-  /// `1` = protocolo nuevo. Es la forma compacta de dejarla en el acta del
-  /// estudio y de compararla contra lo efectivamente asignado.
+  /// La secuencia como código binario: `0` = Protocolo A, `1` = Protocolo B.
+  /// Es la forma compacta de dejarla en el acta del estudio y de compararla
+  /// contra lo efectivamente asignado.
+  ///
+  /// Qué protocolo terapéutico hay detrás de A y de B no está aquí ni en
+  /// ninguna otra parte del sistema (CLAUDE.md §2).
   String get codigoBinario =>
-      valores.map((p) => p == Protocolo.nuevo ? '1' : '0').join();
+      valores.map((p) => p == Protocolo.b ? '1' : '0').join();
 
   /// Cuántas de cada rama. En aleatorización simple el reparto NO queda
   /// equilibrado por construcción: con 60 pacientes es normal terminar 33/27.
   /// Si el desequilibrio importa, la decisión es pasar a bloques, y eso es
   /// otra implementación de [AllocationStrategy], no un parche aquí.
-  ({int vigente, int nuevo}) get reparto => (
-        vigente: valores.where((p) => p == Protocolo.vigente).length,
-        nuevo: valores.where((p) => p == Protocolo.nuevo).length,
+  ({int a, int b}) get reparto => (
+        a: valores.where((p) => p == Protocolo.a).length,
+        b: valores.where((p) => p == Protocolo.b).length,
       );
 
   /// Regenera la secuencia desde su semilla y comprueba que coincide.

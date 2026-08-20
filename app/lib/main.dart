@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/app_state.dart';
 import 'core/theme/app_theme.dart';
@@ -50,6 +51,14 @@ class _SivapAppState extends State<SivapApp> {
         title: 'SIVAP',
         debugShowCheckedModeBanner: false,
         theme: appTheme,
+        // Toda la interfaz en español, incluidos los diálogos que pone Flutter.
+        locale: const Locale('es'),
+        supportedLocales: const [Locale('es')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         home: FutureBuilder<AppState>(
           future: _arranque,
           builder: (context, snapshot) {

@@ -18,6 +18,11 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Textos del propio Flutter en español: selector de fecha, acciones de
+  # accesibilidad. Viene con el SDK, no se descarga de pub.
+  flutter_localizations:
+    sdk: flutter
+
   # SQLite con SQLCipher. `sqlite3` da el acceso; `sqlcipher_flutter_libs`
   # empaqueta la biblioteca nativa que cifra. Sin el segundo, el primero abre
   # bases en claro — por eso la app verifica `PRAGMA cipher_version` al abrir.

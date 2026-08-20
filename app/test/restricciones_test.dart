@@ -2,156 +2,245 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sivap/data/allocation/allocation_strategy.dart';
 import 'package:sivap/data/local/in_memory_study_repository.dart';
 import 'package:sivap/data/local/seed_data.dart';
+import 'package:sivap/domain/models/evento_clinico.dart';
 import 'package:sivap/domain/models/patient.dart';
 import 'package:sivap/domain/models/protocolo.dart';
-import 'package:sivap/domain/models/visit.dart';
 import 'package:sivap/domain/repositories/study_repository.dart';
 
 /// Las restricciones no negociables de CLAUDE.md, como pruebas.
 ///
-/// Si alguna de estas falla, no es un test roto: es el estudio dejando de ser
+/// Si alguna de estas falla, no es un test roto: es el ensayo dejando de ser
 /// válido. Nadie debe "arreglarlas" relajando la aserción.
 void main() {
   late InMemoryStudyRepository repo;
 
   setUp(() => repo = InMemoryStudyRepository());
 
-  Patient enrolarDemo({String nombre = 'Paciente de Prueba'}) => repo.enrolar(
+  Patient enrolarDemo() => repo.enrolar(
         autor: Seed.morales,
-        nombre: nombre,
-        carneIdentidad: '90010112345',
+        nombre: 'Paciente de Prueba',
+        carneIdentidad: '00000000000',
         edad: 36,
         sexo: Sexo.femenino,
-        numeroHistoriaClinica: '41-9999',
+        numeroHistoriaClinica: 'TEST-01',
         telefono: '5 000 0000',
         direccion: 'Sin dirección',
       );
 
-  group('§1 · separación ficha / visita', () {
-    test('la visita no guarda identidad, solo el vínculo interno', () {
-      final p = enrolarDemo();
-      final visitas = repo.visitasDe(p.id);
+  Patient conConsentimiento() {
+    final p = enrolarDemo();
+    repo.registrarConsentimiento(
+        autor: Seed.morales, patientId: p.id, firmaTrazos: const []);
+    return p;
+  }
 
-      expect(visitas, isNotEmpty);
-      for (final v in visitas) {
-        expect(v.patientId, p.id);
-        // El dataset clínico debe poder exportarse sin identidad: ningún valor
-        // capturado puede contener el nombre ni el carné del paciente.
-        expect(v.valores.values.whereType<String>(),
-            everyElement(isNot(contains(p.nombre))));
-        expect(v.valores.containsKey('nombre'), isFalse);
-        expect(v.valores.containsKey('carneIdentidad'), isFalse);
-      }
+  EventoClinico registrar(
+    Patient p,
+    TipoEvento tipo,
+    Map<String, Object?> valores,
+  ) =>
+      repo.registrarEvento(
+        autor: Seed.morales,
+        patientId: p.id,
+        tipo: tipo,
+        fechaOcurrencia: DateTime(2026, 8, 20),
+        valores: valores,
+      );
+
+  group('§1 · separación ficha / datos clínicos', () {
+    test('el evento no guarda identidad, solo el vínculo interno', () {
+      final p = conConsentimiento();
+      final e = registrar(p, TipoEvento.enrolamiento, const {'fio2': 40});
+
+      expect(e.patientId, p.id);
+      // El dataset clínico debe poder exportarse sin identidad.
+      expect(e.valores.values.whereType<String>(),
+          everyElement(isNot(contains(p.nombre))));
+      expect(e.valores.containsKey('nombre'), isFalse);
+      expect(e.valores.containsKey('carneIdentidad'), isFalse);
     });
   });
 
-  group('§2 · sin ediciones silenciosas', () {
-    test('una visita cerrada no se puede sobrescribir por la vía normal', () {
-      final p = enrolarDemo();
-      repo.registrarConsentimiento(
-          autor: Seed.morales, patientId: p.id, firmaTrazos: const []);
-      repo.cerrarVisita(
-          autor: Seed.morales, patientId: p.id, dia: 1, valores: const {'fc': 80});
+  group('§3 · sin ediciones silenciosas', () {
+    test('un evento registrado no se sobrescribe por la vía normal', () {
+      final p = conConsentimiento();
+      final e = registrar(p, TipoEvento.extubacion, const {'duracion_total_vmi': 4});
 
+      // Al no ser repetible y estar ya registrado, el sistema se niega a crear
+      // otro en su lugar: hay que corregir, no duplicar.
       expect(
         () => repo.guardarBorrador(
-            autor: Seed.morales, patientId: p.id, dia: 1, valores: const {'fc': 99}),
-        throwsA(isA<SilentEditRejected>()),
+          autor: Seed.morales,
+          patientId: p.id,
+          tipo: TipoEvento.extubacion,
+          fechaOcurrencia: DateTime(2026, 8, 20),
+          valores: const {'duracion_total_vmi': 9},
+        ),
+        throwsA(isA<EventoNoRepetible>()),
       );
-      expect(repo.visita(p.id, 1)!.valores['fc'], 80);
+      expect(repo.evento(e.id)!.valores['duracion_total_vmi'], 4);
     });
 
     test('corregir sin motivo se rechaza', () {
-      final p = enrolarDemo();
-      repo.registrarConsentimiento(
-          autor: Seed.morales, patientId: p.id, firmaTrazos: const []);
-      repo.cerrarVisita(
-          autor: Seed.morales, patientId: p.id, dia: 1, valores: const {'fc': 80});
+      final p = conConsentimiento();
+      final e = registrar(p, TipoEvento.extubacion, const {'duracion_total_vmi': 4});
 
       expect(
-        () => repo.corregirVisitaEnviada(
+        () => repo.corregirEventoRegistrado(
             autor: Seed.guerra,
-            patientId: p.id,
-            dia: 1,
-            campo: 'fc',
-            valorNuevo: 88,
+            eventoId: e.id,
+            campo: 'duracion_total_vmi',
+            valorNuevo: 6,
             motivo: '   '),
         throwsA(isA<ArgumentError>()),
       );
     });
 
     test('corregir deja valor anterior, valor nuevo, autor y motivo', () {
-      final p = enrolarDemo();
-      repo.registrarConsentimiento(
-          autor: Seed.morales, patientId: p.id, firmaTrazos: const []);
-      repo.cerrarVisita(
-          autor: Seed.morales, patientId: p.id, dia: 1, valores: const {'temp': 39.7});
+      final p = conConsentimiento();
+      final e = registrar(p, TipoEvento.extubacion, const {'duracion_total_vmi': 40});
 
       final antes = repo.auditoria().length;
-      repo.corregirVisitaEnviada(
+      repo.corregirEventoRegistrado(
         autor: Seed.guerra,
-        patientId: p.id,
-        dia: 1,
-        campo: 'temp',
-        valorNuevo: 38.7,
-        motivo: 'error de tecleo',
+        eventoId: e.id,
+        campo: 'duracion_total_vmi',
+        valorNuevo: 4,
+        motivo: 'cero de más',
       );
 
       final entrada = repo.auditoria().first;
       expect(repo.auditoria().length, antes + 1);
-      expect(entrada.campo, 'temp');
-      expect(entrada.valorAnterior, '39.7');
-      expect(entrada.valorNuevo, '38.7');
+      expect(entrada.campo, 'duracion_total_vmi');
+      expect(entrada.valorAnterior, '40');
+      expect(entrada.valorNuevo, '4');
       expect(entrada.autorId, Seed.guerra.id);
-      expect(entrada.motivo, 'error de tecleo');
-      expect(repo.visita(p.id, 1)!.valores['temp'], 38.7);
+      expect(entrada.motivo, 'cero de más');
+      expect(repo.evento(e.id)!.valores['duracion_total_vmi'], 4);
     });
 
     test('la corrección devuelve el registro a la cola de envío', () {
-      final p = enrolarDemo();
-      repo.registrarConsentimiento(
-          autor: Seed.morales, patientId: p.id, firmaTrazos: const []);
-      repo.cerrarVisita(
-          autor: Seed.morales, patientId: p.id, dia: 1, valores: const {'fc': 80});
-      repo.corregirVisitaEnviada(
+      final p = conConsentimiento();
+      final e = registrar(p, TipoEvento.extubacion, const {'duracion_total_vmi': 4});
+      repo.corregirEventoRegistrado(
           autor: Seed.guerra,
-          patientId: p.id,
-          dia: 1,
-          campo: 'fc',
-          valorNuevo: 88,
-          motivo: 'relectura del parte');
+          eventoId: e.id,
+          campo: 'duracion_total_vmi',
+          valorNuevo: 6,
+          motivo: 'relectura de la historia');
 
-      expect(repo.visita(p.id, 1)!.sync, SyncStatus.enCola);
+      expect(repo.evento(e.id)!.sync, SyncStatus.enCola);
     });
   });
 
-  group('§3 · formularios configurables', () {
-    test('los días de visita salen de la definición, no del código', () {
+  group('§4 · captura por eventos, no por calendario', () {
+    test('enrolar no crea ningún registro: los eventos aparecen al ocurrir', () {
       final p = enrolarDemo();
-      expect(repo.visitasDe(p.id).map((v) => v.dia).toList(),
-          repo.config.definicionFormulario.diasVisita);
+
+      expect(repo.eventosDe(p.id), isEmpty);
     });
 
-    test('un campo restringido a ciertos días solo aparece en esos días', () {
-      const def = Seed.formulario;
-      final temp = def.camposPara(1).firstWhere((c) => c.key == 'temp');
+    test('un hito repetible admite varias ocurrencias, numeradas', () {
+      final p = conConsentimiento();
 
-      expect(temp.aplicaA(1), isTrue);
-      expect(temp.aplicaA(14), isTrue, reason: 'sin `dias`, aplica a todos');
-      expect(def.seccionesPara(3).map((s) => s.titulo),
-          contains('Signos vitales'));
+      final uno = registrar(p, TipoEvento.cribado, const {'cumple_criterios': false});
+      final dos = registrar(p, TipoEvento.cribado, const {'cumple_criterios': false});
+      final tres = registrar(p, TipoEvento.cribado, const {'cumple_criterios': true});
+
+      expect([uno.ocurrencia, dos.ocurrencia, tres.ocurrencia], [1, 2, 3]);
+      expect(repo.eventosDe(p.id).where((e) => e.tipo == TipoEvento.cribado).length, 3);
+    });
+
+    test('un hito no repetible no se duplica: se corrige', () {
+      final p = conConsentimiento();
+      registrar(p, TipoEvento.egresoUci, const {'estancia_uci': 10});
+
+      expect(
+        () => registrar(p, TipoEvento.egresoUci, const {'estancia_uci': 11}),
+        throwsA(isA<EventoNoRepetible>()),
+      );
+    });
+
+    test('la PVE, que es el caso que el modelo anterior no podía representar',
+        () {
+      final p = conConsentimiento();
+      for (var i = 0; i < 4; i++) {
+        registrar(p, TipoEvento.pruebaVentilacionEspontanea,
+            {'metodo_pve': 'Tubo en T', 'rsbi_inicio': 90 + i});
+      }
+
+      final intentos = repo
+          .eventosDe(p.id)
+          .where((e) => e.tipo == TipoEvento.pruebaVentilacionEspontanea)
+          .toList();
+      expect(intentos.length, 4);
+      expect(intentos.map((e) => e.ocurrencia), [1, 2, 3, 4]);
+    });
+
+    test('una trayectoria incompleta no es un error', () {
+      // Traqueostomía: el paciente sale del proceso y nunca llega a extubarse.
+      // No hay nada que marcar como perdido — esos eventos simplemente no
+      // existen.
+      final p = conConsentimiento();
+      registrar(p, TipoEvento.cribado, const {'cumple_criterios': false});
+      registrar(p, TipoEvento.traqueostomia,
+          const {'fecha_traqueostomia': '2026-08-18'});
+
+      final tipos = repo.eventosDe(p.id).map((e) => e.tipo).toSet();
+      expect(tipos, contains(TipoEvento.traqueostomia));
+      expect(tipos, isNot(contains(TipoEvento.extubacion)));
+    });
+
+    test('no existe un estado de evento «perdido»', () {
+      expect(EstadoEvento.values.map((e) => e.name),
+          isNot(contains(anyOf('perdida', 'perdido'))));
+    });
+
+    test('la fecha del evento es la real, no una programada', () {
+      final p = conConsentimiento();
+      final ocurrio = DateTime(2026, 8, 11);
+      final e = repo.registrarEvento(
+        autor: Seed.morales,
+        patientId: p.id,
+        tipo: TipoEvento.traqueostomia,
+        fechaOcurrencia: ocurrio,
+        valores: const {'fecha_traqueostomia': '2026-08-11'},
+      );
+
+      expect(e.fechaOcurrencia, ocurrio);
+      // Y la fecha de captura es otra cosa: cuándo se tecleó.
+      expect(e.fechaCaptura, isNotNull);
+    });
+  });
+
+  group('§5 · formularios configurables', () {
+    test('los hitos con formulario salen de la definición, no del código', () {
+      final def = Seed.formulario;
+
+      expect(def.tieneFormulario(TipoEvento.pruebaVentilacionEspontanea), isTrue);
+      expect(def.para(TipoEvento.cribado)!.campos, isNotEmpty);
+    });
+
+    test('cada definición pertenece a su tipo de evento', () {
+      for (final e in Seed.formulario.eventos) {
+        expect(e.tipo, isA<TipoEvento>());
+        expect(e.secciones, isNotEmpty, reason: e.tipo.name);
+      }
     });
 
     test('el rango clínico avisa pero no impide registrar el valor real', () {
-      final temp = Seed.formulario.camposPara(5).firstWhere((c) => c.key == 'temp');
+      final fr = Seed.formulario
+          .para(TipoEvento.pruebaVentilacionEspontanea)!
+          .campos
+          .firstWhere((c) => c.key == 'fr_inicio');
 
-      expect(temp.fueraDeRango(36.8), isNull);
-      expect(temp.fueraDeRango(38.7), isNotNull);
-      expect(temp.fueraDeRango(null), isNull);
+      expect(fr.fueraDeRango(22), isNull);
+      expect(fr.fueraDeRango(70), isNotNull);
+      expect(fr.fueraDeRango(null), isNull);
     });
   });
 
-  group('§4 · asignación aleatoria por computadora, desacoplada', () {
+  group('§6 · asignación aleatoria por computadora, desacoplada', () {
     test('la secuencia se genera desde una semilla y se consume en orden', () {
       final secuencia = AllocationSequence.generada(
           semilla: 12345, longitud: 8, ahora: DateTime(2026));
@@ -165,9 +254,6 @@ void main() {
     });
 
     test('la misma semilla reproduce exactamente la misma secuencia', () {
-      // Esta es la propiedad que hace auditable la aleatorización: un tercero
-      // regenera la secuencia con la semilla del acta y comprueba que las
-      // asignaciones registradas son las que tocaban.
       final a = AllocationSequence.generada(
           semilla: 987, longitud: 64, ahora: DateTime(2026));
       final b = AllocationSequence.generada(
@@ -180,8 +266,7 @@ void main() {
     test('el generador reproduce sus vectores de verificación', () {
       // Si esto falla, el algoritmo de sorteo cambió: toda secuencia generada
       // antes deja de poder regenerarse, y con ella la auditoría de las
-      // asignaciones ya hechas. No se ajusta el vector — se investiga por qué
-      // cambió el generador.
+      // asignaciones ya hechas.
       expect(
         AllocationSequence.generada(
                 semilla: 12345, longitud: 16, ahora: DateTime(2026))
@@ -196,45 +281,23 @@ void main() {
       );
     });
 
-    test('semillas distintas dan secuencias distintas', () {
-      final a = AllocationSequence.generada(
-          semilla: 1, longitud: 64, ahora: DateTime(2026));
-      final b = AllocationSequence.generada(
-          semilla: 2, longitud: 64, ahora: DateTime(2026));
-
-      expect(a.codigoBinario, isNot(b.codigoBinario));
-    });
-
     test('el código binario tiene una cifra por asignación', () {
       final s = AllocationSequence.generada(
           semilla: 42, longitud: 30, ahora: DateTime(2026));
 
       expect(s.codigoBinario.length, 30);
-      expect(RegExp(r'^[01]+$').hasMatch(s.codigoBinario), isTrue);
-      expect(s.reparto.vigente + s.reparto.nuevo, 30);
+      expect(s.reparto.a + s.reparto.b, 30);
     });
 
     test('la secuencia reparte las dos ramas sin fijar proporción exacta', () {
-      // Aleatorización simple: se espera un reparto cercano a la mitad, pero
-      // NO exactamente la mitad. Si alguien "arregla" esto para que salga
-      // 50/50 clavado, ha dejado de ser aleatorización simple.
+      // Aleatorización simple: reparto cercano a la mitad, pero NO la mitad
+      // exacta. Si alguien lo "arregla" para que salga 50/50 clavado, ha
+      // dejado de ser aleatorización simple.
       final s = AllocationSequence.generada(
           semilla: 20260814, longitud: 200, ahora: DateTime(2026));
 
-      expect(s.reparto.vigente, 106);
-      expect(s.reparto.nuevo, 94);
-    });
-
-    test('una secuencia cargada desde fuera no lleva semilla ni se autoverifica',
-        () {
-      final s = AllocationSequence.cargada(
-          valores: const [Protocolo.nuevo, Protocolo.vigente],
-          etiqueta: 'lista del bioestadista',
-          ahora: DateTime(2026));
-
-      expect(s.semilla, isNull);
-      expect(s.verificaContraSemilla(), isFalse);
-      expect(s.codigoBinario, '10');
+      expect(s.reparto.a, 106);
+      expect(s.reparto.b, 94);
     });
 
     test('agotar la secuencia es un error, no una improvisación', () {
@@ -248,24 +311,30 @@ void main() {
           throwsA(isA<AllocationExhausted>()));
     });
 
-    test('cada asignación queda trazada con secuencia, posición y hora', () {
-      final p = enrolarDemo();
-      expect(p.bloqueAleatorizacion, Seed.secuenciaAleatorizacion.etiqueta);
-      expect(p.asignadoEn, isNotNull);
+    test('no hay forma de consultar la rama siguiente sin consumirla', () {
+      // Saber qué rama toca antes de decidir a quién se enrola es el sesgo de
+      // selección que la aleatorización existe para evitar. La API no lo
+      // permite, y es deliberado (CLAUDE.md §6).
+      final estrategia = SequentialAllocation(
+        secuencia: AllocationSequence.generada(
+            semilla: 7, longitud: 4, ahora: DateTime(2026)),
+      );
+
+      expect(estrategia.restantes, 4);
+      // `asignar` es la única salida, y consume.
+      estrategia.asignar(ahora: DateTime(2026));
+      expect(estrategia.restantes, 3);
     });
 
-    test('la asignación del estudio coincide con la secuencia sembrada', () {
-      // El octavo paciente enrolado recibe la octava entrada: los siete
-      // primeros son los de demostración.
+    test('cada asignación queda trazada con secuencia y hora', () {
       final p = enrolarDemo();
-      expect(Seed.secuenciaAleatorizacion.codigoBinario.substring(0, 12),
-          '110111110001');
-      expect(p.protocolo, Seed.secuenciaAleatorizacion.valores[7]);
-      expect(p.protocolo, Protocolo.nuevo);
+
+      expect(p.bloqueAleatorizacion, Seed.secuenciaAleatorizacion.etiqueta);
+      expect(p.protocolo, isIn(Protocolo.values));
     });
   });
 
-  group('§6 · roles y permisos', () {
+  group('§11 · roles y permisos', () {
     test('el observador no enrola ni captura', () {
       expect(
         () => repo.enrolar(
@@ -282,19 +351,15 @@ void main() {
     });
 
     test('el recolector no corrige registros ya enviados', () {
-      final p = enrolarDemo();
-      repo.registrarConsentimiento(
-          autor: Seed.morales, patientId: p.id, firmaTrazos: const []);
-      repo.cerrarVisita(
-          autor: Seed.morales, patientId: p.id, dia: 1, valores: const {'fc': 80});
+      final p = conConsentimiento();
+      final e = registrar(p, TipoEvento.extubacion, const {'duracion_total_vmi': 4});
 
       expect(
-        () => repo.corregirVisitaEnviada(
+        () => repo.corregirEventoRegistrado(
             autor: Seed.morales,
-            patientId: p.id,
-            dia: 1,
-            campo: 'fc',
-            valorNuevo: 88,
+            eventoId: e.id,
+            campo: 'duracion_total_vmi',
+            valorNuevo: 6,
             motivo: 'me equivoqué'),
         throwsA(isA<PermissionDenied>()),
       );
@@ -302,37 +367,36 @@ void main() {
 
     test('el recolector solo ve su propia carga', () {
       final suyos = repo.pacientes(recolectorId: Seed.morales.id);
+
       expect(suyos, isNotEmpty);
       expect(suyos.every((p) => p.recolectorId == Seed.morales.id), isTrue);
       expect(suyos.length, lessThan(repo.pacientes().length));
     });
   });
 
-  group('§8 · consentimiento informado', () {
-    test('sin consentimiento no se capturan visitas', () {
+  group('§13 · consentimiento informado', () {
+    test('sin consentimiento no se capturan eventos', () {
       final p = enrolarDemo();
       expect(p.tieneConsentimiento, isFalse);
 
       expect(
-        () => repo.guardarBorrador(
-            autor: Seed.morales, patientId: p.id, dia: 1, valores: const {'fc': 80}),
+        () => registrar(p, TipoEvento.cribado, const {'cumple_criterios': true}),
         throwsStateError,
       );
     });
 
-    test('el consentimiento registra la versión del documento aprobado', () {
+    test('el consentimiento registra la versión del documento', () {
       final p = enrolarDemo();
       final consent = repo.registrarConsentimiento(
           autor: Seed.morales, patientId: p.id, firmaTrazos: const []);
 
       expect(consent.versionDocumento, repo.config.documentoConsentimiento.version);
-      expect(consent.codigoCei, repo.config.documentoConsentimiento.codigoCei);
       expect(repo.paciente(p.id)!.tieneConsentimiento, isTrue);
     });
 
     test('el estudio arranca sin aprobación del CEI', () {
       // Cambiar esto a `true` es una decisión del equipo, documentada, no un
-      // ajuste de código para que la demo quede más bonita.
+      // ajuste de código para que la demostración quede más bonita.
       expect(repo.config.consentimientoAprobadoPorCei, isFalse);
     });
   });

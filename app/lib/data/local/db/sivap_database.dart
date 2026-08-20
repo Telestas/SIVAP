@@ -21,6 +21,12 @@ class SivapDatabase {
   final Database db;
 
   /// Versión del esquema. Subirla obliga a añadir su migración en [_migrar].
+  ///
+  /// Sigue en 1 pese al cambio de modelo —de visitas por calendario a eventos
+  /// clínicos— porque la versión anterior nunca llegó a ejecutarse en ningún
+  /// dispositivo: no hay base existente que migrar. En cuanto la app corra en
+  /// un teléfono real, cualquier cambio de esquema exige subir el número y
+  /// escribir su migración.
   static const int versionEsquema = 1;
 
   /// Abre la base cifrada en [ruta] con [claveHex] (64 caracteres hex).
@@ -131,30 +137,43 @@ class SivapDatabase {
     ''');
 
     db.execute('''
-      CREATE TABLE visitas (
-        id               TEXT PRIMARY KEY,
+      CREATE TABLE eventos (
+        id               TEXT    PRIMARY KEY,
         paciente_id      TEXT    NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
-        dia              INTEGER NOT NULL,
-        fecha_programada TEXT    NOT NULL,
+        tipo             TEXT    NOT NULL,
+        ocurrencia       INTEGER NOT NULL,
+        fecha_ocurrencia TEXT    NOT NULL,
         estado           TEXT    NOT NULL,
         sync             TEXT    NOT NULL,
         recolector_id    TEXT    NOT NULL,
         fecha_captura    TEXT,
         correcciones     INTEGER NOT NULL DEFAULT 0,
-        UNIQUE (paciente_id, dia)
+        UNIQUE (paciente_id, tipo, ocurrencia)
       );
     ''');
 
-    // Un valor por fila, no un JSON por visita: los campos del formulario son
+    // Un solo borrador abierto por paciente y tipo de evento.
+    //
+    // Dos borradores simultáneos del mismo hito serían dos versiones del mismo
+    // dato compitiendo, y al cerrarlos quedarían dos registros donde solo
+    // ocurrió un hecho. El índice parcial lo impide en la propia base, no solo
+    // en el repositorio.
+    db.execute('''
+      CREATE UNIQUE INDEX idx_un_borrador_por_tipo
+      ON eventos (paciente_id, tipo)
+      WHERE estado = 'borrador';
+    ''');
+
+    // Un valor por fila, no un JSON por evento: los campos del formulario son
     // configurables, así que las columnas no se pueden fijar de antemano. Así
     // además se puede exportar campo a campo y auditar uno solo.
     db.execute('''
-      CREATE TABLE visita_valores (
-        visita_id TEXT NOT NULL REFERENCES visitas(id) ON DELETE CASCADE,
+      CREATE TABLE evento_valores (
+        evento_id TEXT NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
         campo     TEXT NOT NULL,
         tipo      TEXT NOT NULL,
         valor     TEXT,
-        PRIMARY KEY (visita_id, campo)
+        PRIMARY KEY (evento_id, campo)
       );
     ''');
 
@@ -226,10 +245,9 @@ class SivapDatabase {
       );
     ''');
 
-    db.execute(
-        'CREATE INDEX idx_visitas_paciente ON visitas (paciente_id, dia);');
-    db.execute(
-        'CREATE INDEX idx_visitas_sync ON visitas (sync);');
+    db.execute('CREATE INDEX idx_eventos_paciente '
+        'ON eventos (paciente_id, fecha_ocurrencia);');
+    db.execute('CREATE INDEX idx_eventos_sync ON eventos (sync);');
     db.execute(
         'CREATE INDEX idx_auditoria_entidad ON auditoria (entidad_id, ocurrido_en);');
   }

@@ -54,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     letterSpacing: 0.5,
                     color: T.ink)),
             const SizedBox(height: 6),
-            Text('${config.nombreEstudio}\n${config.centro} · ${config.servicio}',
+            Text('Ensayo ${config.acronimo}\n${config.nombreEstudio}',
                 style: const TextStyle(fontSize: 13, color: T.secondary, height: 1.5)),
             const SizedBox(height: 22),
 

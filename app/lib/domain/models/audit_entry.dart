@@ -1,6 +1,6 @@
 /// Entrada del registro de auditoría.
 ///
-/// Restricción no negociable (CLAUDE.md §2): ningún registro ya enviado se
+/// Restricción no negociable (CLAUDE.md §3): ningún registro ya enviado se
 /// sobrescribe en silencio. Toda corrección produce una de estas — incluida la
 /// que hace el administrador. [motivo] es obligatorio: sin motivo no hay
 /// corrección, y la capa de datos lo exige, no la pantalla.
@@ -27,7 +27,7 @@ class AuditEntry {
   final AuditEntity entidad;
   final String entidadId;
 
-  /// Referencia legible del objetivo: "Estévez Cruz · D3", "Sáez Roque · ficha".
+  /// Referencia legible del objetivo: "Estévez Cruz · PVE · 2".
   final String descripcionObjetivo;
 
   final String campo;
@@ -36,4 +36,4 @@ class AuditEntry {
   final String motivo;
 }
 
-enum AuditEntity { ficha, visita, consentimiento, usuario }
+enum AuditEntity { ficha, evento, consentimiento, usuario }

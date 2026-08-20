@@ -1,9 +1,18 @@
-/// Roles del estudio. La tabla de permisos vive en `BASES_MVP_SIVAP.md` §4;
-/// aquí se codifica para que ninguna pantalla la interprete a su manera.
+/// Roles del estudio.
+///
+/// PROVISIONAL: estos son los tres roles del modelo anterior. El diseño de
+/// LIVERE exige cuatro funciones separadas por razones metodológicas —
+/// reclutador, aplicador, evaluador de desenlaces e investigador principal—,
+/// porque quien selecciona pacientes debe estar cegado a la secuencia y quien
+/// evalúa desenlaces, cegado a la rama (BASES §4).
+///
+/// Sustituirlos es el paso 6 de `docs/REENCAMINAMIENTO.md`. La forma es la
+/// correcta —permisos como propiedades del enum—, lo que cambia es el
+/// contenido.
 enum Role {
   observador('Observador', 'Consulta toda la cohorte en solo lectura.'),
   recolector('Recolector de campo',
-      'Crea pacientes y visitas propias. No edita registros ya enviados.'),
+      'Enrola pacientes y captura eventos clínicos. No edita lo ya registrado.'),
   administrador('Administrador', 'Control total. Toda corrección queda en auditoría.');
 
   const Role(this.label, this.description);
@@ -11,7 +20,7 @@ enum Role {
   final String description;
 
   bool get puedeEnrolar => this == recolector || this == administrador;
-  bool get puedeCapturarVisitas => this == recolector || this == administrador;
+  bool get puedeCapturarEventos => this == recolector || this == administrador;
   bool get puedeGestionarUsuarios => this == administrador;
   bool get puedeExportar => this == administrador;
 

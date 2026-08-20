@@ -1,38 +1,33 @@
+import '../../core/ids.dart';
 import '../../domain/models/audit_entry.dart';
 import '../../domain/models/consent.dart';
+import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/role.dart';
-import '../../domain/models/visit.dart';
 import '../../domain/repositories/study_repository.dart';
 import '../allocation/allocation_strategy.dart';
 import 'demo_dataset.dart';
 import 'seed_data.dart';
 
-/// Implementación en memoria del Hito 1.
+/// Implementación en memoria, para pruebas y para el arranque en navegador.
 ///
-/// Sustituible por SQLite cifrado (Drift/Isar) + cola de sincronización sin
-/// tocar ni una pantalla: todas hablan con [StudyRepository].
-///
-/// PENDIENTE de hitos posteriores: cifrado en reposo y envío al servidor. Este
-/// almacén es volátil y no debe usarse con pacientes reales.
+/// El almacén de producción es SQLite cifrado (`SqliteStudyRepository`). Las
+/// dos hablan la misma interfaz y muestran los mismos datos de demostración.
 class InMemoryStudyRepository implements StudyRepository {
   InMemoryStudyRepository()
       : _allocation = SequentialAllocation(
           secuencia: Seed.secuenciaAleatorizacion,
-          // Las 7 primeras entradas ya las consumieron los pacientes de prueba.
-          consumidas: 7,
+          // Los pacientes de demostración ya consumieron sus posiciones.
+          consumidas: Demo.pacientes.length,
         ) {
     _sembrar();
   }
 
   final AllocationStrategy _allocation;
   final Map<String, Patient> _pacientes = {};
-  final Map<String, List<Visit>> _visitas = {};
+  final Map<String, List<EventoClinico>> _eventos = {};
   final Map<String, Consent> _consentimientos = {};
   final List<AuditEntry> _auditoria = [];
-  int _secuenciaId = 0;
-
-  String _nuevoId(String prefijo) => '$prefijo-${(++_secuenciaId).toString().padLeft(4, '0')}';
 
   @override
   StudyConfig get config => Seed.config;
@@ -52,13 +47,36 @@ class InMemoryStudyRepository implements StudyRepository {
   Patient? paciente(String id) => _pacientes[id];
 
   @override
-  List<Visit> visitasDe(String patientId) =>
-      List.unmodifiable(_visitas[patientId] ?? const []);
+  List<EventoClinico> eventosDe(String patientId) {
+    final lista = List<EventoClinico>.from(_eventos[patientId] ?? const []);
+    lista.sort(_cronologico);
+    return List.unmodifiable(lista);
+  }
+
+  /// Orden de la línea de tiempo: por fecha real, y a igualdad de fecha por el
+  /// orden natural de las fases. Dos hitos del mismo día deben salir en el
+  /// orden en que tienen sentido clínico, no en el que se teclearon.
+  static int _cronologico(EventoClinico a, EventoClinico b) {
+    final f = a.fechaOcurrencia.compareTo(b.fechaOcurrencia);
+    if (f != 0) return f;
+    final t = a.tipo.index.compareTo(b.tipo.index);
+    return t != 0 ? t : a.ocurrencia.compareTo(b.ocurrencia);
+  }
 
   @override
-  Visit? visita(String patientId, int dia) {
-    for (final v in _visitas[patientId] ?? const <Visit>[]) {
-      if (v.dia == dia) return v;
+  EventoClinico? evento(String id) {
+    for (final lista in _eventos.values) {
+      for (final e in lista) {
+        if (e.id == id) return e;
+      }
+    }
+    return null;
+  }
+
+  @override
+  EventoClinico? borradorAbierto(String patientId, TipoEvento tipo) {
+    for (final e in _eventos[patientId] ?? const <EventoClinico>[]) {
+      if (e.tipo == tipo && e.estado == EstadoEvento.borrador) return e;
     }
     return null;
   }
@@ -72,17 +90,17 @@ class InMemoryStudyRepository implements StudyRepository {
     return limite == null ? lista : lista.take(limite).toList();
   }
 
+  Iterable<EventoClinico> get _todos => _eventos.values.expand((e) => e);
+
   @override
-  int get registrosEnCola => _visitas.values
-      .expand((v) => v)
-      .where((v) => v.sync != SyncStatus.sincronizado && !v.vacia)
+  int get registrosEnCola => _todos
+      .where((e) => e.sync != SyncStatus.sincronizado && !e.vacio)
       .length;
 
   @override
-  int get dispositivosConCola => _visitas.values
-      .expand((v) => v)
-      .where((v) => v.sync != SyncStatus.sincronizado && !v.vacia)
-      .map((v) => v.recolectorId)
+  int get dispositivosConCola => _todos
+      .where((e) => e.sync != SyncStatus.sincronizado && !e.vacio)
+      .map((e) => e.recolectorId)
       .toSet()
       .length;
 
@@ -106,7 +124,7 @@ class InMemoryStudyRepository implements StudyRepository {
     // ni puede sugerirla: no hay parámetro para ello, a propósito.
     final asignacion = _allocation.asignar(ahora: DateTime.now());
     final paciente = Patient(
-      id: _nuevoId('p'),
+      id: Ids.nuevo('p'),
       nombre: nombre,
       carneIdentidad: carneIdentidad,
       edad: edad,
@@ -121,7 +139,9 @@ class InMemoryStudyRepository implements StudyRepository {
       enroladoEn: DateTime.now(),
     );
     _pacientes[paciente.id] = paciente;
-    _visitas[paciente.id] = _calendarioVacio(paciente);
+    // Sin calendario que pre-crear: los eventos aparecen cuando ocurren
+    // (CLAUDE.md §4).
+    _eventos[paciente.id] = [];
     return paciente;
   }
 
@@ -136,7 +156,7 @@ class InMemoryStudyRepository implements StudyRepository {
     }
     final doc = config.documentoConsentimiento;
     final consent = Consent(
-      id: _nuevoId('c'),
+      id: Ids.nuevo('c'),
       patientId: patientId,
       versionDocumento: doc.version,
       codigoCei: doc.codigoCei,
@@ -145,77 +165,119 @@ class InMemoryStudyRepository implements StudyRepository {
       firmaTrazos: firmaTrazos,
     );
     _consentimientos[consent.id] = consent;
-    _pacientes[patientId] = _pacientes[patientId]!.copyWith(consentimientoId: consent.id);
+    _pacientes[patientId] =
+        _pacientes[patientId]!.copyWith(consentimientoId: consent.id);
     return consent;
   }
 
   @override
-  Visit guardarBorrador({
+  EventoClinico guardarBorrador({
     required Investigador autor,
     required String patientId,
-    required int dia,
+    required TipoEvento tipo,
+    required DateTime fechaOcurrencia,
     required Map<String, Object?> valores,
   }) =>
-      _escribirVisita(
+      _escribir(
         autor: autor,
         patientId: patientId,
-        dia: dia,
+        tipo: tipo,
+        fechaOcurrencia: fechaOcurrencia,
         valores: valores,
-        status: VisitStatus.enCaptura,
+        estado: EstadoEvento.borrador,
         sync: SyncStatus.local,
       );
 
   @override
-  Visit cerrarVisita({
+  EventoClinico registrarEvento({
     required Investigador autor,
     required String patientId,
-    required int dia,
+    required TipoEvento tipo,
+    required DateTime fechaOcurrencia,
     required Map<String, Object?> valores,
   }) =>
-      _escribirVisita(
+      _escribir(
         autor: autor,
         patientId: patientId,
-        dia: dia,
+        tipo: tipo,
+        fechaOcurrencia: fechaOcurrencia,
         valores: valores,
-        status: VisitStatus.enviada,
+        estado: EstadoEvento.registrado,
         sync: SyncStatus.enCola,
       );
 
-  Visit _escribirVisita({
+  EventoClinico _escribir({
     required Investigador autor,
     required String patientId,
-    required int dia,
+    required TipoEvento tipo,
+    required DateTime fechaOcurrencia,
     required Map<String, Object?> valores,
-    required VisitStatus status,
+    required EstadoEvento estado,
     required SyncStatus sync,
   }) {
-    if (!autor.role.puedeCapturarVisitas) {
-      throw PermissionDenied(autor.role, 'capturar visitas');
-    }
-    final paciente = _pacientes[patientId]!;
-    if (!paciente.tieneConsentimiento) {
-      throw StateError(
-          'No se pueden capturar visitas de ${paciente.nombre} sin consentimiento registrado.');
-    }
-    final actual = visita(patientId, dia)!;
-    // Restricción CLAUDE.md §2: lo ya enviado no se sobrescribe por esta vía.
-    if (actual.status.esInmutable) throw SilentEditRejected(actual.id);
+    _verificarPuedeCapturar(autor, patientId, tipo);
 
-    final nueva = actual.copyWith(
-      status: status,
+    final abierto = borradorAbierto(patientId, tipo);
+    final lista = _eventos[patientId]!;
+
+    if (abierto != null) {
+      final actualizado = abierto.copyWith(
+        estado: estado,
+        sync: sync,
+        valores: Map.unmodifiable(valores),
+        fechaOcurrencia: fechaOcurrencia,
+        fechaCaptura: DateTime.now(),
+      );
+      lista[lista.indexWhere((e) => e.id == abierto.id)] = actualizado;
+      return actualizado;
+    }
+
+    final nuevo = EventoClinico(
+      id: Ids.nuevo('e'),
+      patientId: patientId,
+      tipo: tipo,
+      ocurrencia: _siguienteOcurrencia(patientId, tipo),
+      fechaOcurrencia: fechaOcurrencia,
+      estado: estado,
       sync: sync,
       valores: Map.unmodifiable(valores),
+      recolectorId: autor.id,
       fechaCaptura: DateTime.now(),
     );
-    _reemplazar(patientId, nueva);
-    return nueva;
+    lista.add(nuevo);
+    return nuevo;
   }
 
+  void _verificarPuedeCapturar(
+      Investigador autor, String patientId, TipoEvento tipo) {
+    if (!autor.role.puedeCapturarEventos) {
+      throw PermissionDenied(autor.role, 'capturar eventos clínicos');
+    }
+    final p = _pacientes[patientId]!;
+    if (!p.tieneConsentimiento) {
+      throw StateError(
+          'No se pueden capturar eventos de ${p.nombre} sin consentimiento '
+          'registrado.');
+    }
+    // Un hito no repetible que ya se registró no se duplica: se corrige, y la
+    // corrección deja rastro (CLAUDE.md §3).
+    if (!tipo.repetible &&
+        (_eventos[patientId] ?? const <EventoClinico>[])
+            .any((e) => e.tipo == tipo && e.estado.esInmutable)) {
+      throw EventoNoRepetible(tipo);
+    }
+  }
+
+  int _siguienteOcurrencia(String patientId, TipoEvento tipo) =>
+      (_eventos[patientId] ?? const <EventoClinico>[])
+          .where((e) => e.tipo == tipo)
+          .length +
+      1;
+
   @override
-  Visit corregirVisitaEnviada({
+  EventoClinico corregirEventoRegistrado({
     required Investigador autor,
-    required String patientId,
-    required int dia,
+    required String eventoId,
     required String campo,
     required Object? valorNuevo,
     required String motivo,
@@ -227,61 +289,39 @@ class InMemoryStudyRepository implements StudyRepository {
       throw ArgumentError.value(motivo, 'motivo',
           'Una corrección sin motivo es una edición silenciosa: no se admite.');
     }
-    final actual = visita(patientId, dia)!;
-    final paciente = _pacientes[patientId]!;
+    final actual = evento(eventoId)!;
+    final paciente = _pacientes[actual.patientId]!;
     final anterior = actual.valores[campo];
 
-    final nueva = actual.copyWith(
+    final corregido = actual.copyWith(
       valores: Map.unmodifiable({...actual.valores, campo: valorNuevo}),
-      // Corregir devuelve el registro a la cola: el servidor debe recibir la
-      // versión corregida junto con su entrada de auditoría.
+      // Vuelve a la cola: el servidor debe recibir la versión corregida junto
+      // con su entrada de auditoría.
       sync: SyncStatus.enCola,
       correcciones: actual.correcciones + 1,
     );
-    _reemplazar(patientId, nueva);
+    final lista = _eventos[actual.patientId]!;
+    lista[lista.indexWhere((e) => e.id == eventoId)] = corregido;
 
     _auditoria.add(AuditEntry(
-      id: _nuevoId('a'),
+      id: Ids.nuevo('a'),
       ocurridoEn: DateTime.now(),
       autorId: autor.id,
       autorNombre: autor.nombre,
-      entidad: AuditEntity.visita,
-      entidadId: actual.id,
-      descripcionObjetivo: '${paciente.apellidos} · D$dia',
+      entidad: AuditEntity.evento,
+      entidadId: eventoId,
+      descripcionObjetivo: '${paciente.apellidos} · ${actual.referenciaCorta}',
       campo: campo,
       valorAnterior: anterior?.toString(),
       valorNuevo: valorNuevo?.toString(),
       motivo: motivo.trim(),
     ));
-    return nueva;
+    return corregido;
   }
-
-  void _reemplazar(String patientId, Visit visita) {
-    final lista = _visitas[patientId]!;
-    lista[lista.indexWhere((v) => v.dia == visita.dia)] = visita;
-  }
-
-  List<Visit> _calendarioVacio(Patient p) => [
-        for (final dia in config.definicionFormulario.diasVisita)
-          Visit(
-            id: _nuevoId('v'),
-            patientId: p.id,
-            dia: dia,
-            // Día 1 el día del enrolamiento; el resto, a los N-1 días.
-            fechaProgramada: DateTime(
-                p.enroladoEn.year, p.enroladoEn.month, p.enroladoEn.day + dia - 1),
-            status: VisitStatus.programada,
-            sync: SyncStatus.local,
-            valores: const {},
-            recolectorId: p.recolectorId,
-          )
-      ];
 
   // ── Siembra de datos de demostración ───────────────────────────
 
   void _sembrar() {
-    final dias = config.definicionFormulario.diasVisita;
-
     for (final d in Demo.pacientes) {
       _pacientes[d.id] = Patient(
         id: d.id,
@@ -300,41 +340,40 @@ class InMemoryStudyRepository implements StudyRepository {
         consentimientoId: 'c-demo-${d.id}',
       );
 
-      _visitas[d.id] = [
-        for (var i = 0; i < dias.length; i++)
-          Visit(
-            id: idVisitaDemo(d.id, dias[i]),
-            patientId: d.id,
-            dia: dias[i],
-            fechaProgramada: DateTime(d.enroladoEn.year, d.enroladoEn.month,
-                d.enroladoEn.day + dias[i] - 1),
-            status: d.estados[i],
-            sync: d.estados[i] == VisitStatus.enviada
-                ? d.sync
-                : SyncStatus.local,
-            valores: d.estados[i] == VisitStatus.programada
-                ? const {}
-                : Demo.valores(i),
-            recolectorId: d.recolectorId,
-            fechaCaptura: d.estados[i] == VisitStatus.programada
-                ? null
-                : DateTime(d.enroladoEn.year, d.enroladoEn.month,
-                    d.enroladoEn.day + dias[i] - 1, 9, 30),
-          )
+      final porTipo = <TipoEvento, int>{};
+      _eventos[d.id] = [
+        for (final ev in d.eventos)
+          () {
+            final ocurrencia = (porTipo[ev.tipo] = (porTipo[ev.tipo] ?? 0) + 1);
+            final fecha = d.enroladoEn.add(Duration(days: ev.diaDesdeEnrolamiento));
+            return EventoClinico(
+              id: idEventoDemo(d.id, ev.tipo, ocurrencia),
+              patientId: d.id,
+              tipo: ev.tipo,
+              ocurrencia: ocurrencia,
+              fechaOcurrencia: fecha,
+              estado:
+                  ev.borrador ? EstadoEvento.borrador : EstadoEvento.registrado,
+              sync: ev.borrador ? SyncStatus.local : d.sync,
+              valores: ev.valores,
+              recolectorId: d.recolectorId,
+              fechaCaptura:
+                  DateTime(fecha.year, fecha.month, fecha.day, 9, 30),
+            );
+          }()
       ];
     }
 
     for (final a in Demo.auditoria) {
       _auditoria.add(AuditEntry(
-        id: _nuevoId('a'),
+        id: Ids.nuevo('a'),
         ocurridoEn: a.ocurridoEn,
         autorId: a.autor.id,
         autorNombre: a.autor.nombre,
-        entidad: a.entidad,
-        entidadId: a.dia == null
-            ? a.pacienteId
-            : idVisitaDemo(a.pacienteId, a.dia!),
-        descripcionObjetivo: a.descripcionObjetivo,
+        entidad: AuditEntity.evento,
+        entidadId: idEventoDemo(a.pacienteId, a.tipo, a.ocurrencia),
+        descripcionObjetivo:
+            '${Demo.porId(a.pacienteId).apellidos} · ${a.tipo.etiqueta}',
         campo: a.campo,
         valorAnterior: a.valorAnterior,
         valorNuevo: a.valorNuevo,
@@ -343,8 +382,8 @@ class InMemoryStudyRepository implements StudyRepository {
     }
   }
 
-  /// Identificador estable de una visita de demostración, para que las
-  /// entradas de auditoría sembradas apunten a la visita correcta.
-  static String idVisitaDemo(String pacienteId, int dia) =>
-      'v-$pacienteId-$dia';
+  /// Identificador estable de un evento de demostración, para que las entradas
+  /// de auditoría sembradas apunten al evento correcto.
+  static String idEventoDemo(String pacienteId, TipoEvento tipo, int ocurrencia) =>
+      'e-$pacienteId-${tipo.name}-$ocurrencia';
 }

@@ -5,13 +5,13 @@ import '../../core/format.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
 import '../../core/widgets/controls.dart';
-import '../visits/visit_capture_screen.dart';
+import '../eventos/paciente_timeline_screen.dart';
 
 /// 06 · Consentimiento informado.
 ///
 /// Deja constancia de QUÉ versión del documento firmó el paciente y CUÁNDO.
-/// Sin este registro no se pueden capturar visitas: la restricción la impone
-/// la capa de datos, no esta pantalla.
+/// Sin este registro no se pueden capturar eventos clínicos: la restricción la
+/// impone la capa de datos, no esta pantalla.
 class ConsentScreen extends StatefulWidget {
   const ConsentScreen({super.key, required this.patientId});
 
@@ -40,7 +40,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
     );
     state.refrescar();
     Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => VisitCaptureScreen(patientId: widget.patientId)));
+        builder: (_) => PacienteTimelineScreen(patientId: widget.patientId)));
   }
 
   @override
@@ -147,7 +147,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
             const StatusBanner(
               texto: 'El consentimiento se guarda cifrado en el dispositivo y se '
                   'envía al servidor al recuperar señal. No se podrá capturar '
-                  'visitas hasta registrarlo.',
+                  'eventos clínicos hasta registrarlo.',
               alineaArriba: true,
             ),
           ],

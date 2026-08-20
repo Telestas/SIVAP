@@ -1,22 +1,34 @@
-# SIVAP — Sistema de Validación de Protocolos
+# SIVAP — Sistema de captura del ensayo LIVERE
 
-Sistema para automatizar un estudio de cohorte que valida un protocolo clínico nuevo
-frente al vigente, en un hospital cubano. Captura de datos **offline-first** en visitas
-fijas (Día 1, 3, 5, 10, 14), sincronización posterior y exportación a Excel para análisis.
+Sistema para conducir y registrar el **ensayo clínico LIVERE**: validación de un
+protocolo de liberación de la ventilación mecánica invasiva en cuidados intensivos,
+en entornos de recursos limitados. Ensayo controlado, aleatorizado, multicéntrico,
+prospectivo y longitudinal, en tres centros de La Habana.
 
-> Nombre de trabajo provisional. Estado: **Hito 1 — interfaz y capa de datos local**.
+Captura **offline-first** por eventos clínicos —no por calendario—, base local
+cifrada, sincronización posterior y exportación a Excel para análisis.
+
+> **SIVAP** es el nombre provisional del sistema; **LIVERE** es el nombre del estudio.
+> Estado: **reencaminamiento tras revisar las fuentes reales** (20 ago 2026).
+
+## Repositorio público
+
+Este repositorio es **público**. Nada identificable entra aquí: sin nombres de
+investigadores, sin nombres de centros, sin datos de pacientes, sin semillas reales
+ni credenciales. Los datos de demostración son inventados y están marcados como
+tales. Esa información vive en el expediente del estudio.
 
 ## Documentación
 
 | Documento | Contenido |
 |---|---|
-| [CLAUDE.md](CLAUDE.md) | Constitución del repositorio: restricciones no negociables, glosario y convenciones |
-| [BASES_MVP_SIVAP.md](BASES_MVP_SIVAP.md) | Alcance del MVP, arquitectura, roles y decisiones pendientes |
-| [docs/HITO_1.md](docs/HITO_1.md) | Qué se entrega en este hito y qué revisar |
+| [CLAUDE.md](CLAUDE.md) | Constitución del repositorio: restricciones no negociables, glosario clínico y convenciones |
+| [BASES_MVP_SIVAP.md](BASES_MVP_SIVAP.md) | Diseño del ensayo, roles, modelo de eventos y campos del Anexo 4 |
+| [docs/REENCAMINAMIENTO.md](docs/REENCAMINAMIENTO.md) | Plan de corrección de rumbo y su estado |
 | [docs/PENDIENTE.md](docs/PENDIENTE.md) | Qué falta para completar el MVP |
-| [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md) | Cómo llega el APK a los investigadores, y qué decidir antes |
+| [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md) | Cómo llega el APK a los investigadores |
 | [app/README.md](app/README.md) | Cómo correr la app y dónde vive cada restricción |
-| [design/](design/) | El canvas de Claude Design del que sale la interfaz |
+| [design/](design/) | El canvas de diseño del que sale la interfaz |
 
 ## Estructura
 
@@ -30,34 +42,32 @@ web-descarga/  página de descarga del APK
 
 ## Verificación
 
-Cada push analiza y prueba la app en GitHub Actions — el equipo no tiene ancho
-de banda para descargar el SDK de Flutter:
+Cada push analiza y prueba la app en GitHub Actions — el equipo no tiene ancho de
+banda para descargar el SDK de Flutter:
 
 ```bash
 gh workflow run verificar.yml && gh run watch
 ```
 
-## Arquitectura
+Página de descarga del APK: **https://telestas.github.io/SIVAP/**
 
-- **App móvil + web**: Flutter (Dart), persistencia local cifrada (Drift o Isar).
-- **Backend**: FastAPI (Python) + PostgreSQL.
-- **Sync**: cola local con timestamp, resolución "último gana" + auditoría.
-- **Exportación**: .xlsx vía openpyxl, ficha de identidad y datos clínicos por separado.
+## Las reglas que todo cambio debe respetar
 
-## Reglas que todo cambio debe respetar
-
-1. Ficha del paciente y registro de visita son entidades **separadas**.
-2. **Sin ediciones silenciosas**: toda corrección genera entrada de auditoría.
-3. Formularios de visita **configurables como datos**, no hardcodeados.
-4. Módulo de **asignación de protocolo desacoplado** (aleatorización pre-generada).
-5. **Cifrado obligatorio** en reposo y en tránsito.
-6. Cada endpoint declara **qué rol** puede invocarlo.
-7. **Offline-first real**: capturar datos nunca requiere conexión.
-8. Sin enrolamiento de pacientes reales hasta el flag de **aprobación del CEI**.
+1. Ficha del paciente y datos clínicos son **entidades separadas**.
+2. **Cegamiento**: el sistema solo conoce Protocolo A y Protocolo B. Nunca cuál es
+   cuál. Hay una prueba automática que lo comprueba.
+3. **Sin ediciones silenciosas**: toda corrección genera entrada de auditoría.
+4. La captura se estructura **por eventos clínicos, no por calendario**.
+5. Formularios definidos **como datos**, no como código.
+6. Módulo de **asignación desacoplado** y ciego hacia adelante.
+7. La **semilla** no vive en el repositorio ni en la app.
+8. Multicéntrico: todo registro lleva **institución**.
+9. **Minimización** de datos personales.
+10. **Cifrado** obligatorio, en reposo y en tránsito.
+11. Cada endpoint declara **qué rol** lo invoca.
+12. **Offline-first real**.
+13. Sin pacientes reales hasta la **aprobación del CEI**.
+14. El **dato clínico manda** sobre la validación: los rangos avisan, no bloquean.
+15. **Nada identificable** en el repositorio.
 
 Detalle completo en [CLAUDE.md](CLAUDE.md).
-
-## Privacidad
-
-Repositorio **privado**. No versionar datos de pacientes, exportaciones ni credenciales
-(ver [.gitignore](.gitignore)).

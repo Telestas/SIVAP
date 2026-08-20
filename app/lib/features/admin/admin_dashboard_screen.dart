@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
-import '../../core/collections.dart';
 import '../../core/format.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
 import '../../core/widgets/controls.dart';
 import '../../data/local/seed_data.dart';
+import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/protocolo.dart';
-import '../../domain/models/visit.dart';
 import '../enrollment/enrollment_screen.dart';
-import '../visits/visit_capture_screen.dart';
+import '../eventos/paciente_timeline_screen.dart';
 
-/// 07 · Administrador — escritorio, con auditoría.
+/// Panel de administración, en escritorio.
 ///
-/// La misma app, en pantalla ancha. El administrador ve la cohorte entera, el
-/// estado de la cola de sincronización y el historial de correcciones.
+/// Muestra la cohorte en A/B. El recuento por rama es solo un recuento: quien
+/// lo mira no puede inferir cuál rama es cuál, porque el sistema no lo sabe
+/// (CLAUDE.md §2).
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -31,7 +31,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   static const _secciones = [
     'Pacientes',
-    'Visitas',
+    'Eventos',
     'Consentimientos',
     'Auditoría',
     'Usuarios y roles',
@@ -42,12 +42,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final pacientes = state.repo.pacientes().where((p) {
-      if (_filtroProtocolo != null && p.protocolo != _filtroProtocolo) return false;
+      if (_filtroProtocolo != null && p.protocolo != _filtroProtocolo) {
+        return false;
+      }
       final q = _busqueda.trim().toLowerCase();
       return q.isEmpty ||
           p.nombre.toLowerCase().contains(q) ||
-          p.numeroHistoriaClinica.contains(q) ||
-          p.carneIdentidad.contains(q);
+          p.numeroHistoriaClinica.toLowerCase().contains(q);
     }).toList();
 
     return Scaffold(
@@ -89,7 +90,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
 class _BarraLateral extends StatelessWidget {
   const _BarraLateral(
-      {required this.seleccionada, required this.secciones, required this.onSelect});
+      {required this.seleccionada,
+      required this.secciones,
+      required this.onSelect});
 
   final String seleccionada;
   final List<String> secciones;
@@ -117,9 +120,10 @@ class _BarraLateral extends StatelessWidget {
                         color: T.onInk,
                         letterSpacing: 0.4)),
                 SizedBox(height: 3),
-                Text('PANEL DE ADMINISTRACIÓN',
+                Text('ENSAYO LIVERE',
                     style: TextStyle(
                         fontFamily: T.mono,
+                        fontFamilyFallback: T.monoFallback,
                         fontSize: 10,
                         letterSpacing: 0.9,
                         color: T.sidebarMuted)),
@@ -161,7 +165,10 @@ class _BarraLateral extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(state.usuarioActual.role.label,
                     style: const TextStyle(
-                        fontFamily: T.mono, fontSize: 10.5, color: T.sidebarMuted)),
+                        fontFamily: T.mono,
+                        fontFamilyFallback: T.monoFallback,
+                        fontSize: 10.5,
+                        color: T.sidebarMuted)),
                 const SizedBox(height: 10),
                 GestureDetector(
                   onTap: state.cerrarSesion,
@@ -192,7 +199,7 @@ class _Cabecera extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final pacientes = state.repo.pacientes();
-    final vigente = pacientes.where((p) => p.protocolo == Protocolo.vigente).length;
+    final enA = pacientes.where((p) => p.protocolo == Protocolo.a).length;
 
     return Container(
       decoration: const BoxDecoration(
@@ -210,11 +217,11 @@ class _Cabecera extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Pacientes de la cohorte', style: T.h1),
+                    const Text('Pacientes del ensayo', style: T.h1),
                     const SizedBox(height: 4),
                     Text(
-                        '${pacientes.length} enrolados · $vigente protocolo vigente · '
-                        '${pacientes.length - vigente} protocolo nuevo',
+                        '${pacientes.length} enrolados · A: $enA · '
+                        'B: ${pacientes.length - enA}',
                         style: const TextStyle(fontSize: 13, color: T.secondary)),
                   ],
                 ),
@@ -235,7 +242,7 @@ class _Cabecera extends StatelessWidget {
               ],
               SizedBox(
                 width: 140,
-                child: AppButton('Exportar CSV',
+                child: AppButton('Exportar',
                     primary: false, onTap: () => _avisoExportacion(context)),
               ),
               const SizedBox(width: 9),
@@ -256,7 +263,7 @@ class _Cabecera extends StatelessWidget {
                   style: const TextStyle(fontSize: 13.5, color: T.ink),
                   decoration: InputDecoration(
                     isDense: true,
-                    hintText: 'Buscar por nombre, HC o carné',
+                    hintText: 'Buscar por nombre o código',
                     hintStyle: const TextStyle(fontSize: 13.5, color: T.faint),
                     filled: true,
                     fillColor: T.card,
@@ -269,7 +276,8 @@ class _Cabecera extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              _FiltroProtocolo(valor: filtroProtocolo, onChanged: onFiltroProtocolo),
+              _FiltroProtocolo(
+                  valor: filtroProtocolo, onChanged: onFiltroProtocolo),
             ],
           ),
         ],
@@ -282,7 +290,8 @@ class _Cabecera extends StatelessWidget {
       // La exportación real (.xlsx vía openpyxl) vive en el backend, que es
       // trabajo de un hito posterior. Decirlo es mejor que un botón que miente.
       content: Text(
-          'La exportación se genera en el servidor (.xlsx). Pendiente del hito de backend.',
+          'La exportación se genera en el servidor (.xlsx), con la rama como '
+          'A/B. Pendiente del hito de backend.',
           style: TextStyle(fontSize: 13)),
       backgroundColor: T.ink,
       behavior: SnackBarBehavior.floating,
@@ -314,7 +323,8 @@ class _FiltroProtocolo extends StatelessWidget {
             items: [
               const DropdownMenuItem(value: null, child: Text('Protocolo: todos')),
               for (final p in Protocolo.values)
-                DropdownMenuItem(value: p, child: Text('Protocolo: ${p.rama}')),
+                DropdownMenuItem(
+                    value: p, child: Text('Protocolo ${p.letra}')),
             ],
             onChanged: onChanged,
           ),
@@ -327,12 +337,12 @@ class _TablaPacientes extends StatelessWidget {
 
   final List<Patient> pacientes;
 
-  static const _columnas = [2.0, 1.1, 1.2, 1.5, 1.2, 1.1, 0.9];
+  static const columnas = [2.0, 1.1, 1.0, 2.2, 1.2, 1.1, 0.9];
   static const _titulos = [
     'Paciente',
-    'HC',
-    'Protocolo',
-    'Progreso de visitas',
+    'Código',
+    'Rama',
+    'Avance por fases',
     'Recolector',
     'Sincronización',
     'Auditoría'
@@ -358,7 +368,7 @@ class _TablaPacientes extends StatelessWidget {
               children: [
                 for (var i = 0; i < _titulos.length; i++)
                   Expanded(
-                    flex: (_columnas[i] * 10).round(),
+                    flex: (columnas[i] * 10).round(),
                     child: SectionLabel(_titulos[i], size: 10),
                   ),
               ],
@@ -371,7 +381,7 @@ class _TablaPacientes extends StatelessWidget {
                   style: TextStyle(fontSize: 13.5, color: T.faint)),
             ),
           for (final p in pacientes)
-            _FilaPaciente(paciente: p, visitas: repo.visitasDe(p.id)),
+            _FilaPaciente(paciente: p, eventos: repo.eventosDe(p.id)),
         ],
       ),
     );
@@ -379,29 +389,26 @@ class _TablaPacientes extends StatelessWidget {
 }
 
 class _FilaPaciente extends StatelessWidget {
-  const _FilaPaciente({required this.paciente, required this.visitas});
+  const _FilaPaciente({required this.paciente, required this.eventos});
 
   final Patient paciente;
-  final List<Visit> visitas;
+  final List<EventoClinico> eventos;
 
   @override
   Widget build(BuildContext context) {
     final repo = AppScope.of(context).repo;
-    final correcciones = repo.auditoria().where((a) =>
-        a.entidadId == paciente.id ||
-        visitas.any((v) => v.id == a.entidadId)).length;
+    final ids = eventos.map((e) => e.id).toSet();
+    final correcciones =
+        repo.auditoria().where((a) => ids.contains(a.entidadId)).length;
+    final enCola =
+        eventos.any((e) => e.sync != SyncStatus.sincronizado && !e.vacio);
 
-    final enCola = visitas.any((v) => v.sync != SyncStatus.sincronizado && !v.vacia);
-    final primeraAbierta =
-        visitas.primeroQue((v) => !v.status.esInmutable) ?? visitas.first;
-
-    Widget celda(int flex, Widget hijo) =>
-        Expanded(flex: (_TablaPacientes._columnas[flex] * 10).round(), child: hijo);
+    Widget celda(int indice, Widget hijo) => Expanded(
+        flex: (_TablaPacientes.columnas[indice] * 10).round(), child: hijo);
 
     return InkWell(
       onTap: () => Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => VisitCaptureScreen(
-              patientId: paciente.id, diaInicial: primeraAbierta.dia))),
+          builder: (_) => PacienteTimelineScreen(patientId: paciente.id))),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
         decoration: const BoxDecoration(
@@ -416,7 +423,9 @@ class _FilaPaciente extends StatelessWidget {
                 children: [
                   Text(paciente.nombre,
                       style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w600, color: T.ink)),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: T.ink)),
                   const SizedBox(height: 2),
                   Text(paciente.demografia,
                       style: const TextStyle(fontSize: 11.5, color: T.faint)),
@@ -427,19 +436,31 @@ class _FilaPaciente extends StatelessWidget {
                 1,
                 Text(paciente.numeroHistoriaClinica,
                     style: const TextStyle(
-                        fontFamily: T.mono, fontSize: 12.5, color: T.body))),
-            celda(2, Align(
-                alignment: Alignment.centerLeft,
-                child: ProtocolChip(paciente.protocolo))),
+                        fontFamily: T.mono,
+                        fontFamilyFallback: T.monoFallback,
+                        fontSize: 12.5,
+                        color: T.body))),
+            celda(
+                2,
+                Align(
+                    alignment: Alignment.centerLeft,
+                    child: ProtocolChip(paciente.protocolo))),
             celda(
               3,
-              // Wrap y no Row: en una pantalla estrecha cinco píldoras no caben
-              // en el ancho de la columna y un Row desborda.
               Wrap(
                 spacing: 4,
                 runSpacing: 4,
                 children: [
-                  for (final v in visitas) DayPill(dia: v.dia, status: v.status),
+                  for (final fase in FaseEstudio.values)
+                    FasePill(
+                      fase: fase,
+                      registrados: eventos
+                          .where((e) =>
+                              e.tipo.fase == fase && e.estado.esInmutable)
+                          .length,
+                      enBorrador: eventos.any(
+                          (e) => e.tipo.fase == fase && !e.estado.esInmutable),
+                    ),
                 ],
               ),
             ),
@@ -509,10 +530,19 @@ class _PanelAuditoria extends StatelessWidget {
                         fontSize: 14.5, fontWeight: FontWeight.w600, color: T.ink)),
                 Text('Ver todo',
                     style: TextStyle(
-                        fontSize: 12.5, fontWeight: FontWeight.w600, color: T.accent)),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: T.accent)),
               ],
             ),
           ),
+          if (entradas.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Text('Sin correcciones registradas.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: T.faint)),
+            ),
           for (final a in entradas)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
@@ -520,16 +550,18 @@ class _PanelAuditoria extends StatelessWidget {
                 border: Border(bottom: BorderSide(color: Color(0xFFF2F3F4))),
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     flex: 11,
                     child: Text(F.fechaHora(a.ocurridoEn),
                         style: const TextStyle(
-                            fontFamily: T.mono, fontSize: 12, color: T.muted)),
+                            fontFamily: T.mono,
+                            fontFamilyFallback: T.monoFallback,
+                            fontSize: 12,
+                            color: T.muted)),
                   ),
                   Expanded(
-                    flex: 14,
+                    flex: 16,
                     child: Text(a.descripcionObjetivo,
                         style: const TextStyle(fontSize: 13, color: T.ink)),
                   ),
@@ -556,11 +588,12 @@ class _PanelAuditoria extends StatelessWidget {
 }
 
 class _Cambio extends StatelessWidget {
-  const _Cambio(
-      {required this.campo,
-      required this.anterior,
-      required this.nuevo,
-      required this.motivo});
+  const _Cambio({
+    required this.campo,
+    required this.anterior,
+    required this.nuevo,
+    required this.motivo,
+  });
 
   final String campo;
   final String? anterior;
@@ -577,13 +610,17 @@ class _Cambio extends StatelessWidget {
                 text: anterior ?? '—',
                 style: const TextStyle(
                     fontFamily: T.mono,
+                    fontFamilyFallback: T.monoFallback,
                     decoration: TextDecoration.lineThrough,
                     color: T.dangerFg)),
             const TextSpan(text: ' → '),
             TextSpan(
                 text: nuevo ?? '—',
                 style: const TextStyle(
-                    fontFamily: T.mono, fontWeight: FontWeight.w600, color: T.ink)),
+                    fontFamily: T.mono,
+                    fontFamilyFallback: T.monoFallback,
+                    fontWeight: FontWeight.w600,
+                    color: T.ink)),
             TextSpan(text: ' — $motivo'),
           ],
         ),

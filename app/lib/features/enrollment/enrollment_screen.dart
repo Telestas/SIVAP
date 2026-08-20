@@ -255,10 +255,10 @@ class _PanelAsignacion extends StatelessWidget {
                 children: [
                   ProtocolChip(paciente!.protocolo, largo: true, fontSize: 12),
                   const SizedBox(width: 11),
+                  // Solo la letra y la hora. Ninguna descripción de la rama:
+                  // el sistema no sabe cuál es cuál (CLAUDE.md §2).
                   Expanded(
-                    child: Text(
-                        '${paciente!.protocolo.rama}\n'
-                        'asignada ${F.hora(paciente!.asignadoEn)}',
+                    child: Text('Asignado a las ${F.hora(paciente!.asignadoEn)}',
                         style: const TextStyle(
                             fontSize: 12.5, color: T.secondary, height: 1.4)),
                   ),
@@ -268,8 +268,8 @@ class _PanelAsignacion extends StatelessWidget {
             const Divider(height: 1, color: Color(0xFFDBE6E3)),
             const SizedBox(height: 9),
             const Text(
-                'La asignación es automática y no puede modificarse. Cualquier '
-                'cambio requiere solicitud al administrador y queda en auditoría.',
+                'La asignación es automática y no puede modificarse. El sistema '
+                'no registra a qué protocolo corresponde cada rama.',
                 style: TextStyle(fontSize: 12, color: T.secondary, height: 1.5)),
           ],
         ),

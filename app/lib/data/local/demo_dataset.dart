@@ -1,253 +1,347 @@
-import '../../domain/models/audit_entry.dart';
+import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/protocolo.dart';
 import '../../domain/models/role.dart';
-import '../../domain/models/visit.dart';
 import 'seed_data.dart';
 
-/// Juego de datos de demostración: los mismos casos del canvas de diseño.
+/// Juego de datos de demostración.
+///
+/// **Ningún paciente de aquí es real.** Son trayectorias inventadas, elegidas
+/// para que se vea lo que el modelo por eventos permite y el de calendario no:
+/// hitos que se repiten un número distinto de veces en cada paciente, y
+/// trayectorias que terminan donde la clínica las termina.
 ///
 /// Vive aparte de las implementaciones de almacén para que la versión en
-/// memoria y la versión en SQLite muestren exactamente lo mismo. Dos juegos de
-/// datos de prueba divergiendo es una fuente de confusión gratuita.
-///
-/// NINGUNO de estos pacientes es real.
+/// memoria y la de SQLite muestren exactamente lo mismo.
 class Demo {
   const Demo._();
 
   static const pacientes = <DemoPaciente>[
+    // Weaning difícil: tres días de cribado, dos intentos de PVE, el segundo
+    // todavía en borrador. Es el caso que el modelo anterior no podía
+    // representar.
     DemoPaciente(
-      id: 'p-estevez',
+      id: 'p-demo-01',
       nombre: 'Reinaldo Estévez Cruz',
-      carneIdentidad: '64020112345',
+      carneIdentidad: '00000000001',
       edad: 62,
       sexo: Sexo.masculino,
-      hc: '41-2298',
-      telefono: '5 218 4409',
-      direccion: 'Ave. Céspedes nº 118, Rpto. Vista Alegre, mun. Santiago',
-      protocolo: Protocolo.nuevo,
-      recolectorId: 'u-morales',
-      diasDesdeEnrolamiento: 4,
-      estados: [
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-        VisitStatus.enCaptura,
-        VisitStatus.programada,
-        VisitStatus.programada,
-      ],
+      hc: 'DEMO-01',
+      telefono: '5 000 0001',
+      protocolo: Protocolo.a,
+      recolectorId: 'u-001',
+      diasDesdeEnrolamiento: 6,
       sync: SyncStatus.enCola,
+      eventos: [
+        DemoEvento(TipoEvento.enrolamiento, 0, {
+          'fecha_ingreso_uci': '2026-08-12',
+          'causa_intubacion': 'Respiratoria',
+          'comorbilidades': ['EPOC', 'HTA'],
+          'imc': '25–29,9 sobrepeso',
+        }),
+        DemoEvento(TipoEvento.estratificacionRiesgo, 0, {
+          'fecha_inicio_vmi': '2026-08-14',
+          'fio2': 55,
+          'peep': 8,
+        }),
+        DemoEvento(TipoEvento.cribado, 2, {
+          'cumple_criterios': false,
+          'observaciones': 'Persiste requerimiento de FiO₂ elevada.',
+        }),
+        DemoEvento(TipoEvento.cribado, 3, {
+          'cumple_criterios': false,
+          'observaciones': 'Mejora ventilatoria, aún sin criterios completos.',
+        }),
+        DemoEvento(TipoEvento.cribado, 4, {'cumple_criterios': true}),
+        DemoEvento(TipoEvento.evaluacionDiaria, 5, {
+          'detencion_sedacion': true,
+          'evaluacion_ventilacion_espontanea': true,
+          'duracion_ventilacion_espontanea': '> 15 min',
+        }),
+        DemoEvento(TipoEvento.pruebaVentilacionEspontanea, 5, {
+          'metodo_pve': 'Tubo en T',
+          'rsbi_inicio': 88,
+          'fr_inicio': 24,
+          'rsbi_final': 118,
+          'fr_final': 34,
+          'resultado_pve': 'Fallo',
+          'duracion_pve': '< 30 min',
+        }),
+        // Borrador abierto: el segundo intento se está capturando ahora mismo.
+        DemoEvento(
+          TipoEvento.pruebaVentilacionEspontanea,
+          6,
+          {'metodo_pve': 'PSV + PEEP', 'rsbi_inicio': 74, 'fr_inicio': 21},
+          borrador: true,
+        ),
+      ],
     ),
+
+    // Recién enrolado, con el enrolamiento aún en borrador.
     DemoPaciente(
-      id: 'p-ojeda',
+      id: 'p-demo-02',
       nombre: 'Marta Ojeda Pino',
-      carneIdentidad: '72031544218',
+      carneIdentidad: '00000000002',
       edad: 54,
       sexo: Sexo.femenino,
-      hc: '41-2301',
-      telefono: '5 342 8871',
-      direccion: 'Calle 21 e/ 4 y 6, Rpto. Sueño, mun. Santiago',
-      protocolo: Protocolo.vigente,
-      recolectorId: 'u-morales',
+      hc: 'DEMO-02',
+      telefono: '5 000 0002',
+      protocolo: Protocolo.b,
+      recolectorId: 'u-001',
       diasDesdeEnrolamiento: 0,
-      estados: [
-        VisitStatus.enCaptura,
-        VisitStatus.programada,
-        VisitStatus.programada,
-        VisitStatus.programada,
-        VisitStatus.programada,
-      ],
       sync: SyncStatus.enCola,
+      eventos: [
+        DemoEvento(
+          TipoEvento.enrolamiento,
+          0,
+          {'fecha_ingreso_uci': '2026-08-18', 'causa_intubacion': 'Neurológica'},
+          borrador: true,
+        ),
+      ],
     ),
+
+    // Weaning simple: un cribado, una PVE, extubación y alta viva.
     DemoPaciente(
-      id: 'p-fuentes',
+      id: 'p-demo-03',
       nombre: 'Yanet Fuentes Abreu',
-      carneIdentidad: '79061233087',
+      carneIdentidad: '00000000003',
       edad: 47,
       sexo: Sexo.femenino,
-      hc: '41-2287',
-      telefono: '5 471 2093',
-      direccion: 'Calle 9 nº 402, Rpto. Santa Bárbara, mun. Santiago',
-      protocolo: Protocolo.nuevo,
-      recolectorId: 'u-morales',
-      diasDesdeEnrolamiento: 6,
-      estados: [
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-        VisitStatus.programada,
-        VisitStatus.programada,
-      ],
+      hc: 'DEMO-03',
+      telefono: '5 000 0003',
+      protocolo: Protocolo.a,
+      recolectorId: 'u-001',
+      diasDesdeEnrolamiento: 12,
       sync: SyncStatus.sincronizado,
+      eventos: [
+        DemoEvento(TipoEvento.enrolamiento, 0, {
+          'fecha_ingreso_uci': '2026-08-06',
+          'causa_intubacion': 'Anestésica/quirúrgica',
+          'imc': '18,5–24,9 normopeso',
+        }),
+        DemoEvento(TipoEvento.estratificacionRiesgo, 0,
+            {'fecha_inicio_vmi': '2026-08-08', 'fio2': 40, 'peep': 5}),
+        DemoEvento(TipoEvento.cribado, 2, {'cumple_criterios': true}),
+        DemoEvento(TipoEvento.evaluacionDiaria, 2, {
+          'detencion_sedacion': true,
+          'evaluacion_ventilacion_espontanea': true,
+          'duracion_ventilacion_espontanea': '> 15 min',
+        }),
+        DemoEvento(TipoEvento.pruebaVentilacionEspontanea, 2, {
+          'metodo_pve': 'PSV',
+          'rsbi_inicio': 52,
+          'fr_inicio': 18,
+          'rsbi_final': 56,
+          'fr_final': 19,
+          'resultado_pve': 'Éxito',
+          'duracion_pve': '30–60 min',
+        }),
+        DemoEvento(TipoEvento.extubacion, 3, {
+          'test_fuga': true,
+          'resultado_test_fuga': 'Con fuga',
+          'duracion_total_vmi': 4,
+        }),
+        DemoEvento(TipoEvento.soportePostExtubacion, 3, {'tipo_soporte': 'HFNC'}),
+        DemoEvento(TipoEvento.egresoUci, 8,
+            {'estancia_uci': 10, 'estado_egreso': 'Vivo'}),
+      ],
     ),
+
+    // Extubación fallida: el desenlace principal del ensayo.
     DemoPaciente(
-      id: 'p-saez',
+      id: 'p-demo-04',
       nombre: 'Idalberto Sáez Roque',
-      carneIdentidad: '68091877431',
+      carneIdentidad: '00000000004',
       edad: 58,
       sexo: Sexo.masculino,
-      hc: '41-2244',
-      telefono: '5 663 5510',
-      direccion: 'Carretera del Caney km 2, mun. Santiago',
-      protocolo: Protocolo.nuevo,
-      recolectorId: 'u-perez',
-      diasDesdeEnrolamiento: 15,
-      estados: [
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-      ],
+      hc: 'DEMO-04',
+      telefono: '5 000 0004',
+      protocolo: Protocolo.a,
+      recolectorId: 'u-002',
+      diasDesdeEnrolamiento: 20,
       sync: SyncStatus.sincronizado,
+      eventos: [
+        DemoEvento(TipoEvento.enrolamiento, 0, {
+          'fecha_ingreso_uci': '2026-07-29',
+          'causa_intubacion': 'Shock',
+          'comorbilidades': ['DM', 'ERC'],
+        }),
+        DemoEvento(TipoEvento.estratificacionRiesgo, 0,
+            {'fecha_inicio_vmi': '2026-07-31', 'fio2': 60, 'peep': 10}),
+        DemoEvento(TipoEvento.cribado, 3, {'cumple_criterios': true}),
+        DemoEvento(TipoEvento.evaluacionDiaria, 3, {
+          'detencion_sedacion': true,
+          'evaluacion_ventilacion_espontanea': true,
+          'duracion_ventilacion_espontanea': '10–15 min',
+        }),
+        DemoEvento(TipoEvento.pruebaVentilacionEspontanea, 4, {
+          'metodo_pve': 'CPAP',
+          'rsbi_inicio': 96,
+          'fr_inicio': 26,
+          'rsbi_final': 101,
+          'fr_final': 28,
+          'resultado_pve': 'Éxito',
+          'duracion_pve': '60–120 min',
+        }),
+        DemoEvento(TipoEvento.extubacion, 4,
+            {'test_fuga': false, 'duracion_total_vmi': 6}),
+        DemoEvento(TipoEvento.soportePostExtubacion, 4, {'tipo_soporte': 'VNI'}),
+        DemoEvento(TipoEvento.reintubacion, 6, {
+          'reintubacion_72h': true,
+          'causa_reintubacion': 'Fallo respiratorio agudo',
+        }),
+        DemoEvento(TipoEvento.egresoUci, 18,
+            {'estancia_uci': 21, 'estado_egreso': 'Vivo'}),
+      ],
     ),
+
+    // Traqueostomía: la trayectoria se desvía y no llega a extubación.
     DemoPaciente(
-      id: 'p-napoles',
+      id: 'p-demo-05',
       nombre: 'Caridad Nápoles Vega',
-      carneIdentidad: '55112000914',
+      carneIdentidad: '00000000005',
       edad: 71,
       sexo: Sexo.femenino,
-      hc: '41-2239',
-      telefono: '5 109 7734',
-      direccion: 'Calle Heredia nº 57, centro, mun. Santiago',
-      protocolo: Protocolo.vigente,
-      recolectorId: 'u-perez',
-      diasDesdeEnrolamiento: 7,
-      estados: [
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-        VisitStatus.perdida,
-        VisitStatus.programada,
-        VisitStatus.programada,
-      ],
+      hc: 'DEMO-05',
+      telefono: '5 000 0005',
+      protocolo: Protocolo.b,
+      recolectorId: 'u-002',
+      diasDesdeEnrolamiento: 16,
       sync: SyncStatus.sincronizado,
+      eventos: [
+        DemoEvento(TipoEvento.enrolamiento, 0, {
+          'fecha_ingreso_uci': '2026-08-02',
+          'causa_intubacion': 'Neurológica',
+          'comorbilidades': ['HTA', 'ECV previa'],
+        }),
+        DemoEvento(TipoEvento.estratificacionRiesgo, 0,
+            {'fecha_inicio_vmi': '2026-08-04', 'fio2': 45, 'peep': 8}),
+        DemoEvento(TipoEvento.cribado, 2, {'cumple_criterios': false}),
+        DemoEvento(TipoEvento.cribado, 3, {'cumple_criterios': false}),
+        DemoEvento(TipoEvento.cribado, 4, {'cumple_criterios': false}),
+        DemoEvento(TipoEvento.cribado, 5, {
+          'cumple_criterios': false,
+          'observaciones': 'Sin progreso neurológico. Se plantea traqueostomía.',
+        }),
+        DemoEvento(TipoEvento.traqueostomia, 7,
+            {'fecha_traqueostomia': '2026-08-11'}),
+      ],
     ),
+
+    // En curso, con dos cribados registrados.
     DemoPaciente(
-      id: 'p-prieto',
+      id: 'p-demo-06',
       nombre: 'Osvaldo Prieto Lima',
-      carneIdentidad: '57042266180',
+      carneIdentidad: '00000000006',
       edad: 69,
       sexo: Sexo.masculino,
-      hc: '41-2270',
-      telefono: '5 882 3145',
-      direccion: 'Calle 6 nº 21, Rpto. Sueño, mun. Santiago',
-      protocolo: Protocolo.vigente,
-      recolectorId: 'u-morales',
-      diasDesdeEnrolamiento: 10,
-      estados: [
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-        VisitStatus.enviada,
-        VisitStatus.programada,
-      ],
+      hc: 'DEMO-06',
+      telefono: '5 000 0006',
+      protocolo: Protocolo.b,
+      recolectorId: 'u-001',
+      diasDesdeEnrolamiento: 3,
       sync: SyncStatus.sincronizado,
+      eventos: [
+        DemoEvento(TipoEvento.enrolamiento, 0, {
+          'fecha_ingreso_uci': '2026-08-15',
+          'causa_intubacion': 'Cardiovascular',
+          'comorbilidades': ['CI', 'IC'],
+        }),
+        DemoEvento(TipoEvento.estratificacionRiesgo, 0,
+            {'fecha_inicio_vmi': '2026-08-17', 'fio2': 50, 'peep': 6}),
+        DemoEvento(TipoEvento.cribado, 2, {'cumple_criterios': false}),
+        DemoEvento(TipoEvento.cribado, 3, {'cumple_criterios': false}),
+      ],
     ),
+
+    // Trayectoria completa con seguimiento post-egreso.
     DemoPaciente(
-      id: 'p-camacho',
+      id: 'p-demo-07',
       nombre: 'Elsa Camacho Ruiz',
-      carneIdentidad: '82070455602',
+      carneIdentidad: '00000000007',
       edad: 44,
       sexo: Sexo.femenino,
-      hc: '41-2231',
-      telefono: '5 337 9028',
-      direccion: 'Calle 12 nº 305, Rpto. Chicharrones, mun. Santiago',
-      protocolo: Protocolo.nuevo,
-      recolectorId: 'u-perez',
-      diasDesdeEnrolamiento: 2,
-      estados: [
-        VisitStatus.enviada,
-        VisitStatus.enCaptura,
-        VisitStatus.programada,
-        VisitStatus.programada,
-        VisitStatus.programada,
+      hc: 'DEMO-07',
+      telefono: '5 000 0007',
+      protocolo: Protocolo.a,
+      recolectorId: 'u-002',
+      diasDesdeEnrolamiento: 34,
+      sync: SyncStatus.sincronizado,
+      eventos: [
+        DemoEvento(TipoEvento.enrolamiento, 0, {
+          'fecha_ingreso_uci': '2026-07-15',
+          'causa_intubacion': 'Respiratoria',
+          'imc': '30–39,9 obeso',
+        }),
+        DemoEvento(TipoEvento.estratificacionRiesgo, 0,
+            {'fecha_inicio_vmi': '2026-07-17', 'fio2': 65, 'peep': 12}),
+        DemoEvento(TipoEvento.cribado, 3, {'cumple_criterios': true}),
+        DemoEvento(TipoEvento.evaluacionDiaria, 3, {
+          'detencion_sedacion': true,
+          'evaluacion_ventilacion_espontanea': true,
+          'duracion_ventilacion_espontanea': '> 15 min',
+        }),
+        DemoEvento(TipoEvento.pruebaVentilacionEspontanea, 4, {
+          'metodo_pve': 'PSV + PEEP',
+          'rsbi_inicio': 61,
+          'fr_inicio': 20,
+          'rsbi_final': 64,
+          'fr_final': 21,
+          'resultado_pve': 'Éxito',
+          'duracion_pve': '30–60 min',
+        }),
+        DemoEvento(TipoEvento.extubacion, 4, {
+          'test_fuga': true,
+          'resultado_test_fuga': 'Sin fuga',
+          'duracion_total_vmi': 6,
+        }),
+        DemoEvento(
+            TipoEvento.soportePostExtubacion, 4, {'tipo_soporte': 'VNI + HFNC'}),
+        DemoEvento(TipoEvento.egresoUci, 9,
+            {'estancia_uci': 11, 'estado_egreso': 'Vivo'}),
+        DemoEvento(TipoEvento.seguimientoPostEgreso, 33,
+            {'fallecimiento_post_egreso': 'No fallecimiento a 28 días'}),
       ],
-      sync: SyncStatus.enCola,
     ),
   ];
 
-  /// Valores clínicos por posición de visita. La tercera reproduce la maqueta,
-  /// temperatura fuera de rango incluida.
-  static Map<String, Object?> valores(int indiceDia) => switch (indiceDia) {
-        2 => const {
-            'ta': '148/92',
-            'fc': 88,
-            'fr': 20,
-            'temp': 38.7,
-            'spo2': 94,
-            'sintomas': ['Fiebre', 'Disnea'],
-            'observaciones':
-                'Persiste febrícula vespertina. Tolera la vía oral. Se mantiene '
-                    'esquema según rama asignada; sin eventos adversos referidos.',
-          },
-        0 => const {
-            'ta': '136/84',
-            'fc': 82,
-            'fr': 18,
-            'temp': 37.2,
-            'spo2': 96,
-            'peso': 71.5,
-            'sintomas': ['Fiebre', 'Tos'],
-            'observaciones':
-                'Ingresa por cuadro febril de 48 h. Inicia esquema asignado.',
-          },
-        _ => const {
-            'ta': '132/80',
-            'fc': 76,
-            'fr': 17,
-            'temp': 36.9,
-            'spo2': 97,
-            'sintomas': ['Astenia'],
-            'observaciones': 'Evolución favorable. Continúa esquema.',
-          },
-      };
-
-  /// Historial de auditoría de muestra. `entidadId` apunta a la visita por
-  /// `paciente/día`, y cada almacén lo resuelve a su identificador real.
+  /// Correcciones de muestra, para que el historial de auditoría no salga vacío.
   static final auditoria = <DemoAuditoria>[
     DemoAuditoria(
       ocurridoEn: DateTime(2026, 8, 20, 8, 12),
       autor: Seed.guerra,
-      pacienteId: 'p-estevez',
-      dia: 3,
-      campo: 'temp',
-      valorAnterior: '39.7',
-      valorNuevo: '38.7',
-      motivo: 'error de tecleo',
+      pacienteId: 'p-demo-01',
+      tipo: TipoEvento.pruebaVentilacionEspontanea,
+      ocurrencia: 1,
+      campo: 'rsbi_final',
+      valorAnterior: '181',
+      valorNuevo: '118',
+      motivo: 'cifras transpuestas al teclear',
     ),
     DemoAuditoria(
       ocurridoEn: DateTime(2026, 8, 19, 16, 40),
       autor: Seed.guerra,
-      pacienteId: 'p-napoles',
-      dia: 5,
-      campo: 'estado',
-      valorAnterior: 'programada',
-      valorNuevo: 'perdida',
-      motivo: 'paciente no localizado en dos intentos',
-    ),
-    DemoAuditoria(
-      ocurridoEn: DateTime(2026, 8, 19, 11, 5),
-      autor: Seed.morales,
-      pacienteId: 'p-saez',
-      dia: null,
-      campo: 'telefono',
-      valorAnterior: '5 663 5509',
-      valorNuevo: '5 663 5510',
-      motivo: 'solicitado por el recolector',
+      pacienteId: 'p-demo-04',
+      tipo: TipoEvento.reintubacion,
+      ocurrencia: 1,
+      campo: 'causa_reintubacion',
+      valorAnterior: 'Otra',
+      valorNuevo: 'Fallo respiratorio agudo',
+      motivo: 'precisado tras revisar la historia clínica',
     ),
     DemoAuditoria(
       ocurridoEn: DateTime(2026, 8, 18, 9, 22),
       autor: Seed.guerra,
-      pacienteId: 'p-saez',
-      dia: 10,
-      campo: 'spo2',
-      valorAnterior: '9.4',
-      valorNuevo: '94',
-      motivo: 'punto decimal mal introducido',
+      pacienteId: 'p-demo-03',
+      tipo: TipoEvento.extubacion,
+      ocurrencia: 1,
+      campo: 'duracion_total_vmi',
+      valorAnterior: '40',
+      valorNuevo: '4',
+      motivo: 'cero de más',
     ),
   ];
 
-  /// Nombre del paciente de demostración, para componer la referencia corta
-  /// del historial de auditoría.
   static DemoPaciente porId(String id) =>
       pacientes.firstWhere((p) => p.id == id);
 }
@@ -261,12 +355,11 @@ class DemoPaciente {
     required this.sexo,
     required this.hc,
     required this.telefono,
-    required this.direccion,
     required this.protocolo,
     required this.recolectorId,
     required this.diasDesdeEnrolamiento,
-    required this.estados,
     required this.sync,
+    required this.eventos,
   });
 
   final String id;
@@ -276,19 +369,20 @@ class DemoPaciente {
   final Sexo sexo;
   final String hc;
   final String telefono;
-  final String direccion;
   final Protocolo protocolo;
   final String recolectorId;
 
   /// Cuántos días antes de [Seed.hoy] se enroló.
   final int diasDesdeEnrolamiento;
-
-  /// Estado de cada visita, en el orden de `diasVisita`.
-  final List<VisitStatus> estados;
   final SyncStatus sync;
+  final List<DemoEvento> eventos;
 
   DateTime get enroladoEn =>
       Seed.hoy.subtract(Duration(days: diasDesdeEnrolamiento));
+
+  /// Dirección de demostración. El paso 5 elimina este campo de la ficha: el
+  /// Anexo 4 no lo pide, y cada dato personal de más hay que justificarlo.
+  String get direccion => 'Dirección de demostración';
 
   String get apellidos {
     final partes = nombre.split(' ');
@@ -296,12 +390,25 @@ class DemoPaciente {
   }
 }
 
+class DemoEvento {
+  const DemoEvento(this.tipo, this.diaDesdeEnrolamiento, this.valores,
+      {this.borrador = false});
+
+  final TipoEvento tipo;
+
+  /// Días transcurridos desde el enrolamiento hasta que ocurrió el hito.
+  final int diaDesdeEnrolamiento;
+  final Map<String, Object?> valores;
+  final bool borrador;
+}
+
 class DemoAuditoria {
   const DemoAuditoria({
     required this.ocurridoEn,
     required this.autor,
     required this.pacienteId,
-    required this.dia,
+    required this.tipo,
+    required this.ocurrencia,
     required this.campo,
     required this.valorAnterior,
     required this.valorNuevo,
@@ -311,16 +418,10 @@ class DemoAuditoria {
   final DateTime ocurridoEn;
   final Investigador autor;
   final String pacienteId;
-
-  /// `null` si la corrección fue sobre la ficha y no sobre una visita.
-  final int? dia;
+  final TipoEvento tipo;
+  final int ocurrencia;
   final String campo;
   final String? valorAnterior;
   final String? valorNuevo;
   final String motivo;
-
-  AuditEntity get entidad => dia == null ? AuditEntity.ficha : AuditEntity.visita;
-
-  String get descripcionObjetivo =>
-      '${Demo.porId(pacienteId).apellidos} · ${dia == null ? 'ficha' : 'D$dia'}';
 }

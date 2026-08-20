@@ -1,0 +1,37 @@
+name: sivap
+description: >-
+  SIVAP — captura de datos de un estudio de cohorte clínico.
+  App Flutter offline-first para investigadores de campo.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+# Sin dependencias de terceros a propósito: la app debe poder compilarse en una
+# máquina con conectividad intermitente, sin depender de pub.dev en cada build.
+# Cuando entre la persistencia local cifrada se añadirá Drift o Isar, y ahí sí
+# habrá que resolver el acceso a pub una vez.
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    # IBM Plex Sans se distribuye como fuente variable: Flutter la carga y
+    # sintetiza los pesos intermedios. Si el equipo quiere los cortes exactos
+    # del diseño, se añaden los estáticos y se declaran por peso.
+    - family: IBMPlexSans
+      fonts:
+        - asset: assets/fonts/IBMPlexSans-Variable.ttf
+    - family: IBMPlexMono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
+        - asset: assets/fonts/IBMPlexMono-SemiBold.ttf
+          weight: 600

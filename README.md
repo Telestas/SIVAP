@@ -4,7 +4,7 @@ Sistema para automatizar un estudio de cohorte que valida un protocolo clínico 
 frente al vigente, en un hospital cubano. Captura de datos **offline-first** en visitas
 fijas (Día 1, 3, 5, 10, 14), sincronización posterior y exportación a Excel para análisis.
 
-> Nombre de trabajo provisional. Estado: **Hito 0 — definición de bases**.
+> Nombre de trabajo provisional. Estado: **Hito 1 — interfaz y capa de datos local**.
 
 ## Documentación
 
@@ -12,8 +12,19 @@ fijas (Día 1, 3, 5, 10, 14), sincronización posterior y exportación a Excel p
 |---|---|
 | [CLAUDE.md](CLAUDE.md) | Constitución del repositorio: restricciones no negociables, glosario y convenciones |
 | [BASES_MVP_SIVAP.md](BASES_MVP_SIVAP.md) | Alcance del MVP, arquitectura, roles y decisiones pendientes |
+| [docs/HITO_1.md](docs/HITO_1.md) | Qué se entrega en este hito y qué revisar |
+| [app/README.md](app/README.md) | Cómo correr la app y dónde vive cada restricción |
+| [design/](design/) | El canvas de Claude Design del que sale la interfaz |
 
-## Arquitectura (prevista)
+## Estructura
+
+```
+app/      cliente Flutter (móvil + web)
+design/   canvas de diseño, como referencia
+docs/     notas por hito
+```
+
+## Arquitectura
 
 - **App móvil + web**: Flutter (Dart), persistencia local cifrada (Drift o Isar).
 - **Backend**: FastAPI (Python) + PostgreSQL.

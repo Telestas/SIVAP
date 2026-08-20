@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#ececeb;-webkit-font-smoothing:antialiased}
+a{color:#17615a;text-decoration:none}
+a:hover{color:#0f423d;text-decoration:underline}
+</style>
+</helmet>
+<div style="min-height:100%;background:#ececeb;padding:56px 48px 110px;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#16181a">
+  <header style="display:flex;flex-direction:column;gap:10px;max-width:760px;margin-bottom:44px">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7a828c">Sistema SIVAP · nombre de trabajo</div>
+    <h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.01em">Estudio de cohorte — validación de protocolo</h1>
+    <p style="margin:0;font-size:15px;line-height:1.55;color:#5f6771;text-wrap:pretty">Cinco pantallas para médicos investigadores en campo. Superficie clara, badges con significado, estado de sincronización siempre visible. La vista de administrador se muestra en escritorio; el resto es móvil.</p>
+  </header>
+
+  <div style="display:flex;flex-wrap:wrap;gap:56px 44px;align-items:flex-start">
+
+    <!-- 1. LOGIN -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7a828c">01 · Acceso y rol</div>
+      <div style="width:390px;height:844px;background:#fbfbfa;border:1px solid #d5d8db;border-radius:24px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 2px 10px rgba(20,24,28,.06)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a828c">
+          <span>08:41</span><span>SIN DATOS · 84%</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:22px;padding:36px 24px 24px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:26px;font-weight:700;letter-spacing:.02em">SIVAP</div>
+            <div style="font-size:13px;color:#5f6771;line-height:1.5">Registro clínico de cohorte<br>Hospital Provincial · Servicio de Medicina Interna</div>
+          </div>
+
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#fdf1da;border:1px solid #eed9ac;border-radius:8px;padding:12px 14px">
+            <div style="width:8px;height:8px;border-radius:50%;background:#c98a1a;margin-top:5px;flex:none"></div>
+            <div style="font-size:12.5px;line-height:1.5;color:#7a5710">Sin conexión de datos. Se validará su credencial guardada en el dispositivo; los envíos quedarán en cola.</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Usuario</label>
+              <div style="border:1px solid #dcdfe3;border-radius:7px;padding:12px 13px;background:#fff;font-size:15px">dra.morales</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Contraseña</label>
+              <div style="border:1px solid #dcdfe3;border-radius:7px;padding:12px 13px;background:#fff;font-size:15px;letter-spacing:.2em;color:#5f6771">••••••••</div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Rol de sesión</label>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;gap:11px;align-items:flex-start;border:1.5px solid #17615a;background:#e9f2f0;border-radius:8px;padding:12px 13px">
+                <div style="width:15px;height:15px;border-radius:50%;border:4.5px solid #17615a;background:#fff;margin-top:2px;flex:none"></div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <div style="font-size:14.5px;font-weight:600">Recolector de campo</div>
+                  <div style="font-size:12px;color:#5f6771;line-height:1.45">Crea pacientes y visitas propias. No edita registros ya enviados.</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:11px;align-items:flex-start;border:1px solid #dcdfe3;background:#fff;border-radius:8px;padding:12px 13px">
+                <div style="width:15px;height:15px;border-radius:50%;border:1.5px solid #b9bec4;background:#fff;margin-top:2px;flex:none"></div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <div style="font-size:14.5px;font-weight:600">Observador</div>
+                  <div style="font-size:12px;color:#5f6771;line-height:1.45">Consulta toda la cohorte en solo lectura.</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:11px;align-items:flex-start;border:1px solid #dcdfe3;background:#fff;border-radius:8px;padding:12px 13px">
+                <div style="width:15px;height:15px;border-radius:50%;border:1.5px solid #b9bec4;background:#fff;margin-top:2px;flex:none"></div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <div style="font-size:14.5px;font-weight:600">Administrador</div>
+                  <div style="font-size:12px;color:#5f6771;line-height:1.45">Control total. Toda corrección queda en auditoría.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:12px">
+            <div style="background:#16181a;color:#fbfbfa;border-radius:8px;padding:15px;text-align:center;font-size:15px;font-weight:600">Entrar</div>
+            <div style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8b929a;letter-spacing:.05em">v1.0.4 · última sincronización 19 ago, 17:22</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. LISTA — RECOLECTOR -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7a828c">02 · Lista — recolector de campo</div>
+      <div style="width:390px;height:844px;background:#fbfbfa;border:1px solid #d5d8db;border-radius:24px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 2px 10px rgba(20,24,28,.06)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a828c">
+          <span>08:47</span><span>SIN DATOS · 83%</span>
+        </div>
+        <div style="padding:8px 18px 14px;border-bottom:1px solid #e4e6e8;background:#fff;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <div style="font-size:19px;font-weight:600">Mis pacientes</div>
+              <div style="font-size:12px;color:#5f6771">Dra. Morales · Recolector de campo</div>
+            </div>
+            <div style="width:38px;height:38px;border-radius:50%;background:#e6e8ea;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#4a5158">CM</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px;border:1px solid #eed9ac;background:#fdf1da;border-radius:8px;padding:10px 12px">
+            <div style="width:8px;height:8px;border-radius:50%;background:#c98a1a;flex:none"></div>
+            <div style="font-size:12.5px;color:#7a5710;flex:1">{{ syncText }} · se enviará al recuperar señal</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a5710;font-weight:600">VER</div>
+          </div>
+          <div style="border:1px solid #dcdfe3;border-radius:7px;padding:10px 12px;background:#fff;font-size:14px;color:#8b929a">Buscar por nombre o núm. de historia</div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <div style="font-size:12.5px;padding:6px 12px;border-radius:20px;background:#16181a;color:#fbfbfa;font-weight:500">Todos · 14</div>
+            <div style="font-size:12.5px;padding:6px 12px;border-radius:20px;background:#fff;border:1px solid #dcdfe3;color:#4a5158">Visita hoy · 4</div>
+            <div style="font-size:12.5px;padding:6px 12px;border-radius:20px;background:#fff;border:1px solid #dcdfe3;color:#4a5158">Pendientes · 3</div>
+          </div>
+        </div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+          <div style="padding:11px 18px 6px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#8b929a">Visita programada hoy</div>
+
+          <div style="display:flex;flex-direction:column;gap:6px;padding:0 14px">
+            <div style="background:#fff;border:1px solid #e0e2e5;border-left:3px solid #c98a1a;border-radius:8px;padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                <div style="display:flex;flex-direction:column;gap:3px">
+                  <div style="font-size:15.5px;font-weight:600">Reinaldo Estévez Cruz</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#7a828c">HC 41-2298 · 62 a · M</div>
+                </div>
+                <div style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;background:#e2f0ed;color:#0f4f49;font-family:'IBM Plex Mono',monospace;letter-spacing:.03em;white-space:nowrap">PROT. NUEVO</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #eef0f1;padding-top:8px">
+                <div style="font-size:12.5px;color:#5f6771">Día 5 · vence hoy</div>
+                <div style="font-size:11.5px;color:#7a5710;font-weight:600;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#c98a1a;display:inline-block"></span>Sin enviar</div>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #e0e2e5;border-left:3px solid #c98a1a;border-radius:8px;padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                <div style="display:flex;flex-direction:column;gap:3px">
+                  <div style="font-size:15.5px;font-weight:600">Marta Ojeda Pino</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#7a828c">HC 41-2301 · 54 a · F</div>
+                </div>
+                <div style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;background:#e8eef7;color:#2c4a75;font-family:'IBM Plex Mono',monospace;letter-spacing:.03em;white-space:nowrap">PROT. VIGENTE</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #eef0f1;padding-top:8px">
+                <div style="font-size:12.5px;color:#5f6771">Día 1 · vence hoy</div>
+                <div style="font-size:11.5px;color:#7a5710;font-weight:600;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#c98a1a;display:inline-block"></span>Sin enviar</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:16px 18px 6px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#8b929a">Seguimiento</div>
+          <div style="display:flex;flex-direction:column;gap:6px;padding:0 14px">
+            <div style="background:#fff;border:1px solid #e0e2e5;border-radius:8px;padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                <div style="display:flex;flex-direction:column;gap:3px">
+                  <div style="font-size:15.5px;font-weight:600">Yanet Fuentes Abreu</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#7a828c">HC 41-2287 · 47 a · F</div>
+                </div>
+                <div style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;background:#e2f0ed;color:#0f4f49;font-family:'IBM Plex Mono',monospace;letter-spacing:.03em;white-space:nowrap">PROT. NUEVO</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #eef0f1;padding-top:8px">
+                <div style="font-size:12.5px;color:#5f6771">Próx. día 10 · 24 ago</div>
+                <div style="font-size:11.5px;color:#2f6b46;font-weight:600;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#3f8a5e;display:inline-block"></span>Enviado</div>
+              </div>
+            </div>
+            <div style="background:#fff;border:1px solid #e0e2e5;border-radius:8px;padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                <div style="display:flex;flex-direction:column;gap:3px">
+                  <div style="font-size:15.5px;font-weight:600">Osvaldo Prieto Lima</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#7a828c">HC 41-2270 · 69 a · M</div>
+                </div>
+                <div style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;background:#e8eef7;color:#2c4a75;font-family:'IBM Plex Mono',monospace;letter-spacing:.03em;white-space:nowrap">PROT. VIGENTE</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #eef0f1;padding-top:8px">
+                <div style="font-size:12.5px;color:#5f6771">Próx. día 14 · 28 ago</div>
+                <div style="font-size:11.5px;color:#2f6b46;font-weight:600;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#3f8a5e;display:inline-block"></span>Enviado</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="border-top:1px solid #e4e6e8;background:#fff;padding:12px 16px 20px">
+          <div style="background:#16181a;color:#fbfbfa;border-radius:8px;padding:14px;text-align:center;font-size:15px;font-weight:600">+ Enrolar paciente</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. LISTA — OBSERVADOR -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7a828c">03 · Lista — observador (solo lectura)</div>
+      <div style="width:390px;height:844px;background:#fbfbfa;border:1px solid #d5d8db;border-radius:24px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 2px 10px rgba(20,24,28,.06)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a828c">
+          <span>09:03</span><span>3G · 71%</span>
+        </div>
+        <div style="padding:8px 18px 14px;border-bottom:1px solid #e4e6e8;background:#fff;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <div style="font-size:19px;font-weight:600">Cohorte completa</div>
+              <div style="font-size:12px;color:#5f6771">Dr. Betancourt · Observador</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.06em;padding:6px 10px;border-radius:5px;background:#eceff1;color:#4a5158;border:1px solid #dfe2e5">SOLO LECTURA</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px;border:1px solid #c6ddcf;background:#e6f1ea;border-radius:8px;padding:10px 12px">
+            <div style="width:8px;height:8px;border-radius:50%;background:#3f8a5e;flex:none"></div>
+            <div style="font-size:12.5px;color:#2f6b46;flex:1">Datos al día · sincronizado 09:01</div>
+          </div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1;background:#fff;border:1px solid #e0e2e5;border-radius:8px;padding:11px 12px;display:flex;flex-direction:column;gap:3px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#8b929a;text-transform:uppercase">Prot. vigente</div>
+              <div style="font-size:22px;font-weight:600;color:#2c4a75">31</div>
+            </div>
+            <div style="flex:1;background:#fff;border:1px solid #e0e2e5;border-radius:8px;padding:11px 12px;display:flex;flex-direction:column;gap:3px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#8b929a;text-transform:uppercase">Prot. nuevo</div>
+              <div style="font-size:22px;font-weight:600;color:#0f4f49">29</div>
+            </div>
+          </div>
+          <div style="border:1px solid #dcdfe3;border-radius:7px;padding:10px 12px;background:#fff;font-size:14px;color:#8b929a">Buscar en 60 pacientes</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;padding:12px 14px 0">
+          <div style="background:#fff;border:1px solid #e0e2e5;border-radius:8px;padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div style="font-size:15.5px;font-weight:600">Reinaldo Estévez Cruz</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#7a828c">HC 41-2298 · recolecta: Dra. Morales</div>
+              </div>
+              <div style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;background:#e2f0ed;color:#0f4f49;font-family:'IBM Plex Mono',monospace;white-space:nowrap">PROT. NUEVO</div>
+            </div>
+            <div style="display:flex;gap:5px;border-top:1px solid #eef0f1;padding-top:8px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#e6f1ea;color:#2f6b46">D1</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#e6f1ea;color:#2f6b46">D3</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#fdf1da;color:#7a5710">D5</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#f0f1f2;color:#8b929a">D10</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#f0f1f2;color:#8b929a">D14</div>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e0e2e5;border-radius:8px;padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div style="font-size:15.5px;font-weight:600">Marta Ojeda Pino</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#7a828c">HC 41-2301 · recolecta: Dra. Morales</div>
+              </div>
+              <div style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;background:#e8eef7;color:#2c4a75;font-family:'IBM Plex Mono',monospace;white-space:nowrap">PROT. VIGENTE</div>
+            </div>
+            <div style="display:flex;gap:5px;border-top:1px solid #eef0f1;padding-top:8px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#fdf1da;color:#7a5710">D1</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#f0f1f2;color:#8b929a">D3</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#f0f1f2;color:#8b929a">D5</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#f0f1f2;color:#8b929a">D10</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#f0f1f2;color:#8b929a">D14</div>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e0e2e5;border-radius:8px;padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div style="font-size:15.5px;font-weight:600">Idalberto Sáez Roque</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#7a828c">HC 41-2244 · recolecta: Dr. Pérez</div>
+              </div>
+              <div style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;background:#e2f0ed;color:#0f4f49;font-family:'IBM Plex Mono',monospace;white-space:nowrap">PROT. NUEVO</div>
+            </div>
+            <div style="display:flex;gap:5px;border-top:1px solid #eef0f1;padding-top:8px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#e6f1ea;color:#2f6b46">D1</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#e6f1ea;color:#2f6b46">D3</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#e6f1ea;color:#2f6b46">D5</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#e6f1ea;color:#2f6b46">D10</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#e6f1ea;color:#2f6b46">D14</div>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e0e2e5;border-radius:8px;padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div style="font-size:15.5px;font-weight:600">Caridad Nápoles Vega</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#7a828c">HC 41-2239 · recolecta: Dr. Pérez</div>
+              </div>
+              <div style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;background:#e8eef7;color:#2c4a75;font-family:'IBM Plex Mono',monospace;white-space:nowrap">PROT. VIGENTE</div>
+            </div>
+            <div style="display:flex;gap:5px;border-top:1px solid #eef0f1;padding-top:8px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#e6f1ea;color:#2f6b46">D1</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#e6f1ea;color:#2f6b46">D3</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#f6e7e7;color:#9b2c2c">D5</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#f0f1f2;color:#8b929a">D10</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:4px;background:#f0f1f2;color:#8b929a">D14</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;padding:6px 4px 0;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929a">
+            <span>■ completa</span><span style="color:#7a5710">■ pendiente</span><span style="color:#9b2c2c">■ perdida</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. ENROLAMIENTO -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7a828c">04 · Enrolamiento de paciente</div>
+      <div style="width:390px;height:844px;background:#fbfbfa;border:1px solid #d5d8db;border-radius:24px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 2px 10px rgba(20,24,28,.06)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a828c">
+          <span>09:15</span><span>SIN DATOS · 80%</span>
+        </div>
+        <div style="padding:6px 18px 12px;background:#fff;border-bottom:1px solid #e4e6e8;display:flex;align-items:center;gap:12px">
+          <div style="font-size:20px;color:#4a5158;line-height:1">←</div>
+          <div style="font-size:17px;font-weight:600;white-space:nowrap">Enrolar paciente</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a5710;background:#fdf1da;border:1px solid #eed9ac;border-radius:5px;padding:4px 7px;font-weight:600;white-space:nowrap;flex:none">BORRADOR</div>
+        </div>
+        <div style="flex:1;overflow:hidden;padding:16px 18px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Nombre y apellidos</label>
+            <div style="border:1px solid #dcdfe3;border-radius:7px;padding:12px 13px;background:#fff;font-size:15px">Marta Ojeda Pino</div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <div style="flex:1.4;display:flex;flex-direction:column;gap:6px">
+              <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Carné de identidad</label>
+              <div style="border:1px solid #dcdfe3;border-radius:7px;padding:12px 13px;background:#fff;font-size:15px;font-family:'IBM Plex Mono',monospace">72031544218</div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+              <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Edad</label>
+              <div style="border:1px solid #dcdfe3;border-radius:7px;padding:12px 13px;background:#fff;font-size:15px">54</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Núm. de historia clínica</label>
+            <div style="border:1px solid #dcdfe3;border-radius:7px;padding:12px 13px;background:#fff;font-size:15px;font-family:'IBM Plex Mono',monospace">41-2301</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Contacto y dirección</label>
+            <div style="border:1px solid #dcdfe3;border-radius:7px;padding:12px 13px;background:#fff;font-size:15px">5 342 8871</div>
+            <div style="border:1px solid #dcdfe3;border-radius:7px;padding:12px 13px;background:#fff;font-size:14px;color:#4a5158;line-height:1.4">Calle 21 e/ 4 y 6, Rpto. Sueño, mun. Santiago</div>
+          </div>
+
+          <div style="border:1px solid #cfe0dc;background:#eef5f3;border-radius:9px;padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#4a5158">Asignación por aleatorización</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#6b7278">bloque 07</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:11px">
+              <div style="font-size:12px;font-weight:700;padding:7px 12px;border-radius:6px;background:#e8eef7;color:#2c4a75;font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;border:1px solid #cddaeb">PROTOCOLO VIGENTE</div>
+              <div style="font-size:12.5px;color:#5f6771;line-height:1.4">Rama control<br>asignada 09:14</div>
+            </div>
+            <div style="font-size:12px;color:#5f6771;line-height:1.5;border-top:1px solid #dbe6e3;padding-top:9px">La asignación es automática y no puede modificarse. Cualquier cambio requiere solicitud al administrador y queda en auditoría.</div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;border:1px solid #eed9ac;background:#fdf1da;border-radius:8px;padding:12px 13px">
+            <div style="width:8px;height:8px;border-radius:50%;background:#c98a1a;flex:none"></div>
+            <div style="font-size:12.5px;color:#7a5710;line-height:1.45;flex:1">Falta el consentimiento informado</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:#7a5710">FIRMAR</div>
+          </div>
+        </div>
+        <div style="border-top:1px solid #e4e6e8;background:#fff;padding:12px 16px 20px;display:flex;gap:10px">
+          <div style="flex:1;border:1px solid #dcdfe3;border-radius:8px;padding:14px;text-align:center;font-size:14.5px;font-weight:600;color:#4a5158">Guardar</div>
+          <div style="flex:1.4;background:#16181a;color:#fbfbfa;border-radius:8px;padding:14px 10px;text-align:center;font-size:14.5px;font-weight:600;white-space:nowrap">Ir a consentimiento</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. CAPTURA DE VISITA -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7a828c">05 · Captura de visita por día</div>
+      <div style="width:390px;height:844px;background:#fbfbfa;border:1px solid #d5d8db;border-radius:24px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 2px 10px rgba(20,24,28,.06)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a828c">
+          <span>09:32</span><span>SIN DATOS · 78%</span>
+        </div>
+        <div style="background:#fff;border-bottom:1px solid #e4e6e8">
+          <div style="padding:6px 18px 12px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <div style="font-size:20px;color:#4a5158;line-height:1.1">←</div>
+              <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+                <div style="font-size:17px;font-weight:600">Reinaldo Estévez Cruz</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#7a828c">HC 41-2298 · 62 a · M</div>
+              </div>
+              <div style="font-size:11px;font-weight:700;padding:5px 9px;border-radius:5px;background:#e2f0ed;color:#0f4f49;font-family:'IBM Plex Mono',monospace;letter-spacing:.03em;border:1px solid #c9e2dd;white-space:nowrap">PROT. NUEVO</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px;border:1px solid #eed9ac;background:#fdf1da;border-radius:8px;padding:9px 12px">
+              <div style="width:8px;height:8px;border-radius:50%;background:#c98a1a;flex:none"></div>
+              <div style="font-size:12.5px;color:#7a5710;flex:1">Sin conexión · guardando en el dispositivo</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a5710;font-weight:600">{{ syncShort }}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;padding:0 14px 10px">
+            <sc-for list="{{ dayTabs }}" as="t" hint-placeholder-count="5">
+              <div style="{{ t.style }}" onClick="{{ t.onClick }}">{{ t.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:1;overflow:hidden;padding:14px 18px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:15px;font-weight:600">{{ dayTitle }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;padding:4px 9px;border-radius:5px;background:#fdf1da;color:#7a5710">{{ dayState }}</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Signos vitales</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+              <div style="border:1px solid #dcdfe3;border-radius:7px;background:#fff;padding:9px 11px;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:11px;color:#7a828c">TA (mmHg)</div>
+                <div style="font-size:18px;font-weight:600;font-family:'IBM Plex Mono',monospace">148/92</div>
+              </div>
+              <div style="border:1px solid #dcdfe3;border-radius:7px;background:#fff;padding:9px 11px;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:11px;color:#7a828c">FC (lpm)</div>
+                <div style="font-size:18px;font-weight:600;font-family:'IBM Plex Mono',monospace">88</div>
+              </div>
+              <div style="border:1px solid #dcdfe3;border-radius:7px;background:#fff;padding:9px 11px;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:11px;color:#7a828c">FR (rpm)</div>
+                <div style="font-size:18px;font-weight:600;font-family:'IBM Plex Mono',monospace">20</div>
+              </div>
+              <div style="border:1.5px solid #d9a8a8;border-radius:7px;background:#fdf6f6;padding:9px 11px;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:11px;color:#9b2c2c">Temp. (°C) · fuera de rango</div>
+                <div style="font-size:18px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:#9b2c2c">38.7</div>
+              </div>
+              <div style="border:1px solid #dcdfe3;border-radius:7px;background:#fff;padding:9px 11px;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:11px;color:#7a828c">SpO₂ (%)</div>
+                <div style="font-size:18px;font-weight:600;font-family:'IBM Plex Mono',monospace">94</div>
+              </div>
+              <div style="border:1px dashed #cfd3d7;border-radius:7px;background:#fff;padding:9px 11px;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:11px;color:#7a828c">Peso (kg)</div>
+                <div style="font-size:18px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:#b9bec4">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Síntomas referidos</div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <div style="font-size:13px;padding:8px 13px;border-radius:20px;background:#16181a;color:#fbfbfa;font-weight:500">Fiebre</div>
+              <div style="font-size:13px;padding:8px 13px;border-radius:20px;background:#16181a;color:#fbfbfa;font-weight:500">Disnea</div>
+              <div style="font-size:13px;padding:8px 13px;border-radius:20px;background:#fff;border:1px solid #dcdfe3;color:#4a5158">Tos</div>
+              <div style="font-size:13px;padding:8px 13px;border-radius:20px;background:#fff;border:1px solid #dcdfe3;color:#4a5158">Cefalea</div>
+              <div style="font-size:13px;padding:8px 13px;border-radius:20px;background:#fff;border:1px solid #dcdfe3;color:#4a5158">Náuseas</div>
+              <div style="font-size:13px;padding:8px 13px;border-radius:20px;background:#fff;border:1px solid #dcdfe3;color:#4a5158">Astenia</div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px;flex:1">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Observaciones</div>
+            <div style="border:1px solid #dcdfe3;border-radius:7px;background:#fff;padding:11px 12px;font-size:14px;line-height:1.5;color:#2a2e33;flex:1">Persiste febrícula vespertina. Tolera la vía oral. Se mantiene esquema según rama asignada; sin eventos adversos referidos.</div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid #e4e6e8;background:#fff;padding:12px 16px 20px;display:flex;gap:10px">
+          <div style="flex:1;border:1px solid #dcdfe3;border-radius:8px;padding:14px;text-align:center;font-size:14.5px;font-weight:600;color:#4a5158">Borrador</div>
+          <div style="flex:1.5;background:#16181a;color:#fbfbfa;border-radius:8px;padding:14px;text-align:center;font-size:14.5px;font-weight:600">Cerrar visita</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. CONSENTIMIENTO -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7a828c">06 · Consentimiento informado</div>
+      <div style="width:390px;height:844px;background:#fbfbfa;border:1px solid #d5d8db;border-radius:24px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 2px 10px rgba(20,24,28,.06)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a828c">
+          <span>09:19</span><span>SIN DATOS · 79%</span>
+        </div>
+        <div style="padding:6px 18px 12px;background:#fff;border-bottom:1px solid #e4e6e8;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:20px;color:#4a5158;line-height:1">←</div>
+            <div style="font-size:17px;font-weight:600">Consentimiento informado</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+            <div style="font-size:13px;color:#5f6771">Marta Ojeda Pino · HC 41-2301</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;padding:4px 8px;border-radius:5px;background:#eceff1;color:#4a5158;border:1px solid #dfe2e5">DOC. v2.1</div>
+          </div>
+        </div>
+        <div style="flex:1;overflow:hidden;padding:14px 18px;display:flex;flex-direction:column;gap:14px">
+          <div style="border:1px solid #e0e2e5;border-radius:8px;background:#fff;height:210px;overflow:hidden;position:relative">
+            <div style="padding:13px 14px 26px;display:flex;flex-direction:column;gap:9px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#8b929a">Modelo aprobado · CEI 2026-014 · vigente desde 14 mar 2026</div>
+              <div style="font-size:13px;line-height:1.6;color:#2a2e33">Se le invita a participar en un estudio de cohorte que compara el protocolo terapéutico vigente con un protocolo nuevo en pacientes ingresados en este servicio. La asignación a una de las dos ramas se realiza de forma aleatoria y no depende de su médico.</div>
+              <div style="font-size:13px;line-height:1.6;color:#2a2e33">Su participación es voluntaria. Puede retirarse en cualquier momento sin que ello afecte la atención médica que recibe.</div>
+            </div>
+            <div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(to top,#fff 42%,rgba(255,255,255,0));display:flex;align-items:flex-end;justify-content:center;padding-bottom:7px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#9aa1a8;text-transform:uppercase">desplazar · 1 de 4</div>
+            </div>
+            <div style="position:absolute;right:5px;top:12px;width:3px;height:76px;border-radius:2px;background:#d2d6da"></div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <div style="width:17px;height:17px;border-radius:4px;background:#16181a;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px">✓</div>
+              <div style="font-size:13px;line-height:1.45;color:#2a2e33">He leído el documento y se me explicó verbalmente en un lenguaje comprensible.</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <div style="width:17px;height:17px;border-radius:4px;background:#16181a;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px">✓</div>
+              <div style="font-size:13px;line-height:1.45;color:#2a2e33">Acepto participar y que mis datos clínicos se usen con fines de investigación.</div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">Firma del paciente</div>
+            <div style="border:1.5px dashed #c6cad0;border-radius:8px;background:#fff;height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#9aa1a8">firmar con el dedo o el lápiz</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#b9bec4">borrar</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8b929a">
+              <span>Testigo: Dra. C. Morales</span><span>20 ago 2026 · 09:19</span>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:flex-start;gap:10px;border:1px solid #eed9ac;background:#fdf1da;border-radius:8px;padding:11px 13px;margin-top:auto">
+            <div style="width:8px;height:8px;border-radius:50%;background:#c98a1a;margin-top:5px;flex:none"></div>
+            <div style="font-size:12.5px;color:#7a5710;line-height:1.45">El consentimiento se guarda cifrado en el dispositivo y se envía al servidor al recuperar señal. No se podrá capturar visitas hasta registrarlo.</div>
+          </div>
+        </div>
+        <div style="border-top:1px solid #e4e6e8;background:#fff;padding:12px 16px 20px">
+          <div style="background:#16181a;color:#fbfbfa;border-radius:8px;padding:15px;text-align:center;font-size:15px;font-weight:600">Registrar consentimiento</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. ADMIN WEB -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7a828c">07 · Administrador — escritorio, con auditoría</div>
+      <div style="width:1280px;height:856px;background:#fbfbfa;border:1px solid #d5d8db;border-radius:12px;overflow:hidden;display:flex;box-shadow:0 2px 10px rgba(20,24,28,.06)">
+        <div style="width:220px;background:#16181a;color:#c9ced3;display:flex;flex-direction:column;padding:20px 0">
+          <div style="padding:0 20px 22px;display:flex;flex-direction:column;gap:3px">
+            <div style="font-size:19px;font-weight:700;color:#fbfbfa;letter-spacing:.02em">SIVAP</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.09em;color:#7d858d;text-transform:uppercase">Panel de administración</div>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <div style="padding:11px 20px;font-size:14px;background:#24282c;color:#fbfbfa;border-left:3px solid #17615a">Pacientes</div>
+            <div style="padding:11px 20px;font-size:14px;border-left:3px solid transparent">Visitas</div>
+            <div style="padding:11px 20px;font-size:14px;border-left:3px solid transparent">Consentimientos</div>
+            <div style="padding:11px 20px;font-size:14px;border-left:3px solid transparent">Auditoría</div>
+            <div style="padding:11px 20px;font-size:14px;border-left:3px solid transparent">Usuarios y roles</div>
+            <div style="padding:11px 20px;font-size:14px;border-left:3px solid transparent">Exportar datos</div>
+          </div>
+          <div style="margin-top:auto;padding:16px 20px 0;border-top:1px solid #2c3136;display:flex;flex-direction:column;gap:3px">
+            <div style="font-size:13px;color:#fbfbfa">Dr. A. Guerra</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7d858d">Administrador</div>
+          </div>
+        </div>
+
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:20px 28px 16px;background:#fff;border-bottom:1px solid #e4e6e8;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:22px;font-weight:600">Pacientes de la cohorte</div>
+                <div style="font-size:13px;color:#5f6771">60 enrolados · 31 protocolo vigente · 29 protocolo nuevo</div>
+              </div>
+              <div style="display:flex;gap:9px;align-items:center">
+                <div style="display:flex;align-items:center;gap:8px;border:1px solid #eed9ac;background:#fdf1da;border-radius:7px;padding:8px 12px">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#c98a1a"></div>
+                  <div style="font-size:12.5px;color:#7a5710">7 registros en cola desde 2 dispositivos</div>
+                </div>
+                <div style="border:1px solid #dcdfe3;border-radius:7px;padding:9px 14px;font-size:13.5px;font-weight:600;color:#4a5158;background:#fff">Exportar CSV</div>
+                <div style="background:#16181a;color:#fbfbfa;border-radius:7px;padding:9px 14px;font-size:13.5px;font-weight:600">+ Enrolar</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="flex:1;border:1px solid #dcdfe3;border-radius:7px;padding:9px 12px;background:#fff;font-size:13.5px;color:#8b929a">Buscar por nombre, HC o carné</div>
+              <div style="border:1px solid #dcdfe3;border-radius:7px;padding:9px 14px;font-size:13px;color:#4a5158;background:#fff">Protocolo: todos ▾</div>
+              <div style="border:1px solid #dcdfe3;border-radius:7px;padding:9px 14px;font-size:13px;color:#4a5158;background:#fff">Recolector: todos ▾</div>
+              <div style="border:1px solid #dcdfe3;border-radius:7px;padding:9px 14px;font-size:13px;color:#4a5158;background:#fff">Estado: todos ▾</div>
+            </div>
+          </div>
+
+          <div style="flex:1;overflow:hidden;padding:18px 28px">
+            <div style="border:1px solid #e0e2e5;border-radius:9px;background:#fff;overflow:hidden">
+              <div style="display:grid;grid-template-columns:2fr 1.1fr 1.2fr 1.5fr 1.2fr 1.1fr 0.9fr;gap:14px;padding:11px 18px;background:#f4f5f6;border-bottom:1px solid #e4e6e8;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#7a828c">
+                <div>Paciente</div><div>HC</div><div>Protocolo</div><div>Progreso de visitas</div><div>Recolector</div><div>Sincronización</div><div>Auditoría</div>
+              </div>
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="7">
+                <div style="display:grid;grid-template-columns:2fr 1.1fr 1.2fr 1.5fr 1.2fr 1.1fr 0.9fr;gap:14px;padding:13px 18px;border-bottom:1px solid #eef0f1;align-items:center">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <div style="font-size:14px;font-weight:600">{{ r.nombre }}</div>
+                    <div style="font-size:11.5px;color:#8b929a">{{ r.demo }}</div>
+                  </div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#4a5158">{{ r.hc }}</div>
+                  <div><span style="{{ r.protStyle }}">{{ r.prot }}</span></div>
+                  <div style="display:flex;gap:4px">
+                    <sc-for list="{{ r.dias }}" as="d" hint-placeholder-count="5">
+                      <span style="{{ d.style }}">{{ d.label }}</span>
+                    </sc-for>
+                  </div>
+                  <div style="font-size:13px;color:#4a5158">{{ r.recolector }}</div>
+                  <div style="display:flex;align-items:center;gap:6px"><span style="{{ r.syncDot }}"></span><span style="font-size:12.5px;color:#4a5158">{{ r.sync }}</span></div>
+                  <div style="font-size:12.5px;color:#17615a;font-weight:600">{{ r.audit }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="margin-top:18px;border:1px solid #e0e2e5;border-radius:9px;background:#fff;overflow:hidden">
+              <div style="padding:12px 18px;border-bottom:1px solid #eef0f1;display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:14.5px;font-weight:600">Historial de auditoría — últimas correcciones</div>
+                <div style="font-size:12.5px;color:#17615a;font-weight:600">Ver todo</div>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <div style="display:grid;grid-template-columns:1.1fr 1.4fr 2.6fr 1fr;gap:14px;padding:11px 18px;border-bottom:1px solid #f2f3f4;align-items:center">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#7a828c">20 ago 08:12</div>
+                  <div style="font-size:13px">Estévez Cruz · D3</div>
+                  <div style="font-size:13px;color:#4a5158">Temperatura corregida de <span style="font-family:'IBM Plex Mono',monospace;text-decoration:line-through;color:#9b2c2c">39.7</span> a <span style="font-family:'IBM Plex Mono',monospace;font-weight:600">38.7</span> — error de tecleo</div>
+                  <div style="font-size:13px;color:#4a5158">Dr. A. Guerra</div>
+                </div>
+                <div style="display:grid;grid-template-columns:1.1fr 1.4fr 2.6fr 1fr;gap:14px;padding:11px 18px;border-bottom:1px solid #f2f3f4;align-items:center">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#7a828c">19 ago 16:40</div>
+                  <div style="font-size:13px">Nápoles Vega · D5</div>
+                  <div style="font-size:13px;color:#4a5158">Visita marcada como <span style="font-weight:600">perdida</span> — paciente no localizado en dos intentos</div>
+                  <div style="font-size:13px;color:#4a5158">Dr. A. Guerra</div>
+                </div>
+                <div style="display:grid;grid-template-columns:1.1fr 1.4fr 2.6fr 1fr;gap:14px;padding:11px 18px;align-items:center">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#7a828c">19 ago 11:05</div>
+                  <div style="font-size:13px">Sáez Roque · ficha</div>
+                  <div style="font-size:13px;color:#4a5158">Teléfono de contacto actualizado — solicitado por el recolector</div>
+                  <div style="font-size:13px;color:#4a5158">Dra. C. Morales</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;pendientes&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:3,&quot;tsType&quot;:&quot;number&quot;,&quot;min&quot;:0,&quot;max&quot;:12,&quot;section&quot;:&quot;Estado de campo&quot;},&quot;modoSinConexion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Estado de campo&quot;}}">
+class Component extends DCLogic {
+  state = { dia: 3 };
+
+  renderVals() {
+    const p = this.props.pendientes ?? 3;
+    const off = this.props.modoSinConexion ?? true;
+    const dias = [1, 3, 5, 10, 14];
+    const estado = { 1: ['Día 1 · 16 ago 2026', 'ENVIADO'], 3: ['Día 3 · 18 ago 2026', 'ENVIADO'], 5: ['Día 5 · 20 ago 2026', 'EN CAPTURA'], 10: ['Día 10 · 25 ago 2026', 'PROGRAMADA'], 14: ['Día 14 · 29 ago 2026', 'PROGRAMADA'] };
+    const sel = this.state.dia;
+
+    const dayTabs = dias.map(d => ({
+      label: 'Día ' + d,
+      style: {
+        flex: 1, textAlign: 'center', padding: '9px 4px', borderRadius: 7, fontSize: 13,
+        fontWeight: 600, cursor: 'pointer', userSelect: 'none',
+        background: d === sel ? '#16181a' : '#f1f2f3',
+        color: d === sel ? '#fbfbfa' : '#5f6771',
+        border: d === sel ? '1px solid #16181a' : '1px solid #e4e6e8'
+      },
+      onClick: () => this.setState({ dia: d })
+    }));
+
+    const chip = (bg, fg, bd) => ({ fontSize: 11, fontWeight: 600, padding: '4px 8px', borderRadius: 5, background: bg, color: fg, border: '1px solid ' + bd, fontFamily: "'IBM Plex Mono',monospace", whiteSpace: 'nowrap' });
+    const nuevo = chip('#e2f0ed', '#0f4f49', '#c9e2dd');
+    const vigente = chip('#e8eef7', '#2c4a75', '#cddaeb');
+    const dayPill = (state) => {
+      const c = { ok: ['#e6f1ea', '#2f6b46'], pend: ['#fdf1da', '#7a5710'], none: ['#f0f1f2', '#9aa1a8'], lost: ['#f6e7e7', '#9b2c2c'] }[state];
+      return { fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, padding: '3px 6px', borderRadius: 4, background: c[0], color: c[1] };
+    };
+    const dot = (c) => ({ width: 7, height: 7, borderRadius: '50%', background: c, display: 'inline-block' });
+    const mkDias = (states) => dias.map((d, i) => ({ label: 'D' + d, style: dayPill(states[i]) }));
+
+    const rows = [
+      { nombre: 'Reinaldo Estévez Cruz', demo: '62 a · M', hc: '41-2298', prot: 'PROT. NUEVO', protStyle: nuevo, dias: mkDias(['ok', 'ok', 'pend', 'none', 'none']), recolector: 'Dra. Morales', sync: 'En cola', syncDot: dot('#c98a1a'), audit: '1 corrección' },
+      { nombre: 'Marta Ojeda Pino', demo: '54 a · F', hc: '41-2301', prot: 'PROT. VIGENTE', protStyle: vigente, dias: mkDias(['pend', 'none', 'none', 'none', 'none']), recolector: 'Dra. Morales', sync: 'En cola', syncDot: dot('#c98a1a'), audit: '—' },
+      { nombre: 'Yanet Fuentes Abreu', demo: '47 a · F', hc: '41-2287', prot: 'PROT. NUEVO', protStyle: nuevo, dias: mkDias(['ok', 'ok', 'ok', 'none', 'none']), recolector: 'Dra. Morales', sync: 'Al día', syncDot: dot('#3f8a5e'), audit: '—' },
+      { nombre: 'Idalberto Sáez Roque', demo: '58 a · M', hc: '41-2244', prot: 'PROT. NUEVO', protStyle: nuevo, dias: mkDias(['ok', 'ok', 'ok', 'ok', 'ok']), recolector: 'Dr. Pérez', sync: 'Al día', syncDot: dot('#3f8a5e'), audit: '2 correcciones' },
+      { nombre: 'Caridad Nápoles Vega', demo: '71 a · F', hc: '41-2239', prot: 'PROT. VIGENTE', protStyle: vigente, dias: mkDias(['ok', 'ok', 'lost', 'none', 'none']), recolector: 'Dr. Pérez', sync: 'Al día', syncDot: dot('#3f8a5e'), audit: '1 corrección' },
+      { nombre: 'Osvaldo Prieto Lima', demo: '69 a · M', hc: '41-2270', prot: 'PROT. VIGENTE', protStyle: vigente, dias: mkDias(['ok', 'ok', 'ok', 'ok', 'none']), recolector: 'Dra. Morales', sync: 'Al día', syncDot: dot('#3f8a5e'), audit: '—' },
+      { nombre: 'Elsa Camacho Ruiz', demo: '44 a · F', hc: '41-2231', prot: 'PROT. NUEVO', protStyle: nuevo, dias: mkDias(['ok', 'pend', 'none', 'none', 'none']), recolector: 'Dr. Pérez', sync: 'En cola', syncDot: dot('#c98a1a'), audit: '—' }
+    ];
+
+    return {
+      dayTabs, rows,
+      dayTitle: estado[sel][0],
+      dayState: estado[sel][1],
+      syncText: off ? p + ' visitas pendientes de envío' : 'Todo sincronizado',
+      syncShort: off ? p + ' en cola' : 'AL DÍA'
+    };
+  }
+}
+</script>
+</body>
+</html>

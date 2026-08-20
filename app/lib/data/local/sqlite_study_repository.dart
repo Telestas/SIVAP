@@ -142,7 +142,7 @@ class SqliteStudyRepository implements StudyRepository {
   @override
   EventoClinico? borradorAbierto(String patientId, TipoEvento tipo) {
     final filas = _db.select(
-      "SELECT * FROM eventos WHERE paciente_id = ? AND tipo = ? "
+      'SELECT * FROM eventos WHERE paciente_id = ? AND tipo = ? '
       "AND estado = 'borrador';",
       [patientId, tipo.name],
     );
@@ -437,7 +437,7 @@ class SqliteStudyRepository implements StudyRepository {
 
   bool _yaRegistrado(String patientId, TipoEvento tipo) =>
       (_db.select(
-              "SELECT count(*) c FROM eventos WHERE paciente_id = ? "
+              'SELECT count(*) c FROM eventos WHERE paciente_id = ? '
               "AND tipo = ? AND estado = 'registrado';",
               [patientId, tipo.name]).first['c'] as int) >
       0;

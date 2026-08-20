@@ -215,7 +215,7 @@ void main() {
 
   group('§5 · formularios configurables', () {
     test('los hitos con formulario salen de la definición, no del código', () {
-      final def = Seed.formulario;
+      const def = Seed.formulario;
 
       expect(def.tieneFormulario(TipoEvento.pruebaVentilacionEspontanea), isTrue);
       expect(def.para(TipoEvento.cribado)!.campos, isNotEmpty);

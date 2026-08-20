@@ -102,21 +102,20 @@ class FasePillLegend extends StatelessWidget {
             fontFamilyFallback: T.monoFallback,
             fontSize: 10,
             color: T.faint),
-        child: Row(children: [
+        // Wrap y no Row: tres etiquetas no caben en el ancho de un teléfono.
+        child: Wrap(spacing: 14, runSpacing: 4, children: [
           Text('■ con registros',
               style: TextStyle(
                   fontFamily: T.mono,
                   fontFamilyFallback: T.monoFallback,
                   fontSize: 10,
                   color: T.okFg)),
-          SizedBox(width: 14),
           Text('■ en captura',
               style: TextStyle(
                   fontFamily: T.mono,
                   fontFamilyFallback: T.monoFallback,
                   fontSize: 10,
                   color: T.warnFg)),
-          SizedBox(width: 14),
           Text('■ sin registros'),
         ]),
       );

@@ -62,7 +62,7 @@ void main() {
 
   group('la correspondencia no está en ninguna parte del sistema', () {
     test('el documento de consentimiento no la revela', () {
-      final doc = Seed.documentoConsentimiento;
+      const doc = Seed.documentoConsentimiento;
       final texto =
           [...doc.parrafos, ...doc.declaraciones].join(' ').toLowerCase();
 

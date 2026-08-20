@@ -65,8 +65,8 @@ void main() {
     expect(find.text('+ Enrolar paciente'), findsNothing);
     expect(find.text('Idalberto Sáez Roque'), findsOneWidget);
     // Los recuentos van en A/B, sin decir cuál es cuál.
-    expect(find.text('Protocolo A'), findsOneWidget);
-    expect(find.text('Protocolo B'), findsOneWidget);
+    expect(find.text('PROTOCOLO A'), findsOneWidget);
+    expect(find.text('PROTOCOLO B'), findsOneWidget);
   });
 
   testWidgets('la línea de tiempo muestra las fases y los hitos',
@@ -92,8 +92,11 @@ void main() {
 
     // Tres cribados y dos intentos de PVE: exactamente lo que el modelo de
     // calendario no podía representar.
-    expect(find.textContaining('Día 1 ·'), findsOneWidget);
+    // Cribado tiene tres ocurrencias y la evaluación diaria una: «Día 1»
+    // aparece en ambas, «Día 3» solo en el cribado.
+    expect(find.textContaining('Día 1 ·'), findsWidgets);
     expect(find.textContaining('Día 3 ·'), findsOneWidget);
+    expect(find.textContaining('Intento 1 ·'), findsOneWidget);
     expect(find.textContaining('Intento 2 ·'), findsOneWidget);
   });
 
@@ -143,7 +146,7 @@ void main() {
     await tester.pumpWidget(montar(const AdminDashboardScreen(), estado: state));
 
     expect(find.text('Pacientes del ensayo'), findsOneWidget);
-    expect(find.text('Avance por fases'), findsOneWidget);
+    expect(find.text('AVANCE POR FASES'), findsOneWidget);
     expect(find.text('Historial de auditoría — últimas correcciones'),
         findsOneWidget);
     expect(find.textContaining('cifras transpuestas'), findsOneWidget);

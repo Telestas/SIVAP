@@ -154,6 +154,16 @@ h1 {
   text-transform: uppercase;
   color: var(--faint);
 }
+.alternativa {
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--secondary);
+}
+.alternativa a { color: var(--accent); }
+
 .datos dd {
   margin: 0;
   font-family: var(--mono);
@@ -230,6 +240,12 @@ code {
       <dt>Tamaño</dt><dd id="tamano">—</dd>
       <dt>SHA-256</dt><dd id="sha">—</dd>
     </dl>
+    <p class="alternativa" id="alternativa" hidden>
+      ¿El teléfono dice «no se instaló la aplicación»?
+      <a id="descarga-universal" href="#" rel="noopener">Descargue la versión
+      universal</a> (<span id="tamano-universal">—</span>): sirve para cualquier
+      modelo, pero pesa el triple.
+    </p>
   </div>
 
   <div class="tarjeta">
@@ -256,16 +272,16 @@ code {
 </main>
 
 <script>
-// El repositorio y la etiqueta se sustituyen al desplegar (ver pages.yml).
+// El repositorio se sustituye al desplegar (ver pages.yml).
 const REPO = '__REPO__';
-const enlaceReleases = `https://github.com/${REPO}/releases/latest`;
+const paginaReleases = `https://github.com/${REPO}/releases`;
 
 const $ = (id) => document.getElementById(id);
 
-// Enlace de reserva: si la consulta a GitHub falla —repositorio privado, sin
-// conexión, límite de peticiones— el botón sigue llevando a algún sitio útil
-// en vez de quedarse muerto.
-$('descarga').href = enlaceReleases;
+// Enlace de reserva: si la consulta a GitHub falla —sin conexión, límite de
+// peticiones— el botón sigue llevando a algún sitio útil en vez de quedarse
+// muerto.
+$('descarga').href = paginaReleases;
 
 function formatoTamano(bytes) {
   return (bytes / 1048576).toFixed(1).replace('.', ',') + ' MB';
@@ -277,21 +293,41 @@ function formatoFecha(iso) {
   return `${d.getDate()} ${meses[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
+// `/releases/latest` NO sirve aquí: excluye las prereleases, y mientras el CEI
+// no apruebe el estudio todas las versiones son prerelease. Se pide la lista y
+// se toma la primera, que es la más reciente.
+fetch(`https://api.github.com/repos/${REPO}/releases?per_page=1`)
   .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-  .then((release) => {
-    const apk = (release.assets || []).find((a) => a.name.endsWith('.apk'));
-    if (!apk) return Promise.reject('sin apk');
+  .then(([release]) => {
+    if (!release) return Promise.reject('sin releases');
 
-    $('descarga').href = apk.browser_download_url;
-    $('descarga').setAttribute('download', apk.name);
+    const apks = (release.assets || []).filter((a) => a.name.endsWith('.apk'));
+    // El de arm64 es el recomendado: pesa un tercio y vale para casi cualquier
+    // teléfono de los últimos años.
+    const principal = apks.find((a) => a.name.includes('arm64')) || apks[0];
+    const universal = apks.find((a) => a.name.includes('universal'));
+    if (!principal) return Promise.reject('sin apk');
+
+    $('descarga').href = principal.browser_download_url;
+    $('descarga').setAttribute('download', principal.name);
     $('version').textContent = release.tag_name;
     $('fecha').textContent = formatoFecha(release.published_at);
-    $('tamano').textContent = formatoTamano(apk.size);
+    $('tamano').textContent = formatoTamano(principal.size);
 
-    // El SHA-256 lo escribe el workflow en el cuerpo de la release.
-    const m = (release.body || '').match(/\b([a-f0-9]{64})\b/);
-    $('sha').textContent = m ? m[1] : 'ver la página de la versión';
+    // El SHA-256 lo escribe el workflow en el cuerpo de la release, en una
+    // tabla junto al nombre del archivo.
+    const linea = (release.body || '')
+      .split('\n')
+      .find((l) => l.includes(principal.name) && /[a-f0-9]{64}/.test(l));
+    const huella = linea && linea.match(/([a-f0-9]{64})/);
+    $('sha').textContent = huella ? huella[1] : 'ver la página de la versión';
+
+    if (universal && universal !== principal) {
+      $('descarga-universal').href = universal.browser_download_url;
+      $('descarga-universal').setAttribute('download', universal.name);
+      $('tamano-universal').textContent = formatoTamano(universal.size);
+      $('alternativa').hidden = false;
+    }
   })
   .catch(() => {
     for (const id of ['version', 'fecha', 'tamano', 'sha']) {

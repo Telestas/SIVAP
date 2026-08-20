@@ -75,12 +75,29 @@ jobs:
         working-directory: app
         run: flutter test
 
+      # Se compilan dos APK, y la razón es el ancho de banda del equipo.
+      #
+      # El APK universal lleva las bibliotecas nativas de las tres
+      # arquitecturas y pesa unos 68 MB. A la velocidad de conexión con la que
+      # trabaja el equipo eso es media hora por teléfono. El de arm64 pesa un
+      # tercio y sirve para prácticamente cualquier teléfono de los últimos
+      # años; el universal queda como red de seguridad para el que no instale.
       - name: Compilar APK
         working-directory: app
+        env:
+          VERSION: ${{ steps.version.outputs.numero }}
         run: |
+          flutter build apk --release --split-per-abi \
+            --build-name="$VERSION" --build-number="${{ github.run_number }}"
           flutter build apk --release \
-            --build-name="${{ steps.version.outputs.numero }}" \
-            --build-number="${{ github.run_number }}"
+            --build-name="$VERSION" --build-number="${{ github.run_number }}"
+
+          mkdir -p build/entrega
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+             "build/entrega/sivap-$VERSION-arm64.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             "build/entrega/sivap-$VERSION-universal.apk"
+          ls -la build/entrega
 
       # ── Firma ────────────────────────────────────────────────────────
       #
@@ -121,35 +138,43 @@ jobs:
         run: |
           echo "$LLAVERO" | base64 -d > /tmp/sivap.jks
           BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          APK=build/app/outputs/flutter-apk/app-release.apk
-          "$BUILD_TOOLS/zipalign" -p -f 4 "$APK" /tmp/alineado.apk
-          "$BUILD_TOOLS/apksigner" sign \
-            --ks /tmp/sivap.jks \
-            --ks-pass "pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
-            --key-pass "pass:${{ secrets.ANDROID_KEY_PASSWORD }}" \
-            --out "$APK" /tmp/alineado.apk
-          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
+          for APK in build/entrega/*.apk; do
+            "$BUILD_TOOLS/zipalign" -p -f 4 "$APK" /tmp/alineado.apk
+            "$BUILD_TOOLS/apksigner" sign \
+              --ks /tmp/sivap.jks \
+              --ks-pass "pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+              --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+              --key-pass "pass:${{ secrets.ANDROID_KEY_PASSWORD }}" \
+              --out "$APK" /tmp/alineado.apk
+            "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
+          done
           rm -f /tmp/sivap.jks /tmp/alineado.apk
-          echo "firmado=si" >> "$GITHUB_OUTPUT"
 
-      - name: Renombrar
+      # El SHA-256 va en la release para que quien descargue pueda comprobar
+      # que el archivo llegó entero. Con una conexión que se corta, una
+      # descarga a medias produce un error de instalación que no dice lo que
+      # pasa.
+      - name: Huellas y tamaños
         id: apk
         working-directory: app
+        env:
+          VERSION: ${{ steps.version.outputs.numero }}
         run: |
-          NOMBRE="sivap-${{ steps.version.outputs.numero }}.apk"
-          mv build/app/outputs/flutter-apk/app-release.apk "build/$NOMBRE"
-          echo "nombre=$NOMBRE" >> "$GITHUB_OUTPUT"
-          echo "ruta=app/build/$NOMBRE" >> "$GITHUB_OUTPUT"
-          echo "sha256=$(sha256sum "build/$NOMBRE" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "tamano=$(du -h "build/$NOMBRE" | cut -f1)" >> "$GITHUB_OUTPUT"
+          {
+            echo "arm64_nombre=sivap-$VERSION-arm64.apk"
+            echo "arm64_sha=$(sha256sum "build/entrega/sivap-$VERSION-arm64.apk" | cut -d' ' -f1)"
+            echo "arm64_tam=$(du -h "build/entrega/sivap-$VERSION-arm64.apk" | cut -f1)"
+            echo "univ_nombre=sivap-$VERSION-universal.apk"
+            echo "univ_sha=$(sha256sum "build/entrega/sivap-$VERSION-universal.apk" | cut -d' ' -f1)"
+            echo "univ_tam=$(du -h "build/entrega/sivap-$VERSION-universal.apk" | cut -f1)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Publicar release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.numero }}
           name: SIVAP ${{ steps.version.outputs.numero }}
-          files: ${{ steps.apk.outputs.ruta }}
+          files: app/build/entrega/*.apk
           # Todo lo de esta fase es preliminar: sin aprobación del CEI no se
           # enrolan pacientes reales.
           prerelease: true
@@ -160,12 +185,18 @@ jobs:
             modo demostración: los pacientes que aparecen son inventados y la
             base de datos que usa es un archivo aparte del de producción.
 
-            | | |
-            |---|---|
-            | Archivo | `${{ steps.apk.outputs.nombre }}` |
-            | Tamaño | ${{ steps.apk.outputs.tamano }} |
-            | Firma | ${{ steps.llavero.outputs.hay == 'si' && 'llavero del estudio' || '⚠️ clave de depuración' }} |
-            | SHA-256 | `${{ steps.apk.outputs.sha256 }}` |
+            ### Cuál descargar
+
+            | Archivo | Tamaño | Para quién |
+            |---|---|---|
+            | `${{ steps.apk.outputs.arm64_nombre }}` | ${{ steps.apk.outputs.arm64_tam }} | **Empiece por este.** Vale para prácticamente cualquier teléfono de los últimos años |
+            | `${{ steps.apk.outputs.univ_nombre }}` | ${{ steps.apk.outputs.univ_tam }} | Solo si el anterior dice «no se instaló la aplicación» |
+
+            El primero pesa un tercio porque lleva solo las bibliotecas del
+            procesador más común. Con una conexión lenta, la diferencia son
+            veinte minutos por teléfono.
+
+            Firma: ${{ steps.llavero.outputs.hay == 'si' && 'llavero del estudio' || '⚠️ clave de depuración' }}
 
             ${{ steps.llavero.outputs.hay == 'si' && ' ' || '> **Firmado con la clave de depuración.** Sirve para probar la app y validar los formularios. Antes de que nadie capture datos que quiera conservar, hay que crear el llavero del estudio: al cambiar de clave, Android trata la app como otra distinta, obliga a desinstalar, y al desinstalar se pierde la clave de cifrado del dispositivo con todo lo que no se hubiera sincronizado. Instrucciones en `docs/DISTRIBUCION.md`.' }}
 
@@ -182,13 +213,16 @@ jobs:
             checksum, o en un ordenador:
 
             ```
-            sha256sum ${{ steps.apk.outputs.nombre }}
+            sha256sum sivap-*.apk
             ```
 
-            Debe coincidir con el SHA-256 de la tabla.
+            | Archivo | SHA-256 |
+            |---|---|
+            | `${{ steps.apk.outputs.arm64_nombre }}` | `${{ steps.apk.outputs.arm64_sha }}` |
+            | `${{ steps.apk.outputs.univ_nombre }}` | `${{ steps.apk.outputs.univ_sha }}` |
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.apk.outputs.nombre }}
-          path: ${{ steps.apk.outputs.ruta }}
+          name: sivap-${{ steps.version.outputs.numero }}
+          path: app/build/entrega/*.apk
           retention-days: 90

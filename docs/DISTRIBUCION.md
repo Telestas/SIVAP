@@ -1,6 +1,34 @@
 # Distribución del APK
 
-## Estado: resuelto
+## Estado: funcionando
+
+**https://telestas.github.io/SIVAP/** — la página lee la última versión
+publicada y ofrece el APK. Comprobado que se descarga sin cuenta de GitHub.
+
+### Se publican dos APK, y hay que saber por qué
+
+| Archivo | Tamaño | Para quién |
+|---|---|---|
+| `sivap-<v>-arm64.apk` | ~23 MB | El recomendado. Vale para prácticamente cualquier teléfono de los últimos años |
+| `sivap-<v>-universal.apk` | ~65 MB | Solo si el anterior dice «no se instaló la aplicación» |
+
+El universal lleva las bibliotecas nativas de las tres arquitecturas. A la
+velocidad de conexión del equipo, la diferencia son veinte minutos por teléfono
+—y hay nueve investigadores—. La página ofrece el de arm64 y solo enseña el
+universal si hace falta.
+
+### Dos cosas que aprendimos publicando la primera versión
+
+**`/releases/latest` no sirve aquí.** Excluye las prereleases, y mientras el CEI
+no apruebe el estudio todas las versiones lo son. La página pide la lista
+completa y toma la primera.
+
+**El `if` de un paso no ve su propio `env`.** El paso de firma llevaba
+`if: env.LLAVERO != ''` con `LLAVERO` definido en el mismo paso, así que se
+saltaba siempre — incluso con el secreto configurado. Ahora la comprobación va
+en un paso aparte.
+
+## Antecedentes de la decisión
 
 El repositorio es **público** (Telestas/SIVAP), así que:
 

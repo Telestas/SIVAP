@@ -40,17 +40,9 @@ jobs:
           # en otro repositorio (el público de distribución), se cambia aquí.
           REPO_RELEASES: ${{ vars.REPO_RELEASES || github.repository }}
         run: |
-          mkdir -p sitio/fonts
-          cp web-descarga/index.html sitio/
-
-          # Las tipografías van servidas desde el propio sitio, no desde un
-          # CDN: la conexión desde el hospital puede no alcanzar servidores
-          # externos.
-          cp app/assets/fonts/IBMPlexSans-Variable.ttf  sitio/fonts/
-          cp app/assets/fonts/IBMPlexMono-Regular.ttf   sitio/fonts/
-          cp app/assets/fonts/IBMPlexMono-SemiBold.ttf  sitio/fonts/
-          cp app/assets/fonts/OFL-IBMPlex.txt           sitio/fonts/
-
+          # web-descarga/ es autocontenido —tipografías incluidas— para que la
+          # página se pueda abrir tal cual en un navegador antes de desplegar.
+          cp -r web-descarga sitio
           sed -i "s|__REPO__|${REPO_RELEASES}|g" sitio/index.html
 
           # Jekyll ignoraría cualquier archivo que empiece por guion bajo.

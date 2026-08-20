@@ -93,9 +93,28 @@ jobs:
       #
       # Conclusión práctica: crear el llavero ANTES de que nadie capture un
       # solo dato real. Ver docs/DISTRIBUCION.md.
+      # El `env` de un paso NO está disponible en el `if` de ese mismo paso: la
+      # condición se evalúa antes. Escrito así, la firma se saltaba siempre —
+      # incluso con el secreto configurado— y la release decía «clave de
+      # depuración» sin que nadie entendiera por qué. Se comprueba en un paso
+      # aparte, cuya salida sí se puede consultar.
+      - name: ¿Hay llavero del estudio?
+        id: llavero
+        env:
+          LLAVERO: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$LLAVERO" ]; then
+            echo 'hay=si' >> "$GITHUB_OUTPUT"
+            echo 'Se firmará con el llavero del estudio.'
+          else
+            echo 'hay=no' >> "$GITHUB_OUTPUT"
+            echo '::warning::Sin llavero en los secretos: el APK saldrá firmado'\
+                 'con la clave de depuración. No repartir para captura sostenida.'
+          fi
+
       - name: Firmar con el llavero del estudio
         id: firma
-        if: env.LLAVERO != ''
+        if: steps.llavero.outputs.hay == 'si'
         env:
           LLAVERO: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         working-directory: app
@@ -145,8 +164,10 @@ jobs:
             |---|---|
             | Archivo | `${{ steps.apk.outputs.nombre }}` |
             | Tamaño | ${{ steps.apk.outputs.tamano }} |
-            | Firma | ${{ steps.firma.outputs.firmado == 'si' && 'llavero del estudio' || '⚠️ clave de depuración — ver aviso' }} |
+            | Firma | ${{ steps.llavero.outputs.hay == 'si' && 'llavero del estudio' || '⚠️ clave de depuración' }} |
             | SHA-256 | `${{ steps.apk.outputs.sha256 }}` |
+
+            ${{ steps.llavero.outputs.hay == 'si' && ' ' || '> **Firmado con la clave de depuración.** Sirve para probar la app y validar los formularios. Antes de que nadie capture datos que quiera conservar, hay que crear el llavero del estudio: al cambiar de clave, Android trata la app como otra distinta, obliga a desinstalar, y al desinstalar se pierde la clave de cifrado del dispositivo con todo lo que no se hubiera sincronizado. Instrucciones en `docs/DISTRIBUCION.md`.' }}
 
             ### Instalación
 

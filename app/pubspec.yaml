@@ -8,13 +8,28 @@ version: 0.1.0
 environment:
   sdk: ">=3.4.0 <4.0.0"
 
-# Sin dependencias de terceros a propósito: la app debe poder compilarse en una
-# máquina con conectividad intermitente, sin depender de pub.dev en cada build.
-# Cuando entre la persistencia local cifrada se añadirá Drift o Isar, y ahí sí
-# habrá que resolver el acceso a pub una vez.
+# Las dependencias se mantienen al mínimo: la app se compila en máquinas con
+# conectividad intermitente, y cada paquete es algo que hay que poder descargar.
+# Todo lo que hay aquí está por la persistencia cifrada; nada por comodidad.
+#
+# Las versiones son un punto de partida: `flutter pub get` puede pedir ajustar
+# alguna. No fijar versiones exactas a mano sin comprobar que resuelven.
 dependencies:
   flutter:
     sdk: flutter
+
+  # SQLite con SQLCipher. `sqlite3` da el acceso; `sqlcipher_flutter_libs`
+  # empaqueta la biblioteca nativa que cifra. Sin el segundo, el primero abre
+  # bases en claro — por eso la app verifica `PRAGMA cipher_version` al abrir.
+  sqlite3: ^2.4.0
+  sqlcipher_flutter_libs: ^0.6.4
+
+  # Custodia de la clave en el Keystore de Android / Keychain de iOS.
+  flutter_secure_storage: ^9.2.2
+
+  # Dónde va el archivo de base de datos en cada plataforma.
+  path_provider: ^2.1.4
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:

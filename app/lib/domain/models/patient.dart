@@ -49,6 +49,13 @@ class Patient {
   /// "62 a · M" — la línea demográfica que usa el diseño en tarjetas y tablas.
   String get demografia => '$edad a · ${sexo.abreviatura}';
 
+  /// "Estévez Cruz" — apellidos, para referirse al paciente en el historial de
+  /// auditoría sin repetir el nombre completo en cada fila.
+  String get apellidos {
+    final partes = nombre.split(' ');
+    return partes.length <= 2 ? nombre : partes.sublist(1).join(' ');
+  }
+
   Patient copyWith({String? consentimientoId, String? telefono, String? direccion}) =>
       Patient(
         id: id,

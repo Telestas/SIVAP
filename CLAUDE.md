@@ -54,7 +54,16 @@ Ver `01_BASES_MVP_SIVAP.md` para el alcance completo.
 
 ## Convenciones técnicas
 
-- **Frontend/móvil**: Flutter (Dart). Persistencia local con Drift o Isar.
+- **Frontend/móvil**: Flutter (Dart).
+- **Persistencia local**: SQLite cifrado con SQLCipher (`package:sqlite3` + `sqlcipher_flutter_libs`), con el esquema y las migraciones en SQL escrito a mano.
+
+  Se decidió así en vez de Drift o Isar (20 ago 2026): un sistema que guarda datos clínicos debe tener su esquema legible sin compilar nada, y un generador de código es un paso más en un equipo sin desarrollador dedicado. Si más adelante se prefiere Drift, se monta encima — las pantallas hablan con `StudyRepository`, no con la base.
+
+  **La clave de cifrado nunca va en el código.** Se genera en el dispositivo, con `Random.secure`, y se guarda en el Keystore/Keychain del sistema. Una clave dentro del .apk no cifra nada.
+
+  **Al abrir se verifica `PRAGMA cipher_version` y se aborta si falta.** Sin esa comprobación, un fallo de empaquetado dejaría la base en claro sin que nadie se enterara.
+
+  **En navegador no hay cifrado local posible** y no se finge que lo hay: no existe archivo que cifrar, y una clave guardada en el navegador no protege de nadie. La web es el panel de administración y debe leer del servidor, no capturar datos.
 - **Backend**: FastAPI (Python). PostgreSQL como base central.
 - **Sync**: cola local con timestamp; resolución de conflictos "último gana" + registro de auditoría.
 - **Exportación**: generación de .xlsx vía openpyxl, con la ficha y los datos clínicos exportables por separado (para permitir compartir solo la parte clínica sin identidad).

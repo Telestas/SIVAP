@@ -11,7 +11,9 @@ Se actualiza al cerrar cada hito.
 | §2 Asignación | Aleatorización simple generada por computadora, semilla registrada, secuencia verificable |
 | §2 Consentimiento | Pantalla con documento versionado, declaraciones y firma con el dedo |
 | §2 Formularios configurables | El **mecanismo** está: la pantalla se construye desde `VisitFormDefinition` |
-| §2 Auditoría | Solo para corrección de visitas enviadas: valor anterior, nuevo, autor, fecha, motivo |
+| §2 Auditoría | Solo para corrección de visitas enviadas: valor anterior, nuevo, autor, fecha, motivo. En la base, con disparadores que impiden modificarla o borrarla |
+| §3 Persistencia cifrada | SQLite + SQLCipher en móvil y escritorio, clave en el Keystore/Keychain. Sin probar en dispositivo |
+| §3 Despliegue | Borrador de `deploy/compose.yaml`: Postgres, panel web y TLS con Caddy. Falta el backend |
 | §4 Observador | Solo lectura, cohorte completa |
 | §4 Recolector | Crea pacientes y visitas propias, no edita lo enviado |
 | §8 Separación ficha/clínica | `Patient` y `Visit` separados, unidos solo por ID interno |
@@ -20,10 +22,10 @@ Se actualiza al cerrar cada hito.
 
 Ordenado por lo que más riesgo quita primero.
 
-1. **Persistencia local cifrada** (BASES §3). Hoy el almacén es en memoria: al
-   cerrar la app se pierde todo. Es lo que separa un prototipo de algo que un
-   médico puede llevar a una sala. Drift o Isar + cifrado en reposo.
-   No depende de nadie externo: se puede hacer ya.
+1. ~~**Persistencia local cifrada**~~ — **hecha (Hito 2)**, pendiente de probar
+   en un dispositivo real. SQLite + SQLCipher, clave en el Keystore/Keychain.
+   Ver la lista de comprobaciones que exigen dispositivo al final de
+   `app/test/almacen_test.dart`.
 2. **Backend FastAPI + PostgreSQL** (BASES §3). Autenticación real por rol,
    endpoints de ficha, visita, consentimiento y auditoría. Requiere decidir
    dónde se despliega.

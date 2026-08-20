@@ -73,10 +73,32 @@ No son comentarios sueltos: cada una tiene un sitio concreto y una prueba.
 Si una de esas pruebas falla, no es un test roto: es el estudio dejando de ser
 válido.
 
+## Almacenamiento local
+
+| Plataforma | Almacén | Cifrado |
+|---|---|---|
+| Android / iOS / escritorio | SQLite + SQLCipher, archivo en el directorio de la app | Sí, AES-256 |
+| Navegador | En memoria | **No** — y la app lo avisa en pantalla |
+
+La clave la genera el dispositivo la primera vez y vive en el Keystore de
+Android o el Keychain de iOS. **Nunca está en el código**: una clave dentro del
+.apk no cifra nada, porque va en el mismo archivo que cualquiera puede abrir.
+
+Al abrir, la app comprueba `PRAGMA cipher_version` y **se niega a arrancar** si
+lo que se cargó no es SQLCipher. Sin esa comprobación, un fallo de empaquetado
+dejaría la base en claro y nadie se enteraría.
+
+En el navegador no hay cifrado y no se finge que lo haya: no existe archivo que
+cifrar, y guardar la clave en el propio navegador no protege de nadie. La web es
+el panel de administración y su sitio es leer del servidor.
+
+Demostración y producción son **archivos distintos** (`sivap_demo.db` y
+`sivap.db`), no un modo dentro del mismo archivo. Se elige con `modoAlmacen` en
+`lib/main.dart`. Así un paciente inventado no puede acabar nunca en el dataset
+del estudio.
+
 ## Lo que este hito NO hace
 
-- **Sin cifrado en reposo**: el almacén es en memoria y volátil. No usar con
-  pacientes reales.
 - **Sin backend ni sincronización**: el estado "en cola" se simula con un
   interruptor para poder enseñar el comportamiento offline.
 - **Sin exportación**: el .xlsx se genera en el servidor (openpyxl), hito posterior.

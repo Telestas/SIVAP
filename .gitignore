@@ -33,19 +33,27 @@ build/
 .env
 .env.*
 !.env.example
+/deploy/.env
 *.pem
 *.key
 secrets/
 
 # ── Datos clínicos / exportaciones ────────────────
-# Nunca versionar datos de pacientes ni datasets exportados
+# Nunca versionar datos de pacientes ni datasets exportados.
+#
+# Los patrones van anclados con «/» a la raíz del repositorio. Sin anclar,
+# `data/` excluía también `app/lib/data/` —el código de la capa de datos— y el
+# repositorio quedaba sin compilar sin que nada avisara.
 *.xlsx
 *.csv
 *.sqlite
 *.db
 *.db-journal
-data/
-exports/
+*.db-wal
+*.db-shm
+/data/
+/exports/
+/deploy/copias/
 
 # ── Editores / SO ─────────────────────────────────
 .idea/

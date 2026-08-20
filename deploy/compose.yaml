@@ -1,0 +1,89 @@
+# Despliegue de SIVAP — BORRADOR
+#
+# Estado: el backend todavía no existe (ver docs/PENDIENTE.md). Este archivo
+# describe la forma que tendrá el despliegue y ya sirve para levantar el panel
+# web y la base de datos. El servicio `api` está aquí para que la estructura
+# quede fijada; arrancarlo falla hasta que exista `api/`.
+#
+#   docker compose up -d                      → base y panel web (hoy)
+#   docker compose --profile completo up -d   → añade la api (cuando exista)
+#
+# Antes de nada: cp .env.example .env  y rellenar .env
+
+name: sivap
+
+services:
+  # ── Base de datos central ────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?falta POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?falta POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
+      # Ordenación e idioma en español, para que los listados salgan como se
+      # espera y no con la ficha de "Álvarez" detrás de la de "Zamora".
+      POSTGRES_INITDB_ARGS: "--locale=es_ES.UTF-8 --encoding=UTF8"
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+      # Copias de seguridad: este directorio es el que hay que llevarse fuera
+      # del servidor. Una copia que vive en la misma máquina que el original
+      # no es una copia de seguridad.
+      - ./copias:/copias
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Sin `ports`: la base no se asoma a la red. Solo la alcanza `api`, por la
+    # red interna de compose. Para administrarla, túnel SSH.
+    networks: [interna]
+
+  # ── Backend (todavía no existe) ──────────────────────────────────
+  api:
+    build:
+      context: ./api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SIVAP_SECRET_KEY: ${SIVAP_SECRET_KEY:?falta SIVAP_SECRET_KEY}
+      SIVAP_ENTORNO: ${SIVAP_ENTORNO:-produccion}
+    networks: [interna, publica]
+    # Igual que la base: no publica puertos. Se llega por el proxy, con TLS.
+    profiles: [completo]
+
+  # ── Panel web + TLS ──────────────────────────────────────────────
+  #
+  # Caddy sirve la compilación web de Flutter y hace de proxy hacia `api`.
+  # Termina TLS, que es una restricción no negociable (CLAUDE.md §5).
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      SIVAP_DOMINIO: ${SIVAP_DOMINIO:-sivap.local}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./web/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificados y clave privada de la CA interna de Caddy. Sin este
+      # volumen, cada reinicio genera una CA nueva y hay que volver a
+      # instalarla en todos los dispositivos.
+      - datos_caddy:/data
+      - config_caddy:/config
+    networks: [interna, publica]
+
+volumes:
+  datos_postgres:
+  datos_caddy:
+  config_caddy:
+
+networks:
+  interna:
+    internal: true
+  publica:

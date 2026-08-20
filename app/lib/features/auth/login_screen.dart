@@ -74,6 +74,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 onAccion: state.alternarConexion,
               ),
 
+            // Qué garantiza el almacén de esta compilación. Si no cifra o no
+            // persiste, se dice aquí y no en letra pequeña.
+            if (state.almacen.advertencia != null) ...[
+              const SizedBox(height: 12),
+              StatusBanner(
+                  texto: state.almacen.advertencia!, alineaArriba: true),
+            ],
+
             // El CEI aún no ha aprobado: la app funciona, pero no con pacientes
             // reales. Decirlo aquí y no en letra pequeña es deliberado.
             if (!config.consentimientoAprobadoPorCei) ...[

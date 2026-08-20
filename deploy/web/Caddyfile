@@ -1,0 +1,52 @@
+# Proxy y TLS de SIVAP.
+#
+# TLS es obligatorio (CLAUDE.md §5). Hay dos escenarios, y el que aplica en un
+# hospital sin dominio público es el primero:
+#
+# 1. RED INTERNA (por defecto). `tls internal` hace que Caddy emita el
+#    certificado con su propia autoridad. Hay que instalar esa autoridad UNA
+#    vez en cada dispositivo que vaya a abrir el panel; si no, el navegador
+#    avisará de sitio no seguro. El certificado raíz está en el volumen
+#    `datos_caddy`, en /data/caddy/pki/authorities/local/root.crt
+#
+# 2. DOMINIO PÚBLICO. Si el servidor es accesible desde internet con un nombre
+#    propio, se quita la línea `tls internal` y Caddy pide un certificado a
+#    Let's Encrypt automáticamente. Requiere que los puertos 80 y 443 estén
+#    abiertos desde fuera.
+#
+# Lo que NO es una opción: servir esto por http. Van nombres, carnés de
+# identidad y datos clínicos.
+
+{$SIVAP_DOMINIO:sivap.local} {
+	tls internal
+
+	encode zstd gzip
+
+	# API del estudio. Mientras no exista el backend, estas rutas devuelven
+	# 502 — es lo correcto, mejor que fingir que responden.
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	# Panel web (compilación Flutter).
+	handle {
+		root * /srv/sivap
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		# El panel no carga nada de fuera: ni fuentes, ni scripts, ni imágenes
+		# remotas. Las fuentes van empaquetadas en la propia app.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'"
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		# Sin cuerpos de petición en el log: por ahí pasan datos de pacientes.
+		format console
+	}
+}

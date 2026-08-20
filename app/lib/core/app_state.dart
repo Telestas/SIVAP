@@ -1,17 +1,27 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
+import '../data/local/almacen_local.dart';
 import '../data/local/in_memory_study_repository.dart';
 import '../domain/models/role.dart';
 import '../domain/repositories/study_repository.dart';
 
 /// Estado de sesión de la app.
-///
-/// Sin paquetes de terceros a propósito: la app debe compilarse en una máquina
-/// sin acceso fiable a pub.dev. `ChangeNotifier` del SDK sobra para este tamaño.
 class AppState extends ChangeNotifier {
-  AppState() : repo = InMemoryStudyRepository();
+  AppState(this.almacen);
 
-  final StudyRepository repo;
+  /// Almacén volátil, para pruebas y para el arranque en navegador.
+  factory AppState.enMemoria() => AppState(AlmacenLocal(
+        repo: InMemoryStudyRepository(),
+        persistente: false,
+        cifrado: false,
+        descripcion: 'En memoria',
+        advertencia: 'Almacén en memoria: los datos se pierden al cerrar.',
+      ));
+
+  final AlmacenLocal almacen;
+
+  StudyRepository get repo => almacen.repo;
 
   Investigador? _usuario;
   Investigador? get usuario => _usuario;

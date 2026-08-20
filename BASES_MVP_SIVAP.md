@@ -40,7 +40,7 @@ Equipo de médicos investigadores de un hospital cubano, ejecutando una investig
 | Componente | Tecnología | Justificación |
 |---|---|---|
 | App móvil + web | Flutter | Un solo código base, cliente pidió multiplataforma |
-| Almacenamiento local (offline) | Drift o Isar (SQLite embebido) | Persistencia local robusta, consultas estructuradas |
+| Almacenamiento local (offline) | SQLite + SQLCipher, SQL escrito a mano | Persistencia cifrada en reposo, con esquema legible sin generadores de código (decidido 20 ago 2026, en vez de Drift o Isar) |
 | Backend | FastAPI | Ligero, rápido de mantener sin equipo dedicado |
 | Base de datos central | PostgreSQL | Consolidación de todos los investigadores/pacientes |
 | Sync | Cola local con timestamp + resolución "último gana" + log de auditoría | Volumen de 4–10 investigadores no requiere algo más complejo |

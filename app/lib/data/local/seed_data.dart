@@ -45,7 +45,7 @@ class Seed {
   //
   // Para recoger un campo solo en ciertas visitas basta añadirle `dias: [1, 14]`
   // — la pantalla de captura ya lo respeta, no hay que tocar código.
-  static final formulario = VisitFormDefinition(
+  static const formulario = VisitFormDefinition(
     version: 'form-v0.1-borrador',
     diasVisita: const [1, 3, 5, 10, 14],
     secciones: const [

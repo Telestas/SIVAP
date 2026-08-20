@@ -4,4 +4,6 @@ linter:
   rules:
     - prefer_single_quotes
     - avoid_print
-    - require_trailing_commas
+    # `require_trailing_commas` queda fuera a propósito: generaba 264 avisos
+    # que no señalaban ni un problema real, y ahogaba el único error que sí
+    # importaba. Un análisis con ruido es un análisis que nadie lee.

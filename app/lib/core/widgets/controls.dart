@@ -205,26 +205,46 @@ class AppCard extends StatelessWidget {
   final VoidCallback? onTap;
   final double radio;
 
+  static const double _anchoAcento = 3;
+
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: T.card,
-            borderRadius: BorderRadius.circular(radio),
-            border: Border(
-              top: const BorderSide(color: T.lineSoft),
-              right: const BorderSide(color: T.lineSoft),
-              bottom: const BorderSide(color: T.lineSoft),
-              left: acento == null
-                  ? const BorderSide(color: T.lineSoft)
-                  : BorderSide(color: acento!, width: 3),
-            ),
-          ),
-          child: child,
+  Widget build(BuildContext context) {
+    final acento = this.acento;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        // Borde uniforme: Flutter no admite `borderRadius` sobre un borde con
+        // lados de distinto color, así que la franja de acento se pinta dentro
+        // en lugar de ser el lado izquierdo del borde.
+        decoration: BoxDecoration(
+          color: T.card,
+          borderRadius: BorderRadius.circular(radio),
+          border: Border.all(color: T.lineSoft),
         ),
-      );
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Padding(
+              padding: acento == null
+                  ? padding
+                  : padding.copyWith(left: padding.left + _anchoAcento),
+              child: child,
+            ),
+            if (acento != null)
+              // Se estira a la altura de la tarjeta sin necesitar que la
+              // tarjeta tenga altura conocida: dentro de una lista no la tiene.
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: _anchoAcento,
+                child: ColoredBox(color: acento),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Píldora seleccionable: filtros de lista y catálogo de síntomas.

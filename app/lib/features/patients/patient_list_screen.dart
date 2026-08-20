@@ -454,13 +454,12 @@ class _ListaCohorte extends StatelessWidget {
                   const SizedBox(height: 8),
                   const Divider(height: 1, color: T.lineHair),
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 5,
+                    runSpacing: 5,
                     children: [
                       for (final v in repo.visitasDe(p.id))
-                        Padding(
-                          padding: const EdgeInsets.only(right: 5),
-                          child: DayPill(dia: v.dia, status: v.status),
-                        ),
+                        DayPill(dia: v.dia, status: v.status),
                     ],
                   ),
                 ],

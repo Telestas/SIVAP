@@ -1,7 +1,6 @@
 import '../../domain/models/audit_entry.dart';
 import '../../domain/models/consent.dart';
 import '../../domain/models/patient.dart';
-import '../../domain/models/protocolo.dart';
 import '../../domain/models/role.dart';
 import '../../domain/models/visit.dart';
 import '../../domain/repositories/study_repository.dart';

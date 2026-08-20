@@ -325,8 +325,12 @@ class _Seccion extends StatelessWidget {
       final siguiente = i + 1 < campos.length && campos[i + 1].ancho == 1
           ? campos[i + 1]
           : null;
+      // `start` y no `stretch`: dentro de una lista la fila no tiene altura
+      // acotada, y estirar al alto de la fila pediría altura infinita. Las dos
+      // casillas quedan igual de altas porque su contenido es idéntico en
+      // estructura y la etiqueta va limitada a una línea.
       filas.add(Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(child: _input(campo)),
           const SizedBox(width: 9),

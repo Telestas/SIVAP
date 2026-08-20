@@ -206,7 +206,7 @@ class SqliteStudyRepository implements StudyRepository {
 
   @override
   int get dispositivosConCola => _db
-      .select("SELECT count(DISTINCT recolector_id) c FROM visitas "
+      .select('SELECT count(DISTINCT recolector_id) c FROM visitas '
           "WHERE sync != 'sincronizado' "
           'AND EXISTS (SELECT 1 FROM visita_valores v WHERE v.visita_id = visitas.id);')
       .first['c'] as int;

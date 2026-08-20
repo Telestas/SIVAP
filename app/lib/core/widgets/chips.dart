@@ -67,7 +67,7 @@ class DayPillLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DefaultTextStyle(
         style: const TextStyle(fontFamily: T.mono, fontSize: 10, color: T.faint),
-        child: Row(children: const [
+        child: const Row(children: [
           Text('■ completa'),
           SizedBox(width: 14),
           Text('■ pendiente', style: TextStyle(fontFamily: T.mono, fontSize: 10, color: T.warnFg)),

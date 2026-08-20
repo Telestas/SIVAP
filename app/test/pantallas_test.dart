@@ -18,7 +18,20 @@ void main() {
     );
   }
 
+  /// Fija el tamaño de pantalla de la prueba.
+  ///
+  /// El lienzo por defecto de `flutter_test` es 800x600. Las pantallas de la
+  /// app son listas: lo que cae por debajo de esa altura ni siquiera se
+  /// construye, y `find.text` no lo encuentra aunque el código sea correcto.
+  /// Sin esto las pruebas fallarían por el tamaño del lienzo, no por un fallo.
+  void lienzo(WidgetTester tester, {double ancho = 420, double alto = 1600}) {
+    tester.view.physicalSize = Size(ancho, alto);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+  }
+
   testWidgets('01 · el acceso ofrece los tres roles', (tester) async {
+    lienzo(tester);
     await tester.pumpWidget(montar(const LoginScreen()));
 
     expect(find.text('SIVAP'), findsOneWidget);
@@ -30,6 +43,7 @@ void main() {
   });
 
   testWidgets('02 · el recolector ve su carga y puede enrolar', (tester) async {
+    lienzo(tester);
     final state = AppState.enMemoria()..iniciarSesion(Seed.morales);
     await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
 
@@ -42,6 +56,7 @@ void main() {
 
   testWidgets('03 · el observador ve la cohorte y no puede enrolar',
       (tester) async {
+    lienzo(tester);
     final state = AppState.enMemoria()..iniciarSesion(Seed.betancourt);
     await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
 
@@ -53,6 +68,7 @@ void main() {
 
   testWidgets('05 · la captura se construye desde la definición de campos',
       (tester) async {
+    lienzo(tester);
     final state = AppState.enMemoria()..iniciarSesion(Seed.morales);
     await tester.pumpWidget(montar(
         const VisitCaptureScreen(patientId: 'p-estevez', diaInicial: 5),
@@ -70,6 +86,7 @@ void main() {
 
   testWidgets('05 · un valor fuera de rango se señala sin bloquear',
       (tester) async {
+    lienzo(tester);
     final state = AppState.enMemoria()..iniciarSesion(Seed.morales);
     await tester.pumpWidget(montar(
         const VisitCaptureScreen(patientId: 'p-estevez', diaInicial: 5),
@@ -82,6 +99,7 @@ void main() {
 
   testWidgets('05 · una visita ya enviada no ofrece captura al recolector',
       (tester) async {
+    lienzo(tester);
     final state = AppState.enMemoria()..iniciarSesion(Seed.morales);
     await tester.pumpWidget(montar(
         const VisitCaptureScreen(patientId: 'p-estevez', diaInicial: 1),
@@ -93,9 +111,7 @@ void main() {
 
   testWidgets('07 · el panel de administración lista cohorte y auditoría',
       (tester) async {
-    tester.view.physicalSize = const Size(1600, 1100);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
+    lienzo(tester, ancho: 1600, alto: 1400);
 
     final state = AppState.enMemoria()..iniciarSesion(Seed.guerra);
     await tester.pumpWidget(montar(const AdminDashboardScreen(), estado: state));

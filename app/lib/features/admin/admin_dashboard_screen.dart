@@ -433,13 +433,15 @@ class _FilaPaciente extends StatelessWidget {
                 child: ProtocolChip(paciente.protocolo))),
             celda(
               3,
-              Row(children: [
-                for (final v in visitas)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: DayPill(dia: v.dia, status: v.status),
-                  ),
-              ]),
+              // Wrap y no Row: en una pantalla estrecha cinco píldoras no caben
+              // en el ancho de la columna y un Row desborda.
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  for (final v in visitas) DayPill(dia: v.dia, status: v.status),
+                ],
+              ),
             ),
             celda(
                 4,

@@ -1,0 +1,173 @@
+# Compila el APK de campo y lo publica como release del repositorio.
+#
+# NO usa GitHub Packages: ese registro solo admite npm, Maven, NuGet,
+# RubyGems, Gradle y contenedores. Un .apk no cabe ahí. Lo que corresponde
+# para un binario suelto son las releases.
+#
+#   gh workflow run apk.yml -f version=0.1.0
+#
+# O empujando una etiqueta:  git tag v0.1.0 && git push origin v0.1.0
+
+name: APK
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versión (sin la v). Ej.: 0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.1'
+          channel: stable
+          cache: true
+
+      - name: Determinar versión
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "numero=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "numero=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # `--org` fija el identificador de aplicación en cu.sivap.sivap.
+      # Cambiarlo después convierte esto en otra app a ojos de Android: los
+      # usuarios tendrían que desinstalar, y al desinstalar se pierde la clave
+      # de cifrado del dispositivo y con ella los datos sin sincronizar.
+      - name: Generar andamiaje de plataforma
+        working-directory: app
+        run: |
+          flutter create --platforms=android --org cu.sivap .
+          rm -f test/widget_test.dart
+
+      - name: Resolver dependencias
+        working-directory: app
+        run: flutter pub get
+
+      # Se analiza antes de compilar: no tiene sentido repartir un APK de un
+      # código que no pasa su propio análisis.
+      - name: Analizar
+        working-directory: app
+        run: flutter analyze --no-fatal-infos
+
+      - name: Probar
+        working-directory: app
+        run: flutter test
+
+      - name: Compilar APK
+        working-directory: app
+        run: |
+          flutter build apk --release \
+            --build-name="${{ steps.version.outputs.numero }}" \
+            --build-number="${{ github.run_number }}"
+
+      # ── Firma ────────────────────────────────────────────────────────
+      #
+      # Si no hay llavero en los secretos, el APK sale firmado con la clave de
+      # depuración que genera Flutter. Se instala igual, pero NO sirve para
+      # repartir de verdad: el día que se pase a una clave propia, Android lo
+      # tratará como otra aplicación y cada usuario tendrá que desinstalar la
+      # anterior. Al desinstalar se borra la clave del Keystore, y con ella
+      # todo lo que hubiera capturado y no sincronizado.
+      #
+      # Conclusión práctica: crear el llavero ANTES de que nadie capture un
+      # solo dato real. Ver docs/DISTRIBUCION.md.
+      - name: Firmar con el llavero del estudio
+        id: firma
+        if: env.LLAVERO != ''
+        env:
+          LLAVERO: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        working-directory: app
+        run: |
+          echo "$LLAVERO" | base64 -d > /tmp/sivap.jks
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          "$BUILD_TOOLS/zipalign" -p -f 4 "$APK" /tmp/alineado.apk
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks /tmp/sivap.jks \
+            --ks-pass "pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+            --key-pass "pass:${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            --out "$APK" /tmp/alineado.apk
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
+          rm -f /tmp/sivap.jks /tmp/alineado.apk
+          echo "firmado=si" >> "$GITHUB_OUTPUT"
+
+      - name: Renombrar
+        id: apk
+        working-directory: app
+        run: |
+          NOMBRE="sivap-${{ steps.version.outputs.numero }}.apk"
+          mv build/app/outputs/flutter-apk/app-release.apk "build/$NOMBRE"
+          echo "nombre=$NOMBRE" >> "$GITHUB_OUTPUT"
+          echo "ruta=app/build/$NOMBRE" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "build/$NOMBRE" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "tamano=$(du -h "build/$NOMBRE" | cut -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Publicar release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.numero }}
+          name: SIVAP ${{ steps.version.outputs.numero }}
+          files: ${{ steps.apk.outputs.ruta }}
+          # Todo lo de esta fase es preliminar: sin aprobación del CEI no se
+          # enrolan pacientes reales.
+          prerelease: true
+          body: |
+            **Versión de prueba. No para pacientes reales.**
+
+            El estudio no tiene aprobación del CEI, así que la app arranca en
+            modo demostración: los pacientes que aparecen son inventados y la
+            base de datos que usa es un archivo aparte del de producción.
+
+            | | |
+            |---|---|
+            | Archivo | `${{ steps.apk.outputs.nombre }}` |
+            | Tamaño | ${{ steps.apk.outputs.tamano }} |
+            | Firma | ${{ steps.firma.outputs.firmado == 'si' && 'llavero del estudio' || '⚠️ clave de depuración — ver aviso' }} |
+            | SHA-256 | `${{ steps.apk.outputs.sha256 }}` |
+
+            ### Instalación
+
+            Android bloquea por defecto la instalación fuera de Play Store.
+            Al abrir el archivo, el teléfono ofrecerá permitirlo para la app
+            desde la que se descargó; hay que aceptarlo una vez.
+
+            ### Comprobar que el archivo llegó entero
+
+            Con una conexión inestable, una descarga a medias produce errores
+            que no dicen lo que pasa. En el teléfono, con cualquier app de
+            checksum, o en un ordenador:
+
+            ```
+            sha256sum ${{ steps.apk.outputs.nombre }}
+            ```
+
+            Debe coincidir con el SHA-256 de la tabla.
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.nombre }}
+          path: ${{ steps.apk.outputs.ruta }}
+          retention-days: 90

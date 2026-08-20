@@ -47,8 +47,8 @@ class Seed {
   // — la pantalla de captura ya lo respeta, no hay que tocar código.
   static const formulario = VisitFormDefinition(
     version: 'form-v0.1-borrador',
-    diasVisita: const [1, 3, 5, 10, 14],
-    secciones: const [
+    diasVisita: [1, 3, 5, 10, 14],
+    secciones: [
       FormSection(titulo: 'Signos vitales', campos: [
         FieldDefinition(
             key: 'ta',
@@ -134,7 +134,7 @@ class Seed {
     ],
   );
 
-  static StudyConfig get config => StudyConfig(
+  static StudyConfig get config => const StudyConfig(
         nombreEstudio: 'Registro clínico de cohorte',
         centro: 'Hospital Provincial',
         servicio: 'Servicio de Medicina Interna',

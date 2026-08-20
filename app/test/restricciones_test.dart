@@ -133,7 +133,7 @@ void main() {
     });
 
     test('un campo restringido a ciertos días solo aparece en esos días', () {
-      final def = Seed.formulario;
+      const def = Seed.formulario;
       final temp = def.camposPara(1).firstWhere((c) => c.key == 'temp');
 
       expect(temp.aplicaA(1), isTrue);

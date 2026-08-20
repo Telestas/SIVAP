@@ -185,12 +185,21 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen> {
                 padding: const EdgeInsets.fromLTRB(T.gutter, 14, T.gutter, 20),
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      // Expanded, no un Text suelto: en pantallas estrechas
+                      // «Día 10 · 25 ago 2026» más el distintivo de estado no
+                      // caben, y un Row sin holgura desborda en vez de ceder.
+                      Expanded(
+                        child: Text(
                           'Día $_dia · ${F.fechaLarga(visita.fechaProgramada)}',
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w600, color: T.ink)),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: T.ink),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
                       MetaChip(visita.status.etiqueta,
                           tono: switch (visita.status) {
                             VisitStatus.enviada => MetaTone.ok,

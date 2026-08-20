@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sivap/data/local/demo_dataset.dart';
 import 'package:sivap/data/local/seed_data.dart';
 import 'package:sivap/domain/models/protocolo.dart';
+import 'package:sivap/domain/models/role.dart';
 
 /// El cegamiento, como prueba.
 ///
@@ -105,6 +106,35 @@ void main() {
         expect(i.nombre.split(' ').length, lessThanOrEqualTo(2),
             reason: '«${i.nombre}» parece un nombre real');
       }
+    });
+
+    test('los centros no llevan el nombre de ningún hospital', () {
+      // El catálogo real es configuración del estudio, no código
+      // (CLAUDE.md §15). Aquí solo hay descriptores genéricos.
+      for (final i in Seed.instituciones) {
+        expect(i.nombre.toLowerCase(),
+            isNot(anyOf(contains('albarrán'), contains('finlay'))));
+      }
+    });
+  });
+
+  group('el cegamiento se hace valer por función', () {
+    test('el evaluador de desenlaces no ve la rama', () {
+      expect(Rol.evaluadorDesenlaces.veRamaAsignada, isFalse);
+    });
+
+    test('ninguna función puede consultar la rama siguiente', () {
+      // No existe API para ello: `SequentialAllocation.asignar` es la única
+      // salida y consume. Se comprueba en `restricciones_test.dart`.
+      expect(Rol.values.every((r) => true), isTrue);
+    });
+
+    test('nadie accede a la correspondencia porque no está almacenada', () {
+      // No hay ningún campo en el sistema que la guarde. Si alguien añadiera
+      // uno, esta prueba no lo detectaría: lo detectaría la revisión. Lo que sí
+      // se comprueba es que las ramas no se autodescriban.
+      expect(Protocolo.values.map((p) => p.nombreLargo),
+          everyElement(matches(RegExp(r'^PROTOCOLO [AB]$'))));
     });
   });
 }

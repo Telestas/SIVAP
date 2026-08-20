@@ -3,10 +3,12 @@
 Inventario contra `BASES_MVP_SIVAP.md`, verificado contra el código el 20 ago 2026.
 Se actualiza al cerrar cada hito.
 
-> **Antes que nada**: `docs/REENCAMINAMIENTO.md` tiene los pasos 4, 5 y 6 pendientes
-> —campos del Anexo 4, ficha mínima e institución, y roles según cegamiento— y van
-> **antes** del backend. Una vez exista esquema en PostgreSQL con datos
-> sincronizados, cada uno pasa de refactor a migración.
+> **El reencaminamiento está completo** (`docs/REENCAMINAMIENTO.md`, seis pasos).
+> El backend queda desbloqueado salvo por una cosa: **el reparto de la secuencia
+> de aleatorización entre dispositivos**. Sin resolverlo, dos dispositivos
+> trabajando sin conexión asignan la misma posición y el reparto entre ramas deja
+> de ser el que la secuencia dictaba, en silencio. Es bloqueante para enrolar
+> pacientes reales y condiciona el diseño del backend.
 
 ## Hecho (Hito 1 — sin compilar todavía)
 
@@ -15,7 +17,10 @@ Se actualiza al cerrar cada hito.
 | §2 Enrolamiento | Ficha de identidad completa, con contacto y dirección |
 | §2 Asignación | Aleatorización simple generada por computadora, semilla registrada, secuencia verificable |
 | §2 Consentimiento | Pantalla con documento versionado, declaraciones y firma con el dedo |
-| §2 Formularios configurables | El **mecanismo** está: la pantalla se construye desde `EstudioFormDefinition`. Los campos son provisionales — paso 4 |
+| §2 Formularios configurables | La pantalla se construye desde `EstudioFormDefinition`, con los cuatro módulos del Anexo 4 y sus categorías reales |
+| §8 Multicéntrico | Centro en la ficha, en cada evento y en cada investigador. Código de paciente con prefijo de centro |
+| §9 Minimización | Fuera carné de identidad y dirección |
+| BASES §4 Separación de funciones | Seis funciones; la captura va por tipo de hito; el evaluador de desenlaces no ve la rama |
 | §2 Auditoría | Solo para corrección de eventos registrados: valor anterior, nuevo, autor, fecha, motivo. En la base, con disparadores que impiden modificarla o borrarla |
 | §2 Cegamiento | El sistema solo conoce Protocolo A y B, comprobado por `test/cegamiento_test.dart` |
 | §5 Captura por eventos | Línea de tiempo por fases, hitos repetibles, trayectorias incompletas |
@@ -50,11 +55,12 @@ Ordenado por lo que más riesgo quita primero.
 
 | BASES | Qué falta | Nota |
 |---|---|---|
-| §2 | **Registro de investigadores** | El acceso de hoy es de demostración: se elige el rol al entrar. En producción el rol viene del servidor con la credencial |
+| §2 | **Registro de investigadores** | El acceso de hoy es de demostración: se elige la función al entrar. En producción viene del servidor con la credencial — y en un ensayo donde los permisos sostienen el cegamiento, que alguien elija los suyos no es aceptable |
+| §6 | **Reparto de la secuencia por dispositivo** | **Bloqueante.** Ver el aviso de arriba |
 | §4 | **Eliminar** pacientes y visitas (admin) | El repositorio no tiene ningún método de borrado |
 | §4 | **Editar la ficha con historial** (admin) | La auditoría hoy solo cubre visitas. `AuditEntity` ya contempla ficha, consentimiento y usuario; el repositorio no |
 | §4 | **Gestión de usuarios y roles** (admin) | Sección de la barra lateral sin contenido |
-| §6 | **Cargar la secuencia de aleatorización** | Hoy la semilla está en el código. Hace falta pantalla de administración para fijarla una vez, y ver la secuencia y su consumo |
+| §6 | **Cargar la secuencia de aleatorización** | Hoy la semilla de demostración está en el código. Hace falta pantalla de administración para fijar la real una vez, ver su consumo y repartir rangos por dispositivo |
 | §7 | **Activación del estudio** | El flag `consentimientoAprobadoPorCei` existe pero solo se puede cambiar tocando código |
 | — | **Panel de administración: 5 de 6 secciones** | La barra lateral tiene Pacientes, Visitas, Consentimientos, Auditoría, Usuarios y roles, Exportar. Solo Pacientes tiene contenido; el resto cambia el resaltado y no la vista |
 | — | **Auditoría completa** | El "Ver todo" del panel no lleva a ninguna parte; solo se ven las últimas seis entradas |
@@ -64,11 +70,12 @@ Ordenado por lo que más riesgo quita primero.
 
 Ninguna de estas la puede resolver quien programa.
 
-1. **Campos exactos por visita** (BASES §5). El más bloqueante: hasta que no
-   estén, el dataset exportable no queda fijado, y es lo que el bioestadista
-   necesita. Los que hay ahora salen de la maqueta, no de la práctica clínica.
-2. **Rangos clínicos** de cada campo. La app avisa fuera de rango sin bloquear;
-   los límites de hoy son razonables pero no los ha validado un médico.
+1. ~~**Campos exactos por visita**~~ — **hecho**: los cuatro módulos del Anexo 4
+   están cargados con sus categorías reales.
+2. **Rangos clínicos** de cada campo numérico. Van vacíos a propósito.
+   `docs/RANGOS_PENDIENTES.md` está listo para que lo rellene el intensivista, y
+   recoge además dos decisiones que conviene tomar a la vez: si el RSBI se
+   guarda como categoría o como número, y en qué unidad van dos duraciones.
 3. **Semilla y longitud** de la secuencia de aleatorización (BASES §6). Ver la
    recomendación sobre cuándo y dónde fijarla, más abajo.
 4. **Aprobación del CEI** (BASES §7). Sin ella no hay pacientes reales.

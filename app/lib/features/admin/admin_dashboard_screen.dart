@@ -47,6 +47,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
       final q = _busqueda.trim().toLowerCase();
       return q.isEmpty ||
+          p.codigo.toLowerCase().contains(q) ||
           p.nombre.toLowerCase().contains(q) ||
           p.numeroHistoriaClinica.toLowerCase().contains(q);
     }).toList();
@@ -163,7 +164,7 @@ class _BarraLateral extends StatelessWidget {
                 Text(state.usuarioActual.nombre,
                     style: const TextStyle(fontSize: 13, color: T.onInk)),
                 const SizedBox(height: 3),
-                Text(state.usuarioActual.role.label,
+                Text(state.usuarioActual.etiquetaRoles,
                     style: const TextStyle(
                         fontFamily: T.mono,
                         fontFamilyFallback: T.monoFallback,
@@ -263,7 +264,7 @@ class _Cabecera extends StatelessWidget {
                   style: const TextStyle(fontSize: 13.5, color: T.ink),
                   decoration: InputDecoration(
                     isDense: true,
-                    hintText: 'Buscar por nombre o código',
+                    hintText: 'Buscar por código, nombre o historia clínica',
                     hintStyle: const TextStyle(fontSize: 13.5, color: T.faint),
                     filled: true,
                     fillColor: T.card,
@@ -340,7 +341,7 @@ class _TablaPacientes extends StatelessWidget {
   static const columnas = [2.0, 1.1, 1.0, 2.2, 1.2, 1.1, 0.9];
   static const _titulos = [
     'Paciente',
-    'Código',
+    'Centro',
     'Rama',
     'Avance por fases',
     'Recolector',
@@ -421,20 +422,20 @@ class _FilaPaciente extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(paciente.nombre,
+                  Text(paciente.codigo,
                       style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: T.ink)),
                   const SizedBox(height: 2),
-                  Text(paciente.demografia,
+                  Text('${paciente.demografia} · ${paciente.nombre}',
                       style: const TextStyle(fontSize: 11.5, color: T.faint)),
                 ],
               ),
             ),
             celda(
                 1,
-                Text(paciente.numeroHistoriaClinica,
+                Text(paciente.institucion.codigo,
                     style: const TextStyle(
                         fontFamily: T.mono,
                         fontFamilyFallback: T.monoFallback,
@@ -494,8 +495,7 @@ class _FilaPaciente extends StatelessWidget {
     );
   }
 
-  static String _recolector(String id) =>
-      Seed.investigadores.firstWhere((i) => i.id == id).nombre;
+  static String _recolector(String id) => Seed.porId(id).nombre;
 }
 
 /// Historial de auditoría. Es la prueba visible de que ninguna corrección

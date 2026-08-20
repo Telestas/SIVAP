@@ -2,9 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sivap/data/allocation/allocation_strategy.dart';
 import 'package:sivap/data/local/in_memory_study_repository.dart';
 import 'package:sivap/data/local/seed_data.dart';
+import 'package:sivap/domain/models/estudio_form_definition.dart';
 import 'package:sivap/domain/models/evento_clinico.dart';
+import 'package:sivap/domain/models/institucion.dart';
 import 'package:sivap/domain/models/patient.dart';
 import 'package:sivap/domain/models/protocolo.dart';
+import 'package:sivap/domain/models/role.dart';
 import 'package:sivap/domain/repositories/study_repository.dart';
 
 /// Las restricciones no negociables de CLAUDE.md, como pruebas.
@@ -16,36 +19,39 @@ void main() {
 
   setUp(() => repo = InMemoryStudyRepository());
 
-  Patient enrolarDemo() => repo.enrolar(
-        autor: Seed.morales,
+  Patient enrolarDemo({Institucion? institucion}) => repo.enrolar(
+        autor: Seed.reclutador,
+        institucion: institucion ?? Seed.coordinador,
         nombre: 'Paciente de Prueba',
-        carneIdentidad: '00000000000',
+        numeroHistoriaClinica: 'TEST-01',
+        telefonoPrincipal: '5 000 0000',
         edad: 36,
         sexo: Sexo.femenino,
-        numeroHistoriaClinica: 'TEST-01',
-        telefono: '5 000 0000',
-        direccion: 'Sin dirección',
       );
 
   Patient conConsentimiento() {
     final p = enrolarDemo();
     repo.registrarConsentimiento(
-        autor: Seed.morales, patientId: p.id, firmaTrazos: const []);
+        autor: Seed.reclutador, patientId: p.id, firmaTrazos: const []);
     return p;
   }
 
+  /// Registra con la función que corresponde a ese hito: el aplicador captura
+  /// las fases del protocolo, el evaluador los desenlaces.
   EventoClinico registrar(
     Patient p,
     TipoEvento tipo,
     Map<String, Object?> valores,
-  ) =>
-      repo.registrarEvento(
-        autor: Seed.morales,
-        patientId: p.id,
-        tipo: tipo,
-        fechaOcurrencia: DateTime(2026, 8, 20),
-        valores: valores,
-      );
+  ) {
+    final autor = Seed.investigadores.firstWhere((i) => i.puedeCapturar(tipo));
+    return repo.registrarEvento(
+      autor: autor,
+      patientId: p.id,
+      tipo: tipo,
+      fechaOcurrencia: DateTime(2026, 8, 20),
+      valores: valores,
+    );
+  }
 
   group('§1 · separación ficha / datos clínicos', () {
     test('el evento no guarda identidad, solo el vínculo interno', () {
@@ -70,7 +76,7 @@ void main() {
       // otro en su lugar: hay que corregir, no duplicar.
       expect(
         () => repo.guardarBorrador(
-          autor: Seed.morales,
+          autor: Seed.reclutador,
           patientId: p.id,
           tipo: TipoEvento.extubacion,
           fechaOcurrencia: DateTime(2026, 8, 20),
@@ -87,7 +93,7 @@ void main() {
 
       expect(
         () => repo.corregirEventoRegistrado(
-            autor: Seed.guerra,
+            autor: Seed.principal,
             eventoId: e.id,
             campo: 'duracion_total_vmi',
             valorNuevo: 6,
@@ -102,7 +108,7 @@ void main() {
 
       final antes = repo.auditoria().length;
       repo.corregirEventoRegistrado(
-        autor: Seed.guerra,
+        autor: Seed.principal,
         eventoId: e.id,
         campo: 'duracion_total_vmi',
         valorNuevo: 4,
@@ -114,7 +120,7 @@ void main() {
       expect(entrada.campo, 'duracion_total_vmi');
       expect(entrada.valorAnterior, '40');
       expect(entrada.valorNuevo, '4');
-      expect(entrada.autorId, Seed.guerra.id);
+      expect(entrada.autorId, Seed.principal.id);
       expect(entrada.motivo, 'cero de más');
       expect(repo.evento(e.id)!.valores['duracion_total_vmi'], 4);
     });
@@ -123,7 +129,7 @@ void main() {
       final p = conConsentimiento();
       final e = registrar(p, TipoEvento.extubacion, const {'duracion_total_vmi': 4});
       repo.corregirEventoRegistrado(
-          autor: Seed.guerra,
+          autor: Seed.principal,
           eventoId: e.id,
           campo: 'duracion_total_vmi',
           valorNuevo: 6,
@@ -200,7 +206,7 @@ void main() {
       final p = conConsentimiento();
       final ocurrio = DateTime(2026, 8, 11);
       final e = repo.registrarEvento(
-        autor: Seed.morales,
+        autor: Seed.reclutador,
         patientId: p.id,
         tipo: TipoEvento.traqueostomia,
         fechaOcurrencia: ocurrio,
@@ -229,14 +235,65 @@ void main() {
     });
 
     test('el rango clínico avisa pero no impide registrar el valor real', () {
-      final fr = Seed.formulario
+      const campo = FieldDefinition(
+          key: 'fr', label: 'FR', tipo: FieldType.numero, min: 5, max: 60);
+
+      expect(campo.fueraDeRango(22), isNull);
+      expect(campo.fueraDeRango(70), isNotNull);
+      expect(campo.fueraDeRango(null), isNull);
+    });
+
+    test('los campos del Anexo 4 no traen rangos sin validar', () {
+      // Los rangos anteriores eran de paciente general ambulatorio y un
+      // paciente ventilado en UCI los excede con normalidad. Van vacíos hasta
+      // que un intensivista los fije: un aviso falso repetido enseña al equipo
+      // a ignorar los avisos, y entonces tampoco ve los verdaderos.
+      for (final e in Seed.formulario.eventos) {
+        for (final c in e.campos) {
+          expect(c.min, isNull, reason: '${e.tipo.name}.${c.key}');
+          expect(c.max, isNull, reason: '${e.tipo.name}.${c.key}');
+        }
+      }
+    });
+
+    test('los cuatro módulos del Anexo 4 están representados', () {
+      final claves = {
+        for (final e in Seed.formulario.eventos)
+          for (final c in e.campos) c.key
+      };
+
+      // Módulo 1
+      expect(claves, containsAll(['fecha_ingreso_uci', 'causa_intubacion',
+          'comorbilidades', 'imc']));
+      // Módulo 2
+      expect(claves, containsAll(['fecha_inicio_vmi', 'fio2', 'peep',
+          'metodo_pve', 'rsbi_inicio', 'rsbi_final', 'resultado_pve']));
+      // Módulo 3
+      expect(claves, containsAll(['test_fuga', 'resultado_test_fuga',
+          'duracion_total_vmi']));
+      // Módulo 4
+      expect(claves, containsAll(['reintubacion_72h', 'causa_reintubacion',
+          'eventos_adversos', 'estancia_uci', 'estado_egreso',
+          'fallecimiento_post_egreso']));
+    });
+
+    test('el RSBI usa las categorías del Anexo 4', () {
+      final rsbi = Seed.formulario
           .para(TipoEvento.pruebaVentilacionEspontanea)!
           .campos
-          .firstWhere((c) => c.key == 'fr_inicio');
+          .firstWhere((c) => c.key == 'rsbi_inicio');
 
-      expect(fr.fueraDeRango(22), isNull);
-      expect(fr.fueraDeRango(70), isNotNull);
-      expect(fr.fueraDeRango(null), isNull);
+      expect(rsbi.opciones, ['> 105', '≤ 105', '≤ 58']);
+    });
+
+    test('«total de PVE intentadas» no se pide: se cuenta', () {
+      // Pedir dos veces el mismo dato es pedir que discrepen. El propio Anexo
+      // señala que es derivable.
+      final claves = {
+        for (final e in Seed.formulario.eventos)
+          for (final c in e.campos) c.key
+      };
+      expect(claves, isNot(contains('total_pve_intentadas')));
     });
   });
 
@@ -329,7 +386,8 @@ void main() {
     test('cada asignación queda trazada con secuencia y hora', () {
       final p = enrolarDemo();
 
-      expect(p.bloqueAleatorizacion, Seed.secuenciaAleatorizacion.etiqueta);
+      expect(p.secuencia, Seed.secuenciaAleatorizacion.etiqueta);
+      expect(p.posicionSecuencia, greaterThan(0));
       expect(p.protocolo, isIn(Protocolo.values));
     });
   });
@@ -338,14 +396,13 @@ void main() {
     test('el observador no enrola ni captura', () {
       expect(
         () => repo.enrolar(
-            autor: Seed.betancourt,
+            autor: Seed.observador,
+            institucion: Seed.coordinador,
             nombre: 'X',
-            carneIdentidad: '1',
-            edad: 1,
-            sexo: Sexo.masculino,
             numeroHistoriaClinica: '1',
-            telefono: '1',
-            direccion: '1'),
+            telefonoPrincipal: '1',
+            edad: 1,
+            sexo: Sexo.masculino),
         throwsA(isA<PermissionDenied>()),
       );
     });
@@ -356,7 +413,7 @@ void main() {
 
       expect(
         () => repo.corregirEventoRegistrado(
-            autor: Seed.morales,
+            autor: Seed.reclutador,
             eventoId: e.id,
             campo: 'duracion_total_vmi',
             valorNuevo: 6,
@@ -366,10 +423,10 @@ void main() {
     });
 
     test('el recolector solo ve su propia carga', () {
-      final suyos = repo.pacientes(recolectorId: Seed.morales.id);
+      final suyos = repo.pacientes(recolectorId: Seed.reclutador.id);
 
       expect(suyos, isNotEmpty);
-      expect(suyos.every((p) => p.recolectorId == Seed.morales.id), isTrue);
+      expect(suyos.every((p) => p.recolectorId == Seed.reclutador.id), isTrue);
       expect(suyos.length, lessThan(repo.pacientes().length));
     });
   });
@@ -388,7 +445,7 @@ void main() {
     test('el consentimiento registra la versión del documento', () {
       final p = enrolarDemo();
       final consent = repo.registrarConsentimiento(
-          autor: Seed.morales, patientId: p.id, firmaTrazos: const []);
+          autor: Seed.reclutador, patientId: p.id, firmaTrazos: const []);
 
       expect(consent.versionDocumento, repo.config.documentoConsentimiento.version);
       expect(repo.paciente(p.id)!.tieneConsentimiento, isTrue);
@@ -398,6 +455,121 @@ void main() {
       // Cambiar esto a `true` es una decisión del equipo, documentada, no un
       // ajuste de código para que la demostración quede más bonita.
       expect(repo.config.consentimientoAprobadoPorCei, isFalse);
+    });
+  });
+
+  group('§8 · multicéntrico', () {
+    test('el paciente declara su centro y el código lo lleva de prefijo', () {
+      final p = enrolarDemo(institucion: Seed.cardiologia);
+
+      expect(p.institucion, Seed.cardiologia);
+      expect(p.codigo, startsWith('${Seed.cardiologia.codigo}-'));
+    });
+
+    test('el correlativo del código es por centro, no global', () {
+      final a = enrolarDemo(institucion: Seed.militar);
+      final b = enrolarDemo(institucion: Seed.militar);
+
+      expect(a.codigo, isNot(b.codigo));
+      expect(a.codigo, startsWith('HM-'));
+      expect(b.codigo, startsWith('HM-'));
+    });
+
+    test('el evento guarda dónde se capturó, no solo dónde se enroló', () {
+      // Un paciente trasladado tendría eventos de más de un centro, y el
+      // análisis por centro necesita saber dónde ocurrió cada cosa.
+      final p = conConsentimiento();
+      final e = registrar(p, TipoEvento.cribado, const {'cumple_criterios': true});
+
+      expect(e.institucion, isNotNull);
+    });
+  });
+
+  group('§9 · minimización de datos personales', () {
+    test('la ficha no admite carné de identidad ni dirección', () {
+      // No hay dónde ponerlos: el Anexo 4 no los pide y cada dato personal de
+      // más hay que justificarlo ante el Comité de Ética.
+      final p = enrolarDemo();
+      final campos = p.toString();
+
+      expect(campos, isNot(contains('carne')));
+      expect(p.telefonoSecundario, isNull);
+    });
+  });
+
+  group('§2 y BASES §4 · separación de funciones', () {
+    test('el aplicador no registra desenlaces', () {
+      final p = conConsentimiento();
+
+      expect(
+        () => repo.registrarEvento(
+            autor: Seed.aplicador,
+            patientId: p.id,
+            tipo: TipoEvento.reintubacion,
+            fechaOcurrencia: DateTime(2026, 8, 20),
+            valores: const {'reintubacion_72h': false}),
+        throwsA(isA<FueraDeSuFuncion>()),
+      );
+    });
+
+    test('el evaluador no registra fases del protocolo', () {
+      final p = conConsentimiento();
+
+      expect(
+        () => repo.registrarEvento(
+            autor: Seed.evaluador,
+            patientId: p.id,
+            tipo: TipoEvento.pruebaVentilacionEspontanea,
+            fechaOcurrencia: DateTime(2026, 8, 20),
+            valores: const {'metodo_pve': 'PSV'}),
+        throwsA(isA<FueraDeSuFuncion>()),
+      );
+    });
+
+    test('el evaluador de desenlaces no ve la rama asignada', () {
+      // Si la viera, su juicio sobre si hubo extubación fallida —el desenlace
+      // principal— dejaría de ser independiente.
+      expect(Seed.evaluador.veRamaAsignada, isFalse);
+      expect(Seed.aplicador.veRamaAsignada, isTrue);
+      expect(Seed.principal.veRamaAsignada, isTrue);
+    });
+
+    test('acumular aplicador y evaluador oculta la rama, no la muestra', () {
+      // En cegamiento manda la restricción más estricta, no la suma de
+      // permisos.
+      const acumula = Investigador(
+        id: 'u-x',
+        usuario: 'x',
+        nombre: 'Dr. X',
+        roles: {Rol.aplicador, Rol.evaluadorDesenlaces},
+        institucion: Seed.coordinador,
+      );
+
+      expect(acumula.veRamaAsignada, isFalse);
+      expect(acumula.acumulaFuncionesIncompatibles, isTrue);
+    });
+
+    test('solo el investigador principal corrige', () {
+      for (final i in Seed.investigadores) {
+        expect(i.puedeCorregirRegistrado,
+            i.roles.contains(Rol.investigadorPrincipal),
+            reason: i.usuario);
+      }
+    });
+
+    test('el analista exporta pero no captura', () {
+      expect(Seed.analista.puedeExportar, isTrue);
+      expect(Seed.analista.puedeCapturarEventos, isFalse);
+      expect(Seed.analista.puedeEnrolar, isFalse);
+    });
+
+    test('cada hito del estudio tiene una función que lo captura', () {
+      // Si un hito no lo captura nadie, el dato no se recoge y nadie se entera
+      // hasta el análisis.
+      for (final tipo in TipoEvento.values) {
+        expect(Rol.values.any((r) => r.eventosQueCaptura.contains(tipo)), isTrue,
+            reason: tipo.name);
+      }
     });
   });
 }

@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/widgets/chips.dart';
 import '../../core/widgets/controls.dart';
-import '../../domain/models/role.dart';
 import '../../data/local/seed_data.dart';
+import '../../domain/models/role.dart';
 
-/// 01 · Acceso y rol.
+/// Acceso al sistema.
 ///
-/// En el MVP el rol se elige al entrar para poder demostrar las tres vistas.
-/// En producción el rol viene del servidor con la credencial y este selector
-/// desaparece: un investigador no decide sus propios permisos.
+/// En el MVP se elige con qué función entrar, para poder recorrer la app con
+/// cada una y comprobar qué ve y qué no. **En producción la función viene del
+/// servidor con la credencial**: un investigador no elige sus propios permisos,
+/// y menos en un ensayo donde los permisos son la separación de funciones que
+/// sostiene el cegamiento.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -19,9 +22,15 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _usuario = TextEditingController(text: 'dra.morales');
+  final _usuario = TextEditingController();
   final _clave = TextEditingController(text: '········');
-  Role _role = Role.recolector;
+  Investigador _seleccionado = Seed.investigadores.first;
+
+  @override
+  void initState() {
+    super.initState();
+    _usuario.text = _seleccionado.usuario;
+  }
 
   @override
   void dispose() {
@@ -30,11 +39,10 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _entrar() {
-    final state = AppScope.read(context);
-    final investigador = Seed.investigadores.firstWhere((i) => i.role == _role);
-    state.iniciarSesion(investigador);
-  }
+  void _elegir(Investigador i) => setState(() {
+        _seleccionado = i;
+        _usuario.text = i.usuario;
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -55,13 +63,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: T.ink)),
             const SizedBox(height: 6),
             Text('Ensayo ${config.acronimo}\n${config.nombreEstudio}',
-                style: const TextStyle(fontSize: 13, color: T.secondary, height: 1.5)),
+                style: const TextStyle(
+                    fontSize: 13, color: T.secondary, height: 1.5)),
             const SizedBox(height: 22),
 
             if (state.sinConexion)
               StatusBanner(
-                texto: 'Sin conexión de datos. Se validará su credencial guardada '
-                    'en el dispositivo; los envíos quedarán en cola.',
+                texto: 'Sin conexión de datos. Se validará su credencial '
+                    'guardada en el dispositivo; los envíos quedarán en cola.',
                 alineaArriba: true,
                 accion: 'CAMBIAR',
                 onAccion: state.alternarConexion,
@@ -78,8 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // persiste, se dice aquí y no en letra pequeña.
             if (state.almacen.advertencia != null) ...[
               const SizedBox(height: 12),
-              StatusBanner(
-                  texto: state.almacen.advertencia!, alineaArriba: true),
+              StatusBanner(texto: state.almacen.advertencia!, alineaArriba: true),
             ],
 
             // El CEI aún no ha aprobado: la app funciona, pero no con pacientes
@@ -87,33 +95,41 @@ class _LoginScreenState extends State<LoginScreen> {
             if (!config.consentimientoAprobadoPorCei) ...[
               const SizedBox(height: 12),
               const StatusBanner(
-                texto: 'Modo demostración. El CEI no ha aprobado aún protocolo y '
-                    'consentimiento: no se admite el enrolamiento de pacientes reales.',
+                texto: 'Modo demostración. El CEI no ha aprobado aún protocolo '
+                    'y consentimiento: no se admite el enrolamiento de '
+                    'pacientes reales.',
                 alineaArriba: true,
               ),
             ],
 
             const SizedBox(height: 22),
-            LabeledField(label: 'Usuario', controller: _usuario),
+            LabeledField(label: 'Usuario', controller: _usuario, readOnly: true),
             const SizedBox(height: 14),
             LabeledField(label: 'Contraseña', controller: _clave),
 
             const SizedBox(height: 22),
-            const SectionLabel('Rol de sesión'),
-            const SizedBox(height: 9),
-            for (final role in Role.values) ...[
-              _OpcionRol(
-                role: role,
-                seleccionado: _role == role,
-                onTap: () => setState(() => _role = role),
+            const SectionLabel('Función en el ensayo'),
+            const SizedBox(height: 6),
+            const Text(
+                'El diseño del ensayo separa funciones por razones '
+                'metodológicas: quien selecciona pacientes está cegado a la '
+                'secuencia, y quien evalúa desenlaces, a la rama asignada.',
+                style: TextStyle(fontSize: 12, color: T.secondary, height: 1.45)),
+            const SizedBox(height: 12),
+            for (final i in Seed.investigadores) ...[
+              _OpcionFuncion(
+                investigador: i,
+                seleccionado: _seleccionado.id == i.id,
+                onTap: () => _elegir(i),
               ),
-              if (role != Role.values.last) const SizedBox(height: 8),
+              const SizedBox(height: 8),
             ],
 
-            const SizedBox(height: 28),
-            AppButton('Entrar', onTap: _entrar),
+            const SizedBox(height: 20),
+            AppButton('Entrar',
+                onTap: () => AppScope.read(context).iniciarSesion(_seleccionado)),
             const SizedBox(height: 12),
-            Text('v1.0.4 · última sincronización 19 ago, 17:22',
+            Text('v0.2 · ${config.definicionFormulario.version}',
                 textAlign: TextAlign.center,
                 style: T.label(size: 10.5, color: T.faint, tracking: 0.05)),
           ],
@@ -123,11 +139,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _OpcionRol extends StatelessWidget {
-  const _OpcionRol(
-      {required this.role, required this.seleccionado, required this.onTap});
+class _OpcionFuncion extends StatelessWidget {
+  const _OpcionFuncion({
+    required this.investigador,
+    required this.seleccionado,
+    required this.onTap,
+  });
 
-  final Role role;
+  final Investigador investigador;
   final bool seleccionado;
   final VoidCallback onTap;
 
@@ -135,7 +154,7 @@ class _OpcionRol extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
         inMutuallyExclusiveGroup: true,
         selected: seleccionado,
-        label: role.label,
+        label: investigador.etiquetaRoles,
         child: GestureDetector(
           onTap: onTap,
           child: Container(
@@ -167,13 +186,29 @@ class _OpcionRol extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(role.label,
-                          style: const TextStyle(
-                              fontSize: 14.5, fontWeight: FontWeight.w600, color: T.ink)),
-                      const SizedBox(height: 2),
-                      Text(role.description,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(investigador.etiquetaRoles,
+                                style: const TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: T.ink)),
+                          ),
+                          const SizedBox(width: 8),
+                          MetaChip(investigador.institucion.codigo),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(investigador.rolPrincipal.descripcion,
                           style: const TextStyle(
                               fontSize: 12, color: T.secondary, height: 1.45)),
+                      if (seleccionado) ...[
+                        const SizedBox(height: 6),
+                        Text('Cegado a: ${investigador.rolPrincipal.cegadoA}',
+                            style: T.label(
+                                size: 10.5, color: T.body, tracking: 0.02)),
+                      ],
                     ],
                   ),
                 ),

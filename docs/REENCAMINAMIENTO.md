@@ -3,7 +3,8 @@
 Plan de corrección de rumbo tras leer las fuentes reales del ensayo LIVERE
 (protocolo, proyecto de investigación, Anexo 4).
 
-**Estado: pasos 0 a 3 hechos. Pendientes 4, 5 y 6.**
+**Estado: los seis pasos hechos.** Quedan decisiones del equipo, no código;
+están en `docs/PENDIENTE.md` y en CLAUDE.md.
 
 ## Por qué
 
@@ -105,57 +106,108 @@ nunca llega a extubarse es una trayectoria válida, no un error.
 
 ---
 
-## ⬜ Paso 4 — Campos reales del Anexo 4
+## ✅ Paso 4 — Campos reales del Anexo 4 · hecho
 
-El mecanismo ya está bien: `EstudioFormDefinition` es configurable como datos y la
-pantalla la recorre sin nada escrito a mano. Lo que hay en `seed_data.dart` es un
-**esqueleto provisional** trazable a BASES §6 —entre dos y siete campos por evento—,
-suficiente para que la línea de tiempo funcione y se pueda enseñar.
+El esqueleto provisional se sustituyó por los cuatro módulos del Anexo 4, con
+sus categorías exactas: IMC en cinco tramos, siete causas de intubación, ocho
+comorbilidades, cuatro métodos de PVE, RSBI en sus tres categorías, siete causas
+de reintubación, cuatro tramos de mortalidad post-egreso.
 
-**Acción**: sustituirlo por los cuatro módulos completos del Anexo 4, con sus
-categorías exactas.
+**Qué NO se pide, y por qué**
 
-**Atención a los rangos**: van casi todos vacíos a propósito. Los que había (FC
-40–140, temp 35–37,5, SpO₂ 92–100) eran de paciente general ambulatorio y un paciente
-ventilado en UCI los excede con normalidad. Ponerlos sin validación de un intensivista
-produciría avisos falsos que el equipo aprendería a ignorar, que es peor que no
-tenerlos. Recordar la restricción 14: los rangos avisan, no bloquean.
+- «Total de PVE intentadas» → se cuenta a partir del número de eventos de PVE
+  registrados. El propio Anexo señala que es derivable, y pedir dos veces el
+  mismo dato es pedir que discrepen. Hay una prueba que falla si alguien lo
+  añade.
+- Fechas de PVE y de traqueostomía → son la fecha del propio evento.
+- Código, teléfonos, centro, edad, sexo y protocolo → están en la ficha.
 
----
+**Qué SÍ se pide aunque parezca derivable** —duración total de VMI, fecha de PVE
+exitosa, tiempo entre PVE y extubación—: si el evento de origen falta o se
+registró mal, el dato derivado se perdería sin que nadie lo notara. Sirven
+además de comprobación cruzada.
 
-## ⬜ Paso 5 — Ficha mínima e institución
-
-`domain/models/patient.dart` sigue pidiendo nombre, carné de identidad, dirección,
-teléfono y número de historia clínica. El Anexo 4 solo pide código autogenerado,
-teléfonos e institución.
-
-**Acción**
-
-- **Añadir `institucion`** — obligatorio, el ensayo es multicéntrico y no está en el
-  modelo. También en `EventoClinico` y en `Investigador`.
-- **Quitar `carneIdentidad` y `direccion`** — no los pide el formulario del estudio.
-  Cada dato personal almacenado es superficie de riesgo a justificar ante el CEI
-  (restricción 9).
-- Evaluar `nombre` y `numeroHistoriaClinica`: el Anexo 4 no los pide, pero el equipo
-  necesita identificar al paciente en la sala. Si se conservan, con decisión explícita
-  documentada, y siempre en la ficha, nunca en el dataset clínico.
-- Decidir dónde viven edad y sexo: son variables del análisis (Módulo 1), no identidad.
+**Los rangos van vacíos**, y hay una prueba que falla si alguien los rellena sin
+pasar por `docs/RANGOS_PENDIENTES.md`. Ese documento está listo para que el
+intensivista lo complete, y recoge además dos decisiones que conviene tomar a la
+vez: que el RSBI se está guardando como categoría y no como número, y que faltan
+por fijar las unidades de dos duraciones.
 
 ---
 
-## ⬜ Paso 6 — Roles según cegamiento
+## ✅ Paso 5 — Ficha mínima e institución · hecho
 
-Los tres roles actuales (observador / recolector / administrador) no reflejan la
-separación de funciones que exige el diseño del ensayo.
+- **`Institucion` entra en el modelo**: en la ficha, en cada evento clínico y en
+  cada investigador. En el evento y no solo en la ficha porque un paciente
+  trasladado tendría eventos de más de un centro, y el análisis por centro
+  necesita saber dónde ocurrió cada cosa.
+- **Fuera el carné de identidad y la dirección.** No los pide el Anexo 4, y cada
+  dato personal almacenado es superficie de riesgo a justificar (CLAUDE.md §9).
+- **Entra el código de paciente**, con prefijo de centro y correlativo:
+  `HC-004`. Es lo que se ve en pantalla y lo que sale en el dataset. La clave
+  real sigue siendo un identificador aleatorio de 128 bits, que no choca entre
+  dispositivos.
+- **`nombre` y `numeroHistoriaClinica` se conservan** por decisión explícita: el
+  equipo necesita identificar al paciente en la sala. Viven solo en la ficha y
+  nunca salen en el dataset clínico. Es una excepción a justificar ante el CEI,
+  y está anotada como tal.
 
-**Acción**: implementar la tabla de BASES §4 — reclutador, aplicador, evaluador de
-desenlaces, investigador principal, más observador opcional. `role.dart` ya tiene la
-forma correcta (permisos como propiedades del enum), así que el cambio es de
-contenido, no de estructura.
+Las pantallas pasan a mostrar el código en vez del nombre siempre que se puede.
 
-**Antes de programarlo**: decidir con la investigadora principal si un mismo médico
-puede acumular roles, frecuente en equipos pequeños, y si eso compromete el
-cegamiento.
+---
+
+## ✅ Paso 6 — Roles según cegamiento · hecho (con una decisión pendiente)
+
+Los tres roles anteriores se sustituyeron por las funciones de BASES §4:
+reclutador, aplicador, evaluador de desenlaces, analista, investigador principal
+y observador.
+
+Lo que hace que esto sea cegamiento y no una tabla de permisos:
+
+- **La captura va por tipo de hito.** El aplicador registra las fases del
+  protocolo; el evaluador, los desenlaces. Intentar lo contrario lanza
+  `FueraDeSuFuncion`. Hay una prueba que comprueba que ningún hito se queda sin
+  una función que lo capture: un hito que no captura nadie es un dato que no se
+  recoge y nadie se entera hasta el análisis.
+- **El evaluador de desenlaces no ve la rama.** La app le muestra «RAMA OCULTA»
+  en lugar del distintivo A/B. Si la viera, su juicio sobre si hubo extubación
+  fallida —el desenlace principal— dejaría de ser independiente.
+- **Un investigador lleva un conjunto de funciones, no una sola**, porque en
+  equipos pequeños acumular es lo normal. Y en cegamiento manda la restricción
+  más estricta, no la suma de permisos: quien acumule aplicador y evaluador
+  seguirá sin ver la rama, aunque como aplicador podría.
+
+**Lo que queda por decidir con la investigadora principal**: si se admite
+acumular funciones. Está como configuración del estudio
+(`StudyConfig.permiteAcumularRoles`), no como regla escrita en el código, y el
+sistema ya identifica la combinación peligrosa —aplicador + evaluador en la
+misma persona— con `Investigador.acumulaFuncionesIncompatibles`.
+
+---
+
+## ⚠️ Lo que destapó el paso 5: la secuencia y el trabajo sin conexión
+
+Al meter el multicentrismo salió un problema que no estaba a la vista, y que
+**bloquea el enrolamiento real**.
+
+El contador de la secuencia de aleatorización vive en la base de cada
+dispositivo. Dos dispositivos trabajando sin conexión —del mismo centro o de
+centros distintos— leen ambos «van consumidas N» y asignan ambos la posición
+N+1. Al sincronizar, dos pacientes reclaman la misma posición de la secuencia, y
+el reparto deja de ser el que la secuencia dictaba.
+
+Lo grave no es que ocurra: es que **ocurre en silencio**. Nada lo detecta.
+
+Es el mismo problema que resuelven los sobres sellados y numerados que describe
+el proyecto: cada sobre se abre una sola vez porque es un objeto físico. El
+equivalente digital es repartir **rangos disjuntos de la secuencia** por centro
+o por dispositivo — el centro coordinador consume de la 1 a la 40, el segundo de
+la 41 a la 80, y así.
+
+Esto conecta con la decisión que ya estaba abierta sobre los sobres físicos
+(CLAUDE.md, pendientes §7): son la misma decisión. Conviene resolverla antes del
+backend, porque el reparto de rangos condiciona qué envía el servidor a cada
+dispositivo.
 
 ---
 
@@ -180,3 +232,5 @@ Para que quede explícito, porque es la mayor parte del trabajo hecho:
 - El mecanismo de formularios como datos.
 - La integración continua (`verificar.yml`, `apk.yml`, `pages.yml`).
 - El sistema de diseño y las tipografías.
+- El modelo por eventos del paso 3, que absorbió los campos del Anexo 4 sin un
+  solo cambio estructural. Era la prueba de que la primitiva era la correcta.

@@ -164,11 +164,10 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
     final definicion = state.repo.config.definicionFormulario.para(widget.tipo);
     final evento = _evento;
 
+    final usuario = state.usuarioActual;
     final cerrado = evento?.estado.esInmutable ?? false;
-    final puedeCorregir =
-        cerrado && state.usuarioActual.role.puedeCorregirEnviado;
-    final soloLectura =
-        cerrado || !state.usuarioActual.role.puedeCapturarEventos;
+    final puedeCorregir = cerrado && usuario.puedeCorregirRegistrado;
+    final soloLectura = cerrado || !usuario.puedeCapturar(widget.tipo);
 
     if (definicion == null) {
       return Scaffold(
@@ -194,8 +193,11 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
       backgroundColor: T.surface,
       appBar: AppTopBar(
         titulo: evento?.referencia ?? widget.tipo.etiqueta,
-        trailing: ProtocolChip(paciente.protocolo),
-        subtitulo: Text('${paciente.nombre} · ${paciente.demografia}',
+        // El evaluador de desenlaces no ve la rama (BASES §4).
+        trailing: usuario.veRamaAsignada
+            ? ProtocolChip(paciente.protocolo)
+            : const MetaChip('RAMA OCULTA'),
+        subtitulo: Text('${paciente.codigo} · ${paciente.demografia}',
             style: T.monoData),
       ),
       body: SafeArea(
@@ -236,8 +238,8 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
             if (cerrado) ...[
               StatusBanner(
                 texto: puedeCorregir
-                    ? 'Evento ya registrado. Toque un campo para corregirlo: se '
-                        'le pedirá el motivo y quedará en auditoría.'
+                    ? 'Evento ya registrado. Toque un campo para corregirlo: '
+                        'se le pedirá el motivo y quedará en auditoría.'
                     : 'Evento ya registrado. No admite cambios; solicite la '
                         'corrección al investigador principal.',
                 tono: BannerTone.ok,

@@ -2,6 +2,7 @@ import '../models/audit_entry.dart';
 import '../models/consent.dart';
 import '../models/estudio_form_definition.dart';
 import '../models/evento_clinico.dart';
+import '../models/institucion.dart';
 import '../models/patient.dart';
 import '../models/role.dart';
 
@@ -10,13 +11,27 @@ class StudyConfig {
   const StudyConfig({
     required this.nombreEstudio,
     required this.acronimo,
+    required this.instituciones,
     required this.consentimientoAprobadoPorCei,
+    required this.permiteAcumularRoles,
     required this.documentoConsentimiento,
     required this.definicionFormulario,
   });
 
   final String nombreEstudio;
   final String acronimo;
+
+  /// Centros participantes (CLAUDE.md §8). El catálogo real es configuración
+  /// del estudio: los nombres de los hospitales no se versionan (§15).
+  final List<Institucion> instituciones;
+
+  /// Si un mismo investigador puede acumular funciones.
+  ///
+  /// Decisión de la investigadora principal, no del desarrollo. En equipos
+  /// pequeños es frecuente y a veces inevitable; la combinación que sí rompe el
+  /// cegamiento es aplicador + evaluador de desenlaces en la misma persona
+  /// (`Investigador.acumulaFuncionesIncompatibles`).
+  final bool permiteAcumularRoles;
 
   /// **Restricción no negociable (CLAUDE.md §13).** Sin este flag el sistema no
   /// admite enrolamiento de pacientes reales. Se gestiona en configuración del
@@ -31,13 +46,30 @@ class StudyConfig {
 /// La UI oculta lo que no corresponde, pero la regla se hace valer aquí:
 /// una pantalla mal escrita no debe poder saltarse los permisos.
 class PermissionDenied implements Exception {
-  const PermissionDenied(this.role, this.accion);
+  const PermissionDenied(this.quien, this.accion);
 
-  final Role role;
+  final Investigador quien;
   final String accion;
 
   @override
-  String toString() => 'El rol ${role.label} no puede $accion.';
+  String toString() => '${quien.etiquetaRoles} no puede $accion.';
+}
+
+/// Se lanza al intentar capturar un hito que la función del usuario no cubre.
+///
+/// No es un permiso administrativo: es la separación de funciones que el
+/// cegamiento exige (BASES §4). Que un aplicador registre desenlaces anularía
+/// la independencia de la evaluación.
+class FueraDeSuFuncion implements Exception {
+  const FueraDeSuFuncion(this.quien, this.tipo);
+
+  final Investigador quien;
+  final TipoEvento tipo;
+
+  @override
+  String toString() =>
+      '«${tipo.etiqueta}» no corresponde a ${quien.etiquetaRoles}. Lo registra '
+      'otra función del equipo.';
 }
 
 /// Se lanza al intentar sobrescribir un registro ya enviado sin auditoría.
@@ -95,18 +127,19 @@ abstract class StudyRepository {
 
   /// Enrola un paciente. La rama la decide el módulo de aleatorización; el
   /// llamante no puede proponerla — no hay parámetro para ello, a propósito.
-  /// La ficha conserva por ahora los campos actuales. Reducirla a lo que pide
-  /// el Anexo 4 —código autogenerado, teléfonos e institución— es el paso 5 de
-  /// `docs/REENCAMINAMIENTO.md`.
+  ///
+  /// El código del paciente lo genera el sistema con el prefijo del centro. Ni
+  /// el carné de identidad ni la dirección se piden: el Anexo 4 no los necesita
+  /// y cada dato personal almacenado hay que justificarlo (CLAUDE.md §9).
   Patient enrolar({
     required Investigador autor,
+    required Institucion institucion,
     required String nombre,
-    required String carneIdentidad,
+    required String numeroHistoriaClinica,
+    required String telefonoPrincipal,
     required int edad,
     required Sexo sexo,
-    required String numeroHistoriaClinica,
-    required String telefono,
-    required String direccion,
+    String? telefonoSecundario,
   });
 
   Consent registrarConsentimiento({

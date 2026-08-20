@@ -36,34 +36,36 @@ void main() {
     await tester.pumpWidget(montar(const LoginScreen()));
 
     expect(find.text('SIVAP'), findsOneWidget);
-    expect(find.text('Recolector de campo'), findsOneWidget);
+    // Una opción por función del ensayo.
+    expect(find.text('Aplicador'), findsOneWidget);
+    expect(find.text('Evaluador de desenlaces'), findsOneWidget);
+    expect(find.text('Investigador principal'), findsOneWidget);
     expect(find.text('Observador'), findsOneWidget);
-    expect(find.text('Administrador'), findsOneWidget);
     // El CEI no ha aprobado: la advertencia tiene que estar a la vista.
     expect(find.textContaining('Modo demostración'), findsOneWidget);
   });
 
   testWidgets('el recolector ve su carga y puede enrolar', (tester) async {
     lienzo(tester);
-    final state = AppState.enMemoria()..iniciarSesion(Seed.morales);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
     await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
 
     expect(find.text('Mis pacientes'), findsOneWidget);
     expect(find.text('+ Enrolar paciente'), findsOneWidget);
-    expect(find.text('Reinaldo Estévez Cruz'), findsOneWidget);
-    // Paciente de otro recolector: no debe aparecer.
-    expect(find.text('Idalberto Sáez Roque'), findsNothing);
+    expect(find.textContaining('HC-001'), findsOneWidget);
+    // Paciente de otro centro y otro recolector: no debe aparecer.
+    expect(find.textContaining('IC-001'), findsNothing);
   });
 
   testWidgets('el observador ve la cohorte y no puede enrolar', (tester) async {
     lienzo(tester);
-    final state = AppState.enMemoria()..iniciarSesion(Seed.betancourt);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.observador);
     await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
 
     expect(find.text('Cohorte completa'), findsOneWidget);
     expect(find.text('SOLO LECTURA'), findsOneWidget);
     expect(find.text('+ Enrolar paciente'), findsNothing);
-    expect(find.text('Idalberto Sáez Roque'), findsOneWidget);
+    expect(find.text('IC-001'), findsOneWidget);
     // Los recuentos van en A/B, sin decir cuál es cuál.
     expect(find.text('PROTOCOLO A'), findsOneWidget);
     expect(find.text('PROTOCOLO B'), findsOneWidget);
@@ -72,7 +74,7 @@ void main() {
   testWidgets('la línea de tiempo muestra las fases y los hitos',
       (tester) async {
     lienzo(tester, alto: 4000);
-    final state = AppState.enMemoria()..iniciarSesion(Seed.morales);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
     await tester.pumpWidget(montar(
         const PacienteTimelineScreen(patientId: 'p-demo-01'),
         estado: state));
@@ -85,7 +87,7 @@ void main() {
 
   testWidgets('un hito repetible lista todas sus ocurrencias', (tester) async {
     lienzo(tester, alto: 4000);
-    final state = AppState.enMemoria()..iniciarSesion(Seed.morales);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
     await tester.pumpWidget(montar(
         const PacienteTimelineScreen(patientId: 'p-demo-01'),
         estado: state));
@@ -103,7 +105,7 @@ void main() {
   testWidgets('el formulario se construye desde la definición del evento',
       (tester) async {
     lienzo(tester, alto: 3000);
-    final state = AppState.enMemoria()..iniciarSesion(Seed.morales);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
     await tester.pumpWidget(montar(
       const EventoFormScreen.nuevo(
         patientId: 'p-demo-01',
@@ -112,8 +114,8 @@ void main() {
       estado: state,
     ));
 
-    expect(find.text('MONITORIZACIÓN AL INICIO'), findsOneWidget);
-    expect(find.text('MONITORIZACIÓN AL FINAL'), findsOneWidget);
+    expect(find.text('MONITORIZACIÓN AL INICIO DE LA PVE'), findsOneWidget);
+    expect(find.text('MONITORIZACIÓN AL FINAL DE LA PVE'), findsOneWidget);
     expect(find.text('Tubo en T'), findsOneWidget);
     expect(find.text('FECHA EN QUE OCURRIÓ'), findsOneWidget);
   });
@@ -121,7 +123,7 @@ void main() {
   testWidgets('un evento registrado no ofrece captura al recolector',
       (tester) async {
     lienzo(tester, alto: 3000);
-    final state = AppState.enMemoria()..iniciarSesion(Seed.morales);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
     final evento = state.repo
         .eventosDe('p-demo-03')
         .firstWhere((e) => e.tipo == TipoEvento.extubacion);
@@ -142,7 +144,7 @@ void main() {
   testWidgets('el panel de administración lista cohorte y auditoría',
       (tester) async {
     lienzo(tester, ancho: 1600, alto: 1600);
-    final state = AppState.enMemoria()..iniciarSesion(Seed.guerra);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.principal);
     await tester.pumpWidget(montar(const AdminDashboardScreen(), estado: state));
 
     expect(find.text('Pacientes del ensayo'), findsOneWidget);

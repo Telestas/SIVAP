@@ -1,3 +1,5 @@
+import 'institucion.dart';
+
 /// Fase del proceso de liberación de la VMI.
 ///
 /// Sirve para agrupar los eventos en la línea de tiempo del paciente. No es un
@@ -170,6 +172,7 @@ class EventoClinico {
     required this.sync,
     required this.valores,
     required this.recolectorId,
+    required this.institucion,
     this.fechaCaptura,
     this.correcciones = 0,
   });
@@ -194,6 +197,12 @@ class EventoClinico {
   final Map<String, Object?> valores;
 
   final String recolectorId;
+
+  /// Centro donde se capturó (CLAUDE.md §8). Se guarda en el propio evento y no
+  /// solo en la ficha: un paciente trasladado entre centros tendría eventos de
+  /// más de uno, y el análisis por centro necesita saber dónde ocurrió cada
+  /// cosa, no dónde se enroló.
+  final Institucion institucion;
 
   /// Cuándo se introdujo en el sistema, que puede ser bastante después de que
   /// ocurriera: se captura sin conexión, a veces al final del turno.
@@ -239,6 +248,7 @@ class EventoClinico {
         sync: sync ?? this.sync,
         valores: valores ?? this.valores,
         recolectorId: recolectorId,
+        institucion: institucion,
         fechaCaptura: fechaCaptura ?? this.fechaCaptura,
         correcciones: correcciones ?? this.correcciones,
       );

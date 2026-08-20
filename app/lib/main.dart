@@ -7,7 +7,6 @@ import 'core/theme/tokens.dart';
 import 'core/widgets/controls.dart';
 import 'data/local/abrir_almacen.dart';
 import 'data/local/almacen_local.dart';
-import 'domain/models/role.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/patients/patient_list_screen.dart';
@@ -82,10 +81,12 @@ class _Raiz extends StatelessWidget {
     final state = AppScope.of(context);
     if (state.usuario == null) return const LoginScreen();
 
-    // El administrador trabaja en escritorio (maqueta 07); en pantalla estrecha
-    // recibe la misma lista que el resto para no dejarlo sin app en el móvil.
+    // Quien administra o analiza trabaja en escritorio; en pantalla estrecha
+    // recibe la misma lista que el resto, para no dejarlo sin app en el móvil.
+    final usuario = state.usuarioActual;
     final ancha = MediaQuery.sizeOf(context).width >= 900;
-    return state.usuarioActual.role == Role.administrador && ancha
+    final panel = usuario.puedeGestionarUsuarios || usuario.puedeExportar;
+    return panel && ancha
         ? const AdminDashboardScreen()
         : const PatientListScreen();
   }

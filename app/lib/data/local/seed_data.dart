@@ -1,77 +1,153 @@
 import '../../domain/models/consent.dart';
 import '../../domain/models/estudio_form_definition.dart';
 import '../../domain/models/evento_clinico.dart';
+import '../../domain/models/institucion.dart';
 import '../../domain/models/role.dart';
 import '../../domain/repositories/study_repository.dart';
 import '../allocation/allocation_strategy.dart';
 
 /// Configuración y datos de arranque del estudio.
 ///
-/// Nada de aquí es real: ni los investigadores, ni la semilla, ni el texto del
-/// consentimiento. El repositorio es público (CLAUDE.md §15).
+/// Nada de aquí es real: ni los investigadores, ni los centros, ni la semilla,
+/// ni el texto del consentimiento. El repositorio es público (CLAUDE.md §15).
 class Seed {
   const Seed._();
 
   /// Fecha de referencia de los datos de demostración.
   static final DateTime hoy = DateTime(2026, 8, 20);
 
+  // ── Centros participantes ──────────────────────────────────────
+  //
+  // Descriptores genéricos. El catálogo real —con los nombres de los tres
+  // hospitales— es configuración del estudio y no se versiona (CLAUDE.md §15).
+  // El `codigo` es el prefijo del código de paciente: cambiarlo rompería los
+  // códigos ya emitidos.
+  static const coordinador = Institucion(
+    codigo: 'HC',
+    nombre: 'Hospital clínico-quirúrgico docente',
+    coordinador: true,
+  );
+  static const cardiologia = Institucion(
+    codigo: 'IC',
+    nombre: 'Instituto de cardiología y cirugía cardiovascular',
+  );
+  static const militar = Institucion(
+    codigo: 'HM',
+    nombre: 'Hospital militar central',
+  );
+
+  static const instituciones = [coordinador, cardiologia, militar];
+
   // ── Investigadores de demostración ─────────────────────────────
   //
-  // Los roles todavía son los tres del modelo anterior. Sustituirlos por
-  // reclutador / aplicador / evaluador / investigador principal es el paso 6
-  // de `docs/REENCAMINAMIENTO.md`.
-  static const morales = Investigador(
+  // Uno por función, para poder recorrer la app con cada una y comprobar qué
+  // ve y qué no. El primero acumula reclutador y aplicador, que es lo habitual
+  // en un equipo pequeño y no compromete el cegamiento — la combinación que sí
+  // lo rompe es aplicador + evaluador de desenlaces.
+  static const reclutador = Investigador(
     id: 'u-001',
     usuario: 'investigador.uno',
     nombre: 'Dra. Uno',
-    role: Role.recolector,
+    roles: {Rol.reclutador, Rol.aplicador},
+    institucion: coordinador,
   );
-  static const perez = Investigador(
+  static const aplicador = Investigador(
     id: 'u-002',
     usuario: 'investigador.dos',
     nombre: 'Dr. Dos',
-    role: Role.recolector,
+    roles: {Rol.aplicador},
+    institucion: cardiologia,
   );
-  static const betancourt = Investigador(
+  static const evaluador = Investigador(
     id: 'u-003',
-    usuario: 'observador.tres',
-    nombre: 'Dr. Tres',
-    role: Role.observador,
+    usuario: 'investigador.tres',
+    nombre: 'Dra. Tres',
+    roles: {Rol.evaluadorDesenlaces},
+    institucion: coordinador,
   );
-  static const guerra = Investigador(
+  static const analista = Investigador(
     id: 'u-004',
-    usuario: 'principal.cuatro',
-    nombre: 'Dra. Cuatro',
-    role: Role.administrador,
+    usuario: 'investigador.cuatro',
+    nombre: 'Dr. Cuatro',
+    roles: {Rol.analista},
+    institucion: coordinador,
+  );
+  static const principal = Investigador(
+    id: 'u-005',
+    usuario: 'investigador.cinco',
+    nombre: 'Dra. Cinco',
+    roles: {Rol.investigadorPrincipal},
+    institucion: coordinador,
+  );
+  static const observador = Investigador(
+    id: 'u-006',
+    usuario: 'investigador.seis',
+    nombre: 'Dr. Seis',
+    roles: {Rol.observador},
+    institucion: militar,
   );
 
-  static const investigadores = [morales, perez, betancourt, guerra];
+  /// Cada centro necesita su reclutador: quien enrola en un hospital no es
+  /// alguien de otro, y el rol de reclutador no lo cubre el aplicador.
+  static const reclutadorCardiologia = Investigador(
+    id: 'u-007',
+    usuario: 'investigador.siete',
+    nombre: 'Dra. Siete',
+    roles: {Rol.reclutador},
+    institucion: cardiologia,
+  );
+
+  static const investigadores = [
+    reclutador,
+    aplicador,
+    evaluador,
+    analista,
+    principal,
+    observador,
+    reclutadorCardiologia,
+  ];
+
+  static Investigador porId(String id) =>
+      investigadores.firstWhere((i) => i.id == id);
 
   // ── Definición de formularios ──────────────────────────────────
   //
-  // PROVISIONAL. Este es un esqueleto mínimo por evento, trazable a BASES §6,
-  // suficiente para que la línea de tiempo funcione y se pueda enseñar.
+  // Los cuatro módulos del Anexo 4, repartidos entre los hitos de BASES §5.
   //
-  // El paso 4 de `docs/REENCAMINAMIENTO.md` lo sustituye por los cuatro módulos
-  // completos del Anexo 4, con sus categorías exactas.
+  // Lo que NO se pide aquí, y por qué:
   //
-  // Los rangos de plausibilidad van casi todos vacíos a propósito: los que
-  // había eran de paciente general ambulatorio, y un paciente ventilado en UCI
-  // los excede con normalidad. Ponerlos sin validación de un intensivista
-  // produciría avisos falsos que el equipo aprendería a ignorar, que es peor
-  // que no tenerlos (CLAUDE.md §14 y pendiente §8).
+  //  - Código de paciente, teléfonos, institución, edad y sexo → están en la
+  //    ficha, no en un evento.
+  //  - Protocolo aplicado → lo asigna la aleatorización, nadie lo teclea.
+  //  - «Total de PVE intentadas» → se cuenta solo, a partir del número de
+  //    eventos de PVE registrados. Es el propio Anexo el que señala que es
+  //    derivable, y pedir dos veces el mismo dato es pedir que discrepen.
+  //  - Fechas de PVE y de traqueostomía → son la fecha del propio evento.
+  //
+  // Lo que SÍ se pide aunque parezca derivable —duración total de VMI, fecha de
+  // PVE exitosa, tiempo entre PVE y extubación— se conserva a propósito: si el
+  // evento de origen falta o se registró mal, el dato derivado se perdería sin
+  // que nadie lo notara. Sirven además de comprobación cruzada.
+  //
+  // **Rangos de plausibilidad: vacíos, pendientes de un intensivista.** Los
+  // anteriores (FC 40–140, temp 35–37,5, SpO₂ 92–100) eran de paciente general
+  // ambulatorio, y un paciente ventilado en UCI los excede con normalidad.
+  // Activarlos sin validar produciría avisos constantes que el equipo
+  // aprendería a ignorar, que es peor que no tenerlos. Ver
+  // `docs/RANGOS_PENDIENTES.md`.
   static const formulario = EstudioFormDefinition(
-    version: 'form-v0.2-provisional',
+    version: 'anexo4-v1',
     eventos: [
+      // ── Módulo 1 · Datos generales del paciente ────────────────
       EventoDefinicion(
         tipo: TipoEvento.enrolamiento,
         secciones: [
           FormSection(
-            titulo: 'Datos generales',
+            titulo: 'Ingreso',
             campos: [
               FieldDefinition(
                 key: 'fecha_ingreso_uci',
-                label: 'Ingreso a UCI',
+                label: 'Fecha de ingreso a UCI',
                 tipo: FieldType.fecha,
                 obligatorio: true,
                 ancho: 2,
@@ -82,13 +158,18 @@ class Seed {
                 tipo: FieldType.seleccionUnica,
                 ancho: 2,
                 opciones: [
-                  '<18,5 bajo peso',
-                  '18,5–24,9 normopeso',
-                  '25–29,9 sobrepeso',
-                  '30–39,9 obeso',
-                  '>40 superobeso',
+                  '< 18,5 · bajo peso',
+                  '18,5–24,9 · normopeso',
+                  '25–29,9 · sobrepeso',
+                  '30–39,9 · obeso',
+                  '> 40 · superobeso',
                 ],
               ),
+            ],
+          ),
+          FormSection(
+            titulo: 'Motivo de la ventilación',
+            campos: [
               FieldDefinition(
                 key: 'causa_intubacion',
                 label: 'Causa de intubación y VMI',
@@ -110,25 +191,51 @@ class Seed {
                 label: 'Comorbilidades relevantes',
                 tipo: FieldType.seleccionMultiple,
                 ancho: 2,
-                opciones: ['HTA', 'DM', 'CI', 'IC', 'ERC', 'EPOC', 'AB', 'ECV previa'],
+                ayuda: 'HTA hipertensión · DM diabetes · CI cardiopatía '
+                    'isquémica · IC insuficiencia cardíaca · ERC enfermedad '
+                    'renal crónica · AB asma bronquial',
+                opciones: [
+                  'HTA',
+                  'DM',
+                  'CI',
+                  'IC',
+                  'ERC',
+                  'EPOC',
+                  'AB',
+                  'ECV previa',
+                ],
               ),
             ],
           ),
         ],
       ),
+
+      // ── Módulo 2 · Datos ventilatorios ─────────────────────────
       EventoDefinicion(
         tipo: TipoEvento.estratificacionRiesgo,
         secciones: [
           FormSection(
-            titulo: 'Parámetros ventilatorios',
+            titulo: 'Ventilación mecánica',
             campos: [
               FieldDefinition(
                 key: 'fecha_inicio_vmi',
-                label: 'Inicio de VMI',
+                label: 'Fecha de inicio de VMI',
                 tipo: FieldType.fecha,
                 obligatorio: true,
                 ancho: 2,
               ),
+              FieldDefinition(
+                key: 'fecha_primera_evaluacion',
+                label: 'Fecha de primera evaluación',
+                tipo: FieldType.fecha,
+                obligatorio: true,
+                ancho: 2,
+              ),
+            ],
+          ),
+          FormSection(
+            titulo: 'Parámetros en la primera evaluación',
+            campos: [
               FieldDefinition(
                 key: 'fio2',
                 label: 'FiO₂',
@@ -174,25 +281,37 @@ class Seed {
         tipo: TipoEvento.evaluacionDiaria,
         secciones: [
           FormSection(
-            titulo: 'Evaluación del día',
+            titulo: 'Detención de sedación',
             campos: [
               FieldDefinition(
                 key: 'detencion_sedacion',
-                label: '¿Detención diaria de sedación?',
+                label: '¿Se realizó detención diaria de sedación?',
                 tipo: FieldType.siNo,
                 obligatorio: true,
                 ancho: 2,
               ),
               FieldDefinition(
+                key: 'duracion_detencion_sedacion',
+                label: 'Duración de la detención',
+                unidad: 'h',
+                tipo: FieldType.numero,
+                decimales: 1,
+              ),
+            ],
+          ),
+          FormSection(
+            titulo: 'Ventilación espontánea',
+            campos: [
+              FieldDefinition(
                 key: 'evaluacion_ventilacion_espontanea',
-                label: '¿Evaluación de ventilación espontánea?',
+                label: '¿Se evaluó la ventilación espontánea?',
                 tipo: FieldType.siNo,
                 obligatorio: true,
                 ancho: 2,
               ),
               FieldDefinition(
                 key: 'duracion_ventilacion_espontanea',
-                label: 'Duración',
+                label: 'Duración de la evaluación',
                 tipo: FieldType.seleccionUnica,
                 ancho: 2,
                 opciones: ['> 15 min', '10–15 min', '< 10 min'],
@@ -209,7 +328,7 @@ class Seed {
             campos: [
               FieldDefinition(
                 key: 'metodo_pve',
-                label: 'Método empleado',
+                label: 'Método de PVE empleado',
                 tipo: FieldType.seleccionUnica,
                 obligatorio: true,
                 ancho: 2,
@@ -217,45 +336,94 @@ class Seed {
               ),
             ],
           ),
+          // Los dos bloques de monitorización llevan los mismos campos, con
+          // sufijo distinto: el análisis compara inicio contra final.
           FormSection(
-            titulo: 'Monitorización al inicio',
+            titulo: 'Monitorización al inicio de la PVE',
             campos: [
               FieldDefinition(
                 key: 'rsbi_inicio',
                 label: 'RSBI',
-                tipo: FieldType.numero,
+                tipo: FieldType.seleccionUnica,
                 obligatorio: true,
-                min: 0,
-                max: 250,
+                ancho: 2,
+                ayuda: 'Índice de respiración rápida superficial (Tobin)',
+                opciones: ['> 105', '≤ 105', '≤ 58'],
               ),
               FieldDefinition(
                 key: 'fr_inicio',
-                label: 'FR',
+                label: 'Frecuencia respiratoria',
                 unidad: 'rpm',
                 tipo: FieldType.numero,
                 obligatorio: true,
-                min: 5,
-                max: 60,
+              ),
+              FieldDefinition(
+                key: 'vt_inicio',
+                label: 'Vt',
+                unidad: 'ml',
+                tipo: FieldType.numero,
+              ),
+              FieldDefinition(
+                key: 'vm_inicio',
+                label: 'VM',
+                unidad: 'L',
+                tipo: FieldType.numero,
+                decimales: 1,
+              ),
+              FieldDefinition(
+                key: 'pplateau_inicio',
+                label: 'Pplateau',
+                unidad: 'cmH₂O',
+                tipo: FieldType.numero,
+              ),
+              FieldDefinition(
+                key: 'driving_pressure_inicio',
+                label: 'Driving pressure',
+                unidad: 'cmH₂O',
+                tipo: FieldType.numero,
               ),
             ],
           ),
           FormSection(
-            titulo: 'Monitorización al final',
+            titulo: 'Monitorización al final de la PVE',
             campos: [
               FieldDefinition(
                 key: 'rsbi_final',
                 label: 'RSBI',
-                tipo: FieldType.numero,
-                min: 0,
-                max: 250,
+                tipo: FieldType.seleccionUnica,
+                ancho: 2,
+                opciones: ['> 105', '≤ 105', '≤ 58'],
               ),
               FieldDefinition(
                 key: 'fr_final',
-                label: 'FR',
+                label: 'Frecuencia respiratoria',
                 unidad: 'rpm',
                 tipo: FieldType.numero,
-                min: 5,
-                max: 60,
+              ),
+              FieldDefinition(
+                key: 'vt_final',
+                label: 'Vt',
+                unidad: 'ml',
+                tipo: FieldType.numero,
+              ),
+              FieldDefinition(
+                key: 'vm_final',
+                label: 'VM',
+                unidad: 'L',
+                tipo: FieldType.numero,
+                decimales: 1,
+              ),
+              FieldDefinition(
+                key: 'pplateau_final',
+                label: 'Pplateau',
+                unidad: 'cmH₂O',
+                tipo: FieldType.numero,
+              ),
+              FieldDefinition(
+                key: 'driving_pressure_final',
+                label: 'Driving pressure',
+                unidad: 'cmH₂O',
+                tipo: FieldType.numero,
               ),
             ],
           ),
@@ -264,7 +432,7 @@ class Seed {
             campos: [
               FieldDefinition(
                 key: 'resultado_pve',
-                label: 'Resultado',
+                label: 'Resultado de la PVE',
                 tipo: FieldType.seleccionUnica,
                 obligatorio: true,
                 ancho: 2,
@@ -272,8 +440,9 @@ class Seed {
               ),
               FieldDefinition(
                 key: 'duracion_pve',
-                label: 'Duración',
+                label: 'Duración de la PVE',
                 tipo: FieldType.seleccionUnica,
+                obligatorio: true,
                 ancho: 2,
                 opciones: ['< 30 min', '30–60 min', '60–120 min'],
               ),
@@ -287,22 +456,25 @@ class Seed {
           FormSection(
             titulo: 'Traqueostomía',
             campos: [
+              // La fecha es la del propio evento; no se pide dos veces.
               FieldDefinition(
-                key: 'fecha_traqueostomia',
-                label: 'Fecha de realización',
-                tipo: FieldType.fecha,
-                obligatorio: true,
+                key: 'observaciones',
+                label: 'Observaciones',
+                tipo: FieldType.textoLargo,
                 ancho: 2,
+                ayuda: 'La fecha de realización es la fecha de este registro.',
               ),
             ],
           ),
         ],
       ),
+
+      // ── Módulo 3 · Evaluación para extubación ──────────────────
       EventoDefinicion(
         tipo: TipoEvento.extubacion,
         secciones: [
           FormSection(
-            titulo: 'Extubación',
+            titulo: 'Test de fuga',
             campos: [
               FieldDefinition(
                 key: 'test_fuga',
@@ -310,13 +482,33 @@ class Seed {
                 tipo: FieldType.siNo,
                 obligatorio: true,
                 ancho: 2,
+                ayuda: 'Estima el riesgo de estridor tras retirar el tubo',
               ),
               FieldDefinition(
                 key: 'resultado_test_fuga',
-                label: 'Resultado del test de fuga',
+                label: 'Resultado',
                 tipo: FieldType.seleccionUnica,
                 ancho: 2,
                 opciones: ['Con fuga', 'Sin fuga'],
+              ),
+            ],
+          ),
+          FormSection(
+            titulo: 'Tiempos',
+            campos: [
+              FieldDefinition(
+                key: 'fecha_pve_exitosa',
+                label: 'Fecha de la PVE exitosa',
+                tipo: FieldType.fecha,
+                obligatorio: true,
+                ancho: 2,
+              ),
+              FieldDefinition(
+                key: 'tiempo_pve_extubacion',
+                label: 'Tiempo entre PVE exitosa y extubación',
+                unidad: 'h',
+                tipo: FieldType.numero,
+                decimales: 1,
               ),
               FieldDefinition(
                 key: 'duracion_total_vmi',
@@ -329,17 +521,28 @@ class Seed {
           ),
         ],
       ),
+
+      // ── Módulo 4 · Desenlaces clínicos ─────────────────────────
       EventoDefinicion(
         tipo: TipoEvento.soportePostExtubacion,
         secciones: [
           FormSection(
-            titulo: 'Soporte',
+            titulo: 'Soporte respiratorio',
             campos: [
+              // Se registra también cuando la respuesta es «No»: la ausencia de
+              // registro sería ambigua —¿no hubo soporte, o no se anotó?— y esa
+              // ambigüedad no se puede resolver después.
+              FieldDefinition(
+                key: 'soporte_post_extubacion',
+                label: '¿Hubo soporte tras la extubación?',
+                tipo: FieldType.siNo,
+                obligatorio: true,
+                ancho: 2,
+              ),
               FieldDefinition(
                 key: 'tipo_soporte',
                 label: 'Tipo de soporte',
                 tipo: FieldType.seleccionUnica,
-                obligatorio: true,
                 ancho: 2,
                 opciones: ['HFNC', 'VNI', 'VNI + HFNC'],
               ),
@@ -351,7 +554,7 @@ class Seed {
         tipo: TipoEvento.reintubacion,
         secciones: [
           FormSection(
-            titulo: 'Reintubación',
+            titulo: 'Desenlace principal',
             campos: [
               FieldDefinition(
                 key: 'reintubacion_72h',
@@ -359,11 +562,13 @@ class Seed {
                 tipo: FieldType.siNo,
                 obligatorio: true,
                 ancho: 2,
-                ayuda: 'Desenlace principal del ensayo',
+                ayuda: 'Extubación fallida — es el desenlace principal del '
+                    'ensayo. Se registra siempre, también cuando la respuesta '
+                    'es que no.',
               ),
               FieldDefinition(
                 key: 'causa_reintubacion',
-                label: 'Causa',
+                label: 'Causa de la reintubación',
                 tipo: FieldType.seleccionUnica,
                 ancho: 2,
                 opciones: [
@@ -378,6 +583,26 @@ class Seed {
               ),
             ],
           ),
+          FormSection(
+            titulo: 'Eventos adversos post-extubación',
+            campos: [
+              FieldDefinition(
+                key: 'eventos_adversos',
+                label: 'Eventos adversos',
+                tipo: FieldType.seleccionMultiple,
+                ancho: 2,
+                ayuda: 'Se recogen aquí porque este registro existe siempre, '
+                    'haya habido reintubación o no.',
+                opciones: [
+                  'Ninguna',
+                  'Laringoespasmo',
+                  'Broncoaspiración',
+                  'Estridor',
+                  'Fallo respiratorio agudo',
+                ],
+              ),
+            ],
+          ),
         ],
       ),
       EventoDefinicion(
@@ -388,16 +613,18 @@ class Seed {
             campos: [
               FieldDefinition(
                 key: 'estancia_uci',
-                label: 'Estancia en UCI',
+                label: 'Duración de la estancia en UCI',
                 unidad: 'días',
                 tipo: FieldType.numero,
                 obligatorio: true,
+                ancho: 2,
               ),
               FieldDefinition(
                 key: 'estado_egreso',
-                label: 'Estado al egreso',
+                label: 'Estado al egreso de UCI',
                 tipo: FieldType.seleccionUnica,
                 obligatorio: true,
+                ancho: 2,
                 opciones: ['Vivo', 'Fallecido'],
               ),
             ],
@@ -433,8 +660,8 @@ class Seed {
   // ── Consentimiento informado ───────────────────────────────────
   //
   // Texto de demostración. El real está en el Anexo 3 del proyecto y se carga
-  // cuando el CEI lo apruebe. Nótese que no dice cuál rama es cuál: el
-  // documento que firma el paciente tampoco puede romper el cegamiento.
+  // cuando el CEI lo apruebe. No dice cuál rama es cuál: el documento que firma
+  // el paciente tampoco puede romper el cegamiento.
   static const documentoConsentimiento = ConsentDocument(
     version: 'v0.1-demostración',
     codigoCei: 'CEI pendiente',
@@ -460,10 +687,15 @@ class Seed {
   static StudyConfig get config => const StudyConfig(
         nombreEstudio: 'Liberación de la ventilación mecánica invasiva',
         acronimo: 'LIVERE',
+        instituciones: instituciones,
         // Restricción CLAUDE.md §13: en falso hasta que el CEI apruebe. Con el
         // flag en falso la app funciona en modo demostración y bloquea el
         // enrolamiento de pacientes reales.
         consentimientoAprobadoPorCei: false,
+        // PENDIENTE de la investigadora principal. En `true` mientras no se
+        // decida, porque en un equipo pequeño acumular funciones es lo normal;
+        // la app avisa cuando la combinación compromete el cegamiento.
+        permiteAcumularRoles: true,
         documentoConsentimiento: documentoConsentimiento,
         definicionFormulario: formulario,
       );

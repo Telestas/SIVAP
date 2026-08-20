@@ -73,6 +73,21 @@ void main() {
           Demo.pacientes.length);
     });
 
+    test('los códigos de paciente tampoco', () {
+      expect(Demo.pacientes.map((p) => p.codigo).toSet().length,
+          Demo.pacientes.length);
+    });
+
+    test('cada evento lo captura una función que puede capturarlo', () {
+      for (final p in Demo.pacientes) {
+        for (final e in p.eventos) {
+          final autor = Seed.porId(e.recolectorId ?? p.recolectorId);
+          expect(autor.puedeCapturar(e.tipo), isTrue,
+              reason: '${autor.usuario} no captura ${e.tipo.name}');
+        }
+      }
+    });
+
     test('la auditoría de muestra apunta a pacientes que existen', () {
       for (final a in Demo.auditoria) {
         expect(() => Demo.porId(a.pacienteId), returnsNormally,

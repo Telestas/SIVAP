@@ -68,7 +68,10 @@ No son comentarios sueltos: cada una tiene un sitio concreto y una prueba.
 | §2 cegamiento | `Protocolo` es A/B y no tiene campo que describa la rama | `test/cegamiento_test.dart` |
 | §3 sin ediciones silenciosas | `EventoNoRepetible`; `corregirEventoRegistrado` exige motivo; disparadores en la base | `test/restricciones_test.dart` |
 | §4 captura por eventos | `TipoEvento` con ocurrencias repetibles y fecha real; enrolar no pre-crea nada | idem |
-| §5 formularios configurables | `EstudioFormDefinition`; la pantalla recorre la definición | idem |
+| §5 formularios configurables | `EstudioFormDefinition` con los cuatro módulos del Anexo 4; la pantalla recorre la definición | idem |
+| §8 multicéntrico | `Institucion` en ficha, evento e investigador; código con prefijo de centro | idem |
+| §9 minimización | La ficha no admite carné ni dirección | idem |
+| BASES §4 separación de funciones | La captura va por tipo de hito; el evaluador no ve la rama | idem |
 | §6 asignación desacoplada | `AllocationStrategy` + `SequentialAllocation`; sin forma de ver la rama siguiente | idem |
 | §7 semilla fuera del repositorio | `Seed.semillaDemostracion` está marcada como falsa | `test/cegamiento_test.dart` |
 | §10 cifrado | SQLCipher, clave en Keystore/Keychain, `PRAGMA cipher_version` verificado | `test/almacen_test.dart` |
@@ -109,16 +112,14 @@ del estudio.
 - **Sin backend ni sincronización**: el estado "en cola" se simula con un
   interruptor para poder enseñar el comportamiento offline.
 - **Sin exportación**: el .xlsx se genera en el servidor (openpyxl), hito posterior.
-- **Los campos son provisionales.** Hay un esqueleto por evento trazable a BASES §6;
-  el paso 4 del reencaminamiento lo sustituye por los cuatro módulos del Anexo 4.
-  Cambiarlos es editar `Seed.formulario`, no tocar pantallas.
-- **Los rangos clínicos van casi todos vacíos** a propósito: los que había eran de
-  paciente ambulatorio y en UCI producirían avisos falsos. Requieren validación por
-  un intensivista.
-- **La ficha todavía pide carné y dirección**, que el Anexo 4 no pide, y **no tiene
-  institución**, que el ensayo multicéntrico necesita. Es el paso 5.
-- **Los roles son los tres del modelo anterior.** El ensayo exige cuatro funciones
-  separadas por cegamiento. Es el paso 6.
+- **Los rangos clínicos van vacíos** a propósito, y hay una prueba que falla si
+  alguien los rellena: los anteriores eran de paciente ambulatorio y en UCI
+  producirían avisos falsos constantes. Ver `../docs/RANGOS_PENDIENTES.md`.
+- **La secuencia de aleatorización no está repartida por dispositivo.** Dos
+  dispositivos sin conexión asignarían la misma posición. Es bloqueante para
+  enrolar pacientes reales — ver `../docs/REENCAMINAMIENTO.md`.
+- **El acceso es de demostración**: se elige la función al entrar. En producción
+  viene del servidor con la credencial.
 - **La semilla de aleatorización es de demostración** (`Seed.semillaAleatorizacion`).
   La del estudio real la fija el investigador principal una sola vez, antes del
   primer paciente, y va al acta. Cambiarla con pacientes ya enrolados invalida

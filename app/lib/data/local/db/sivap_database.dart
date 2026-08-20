@@ -84,10 +84,10 @@ class SivapDatabase {
 
   // ── Esquema ──────────────────────────────────────────────────────
   //
-  // Dos tablas para el paciente, no una, y es a propósito (BASES §8):
+  // Dos tablas para el paciente, no una, y es a propósito (BASES §10):
   //
-  //   identidad  → nombre, carné, historia clínica, teléfono, dirección
-  //   pacientes  → edad, sexo, rama asignada, recolector, fechas
+  //   identidad  → nombre, historia clínica, teléfonos
+  //   pacientes  → código, centro, edad, sexo, rama asignada, fechas
   //
   // El dataset que se manda a analizar sale de `pacientes` + `visitas` sin
   // tocar `identidad`. La separación no es un adorno: es lo que permite
@@ -111,7 +111,9 @@ class SivapDatabase {
   static void _crearVersion1(Database db) {
     db.execute('''
       CREATE TABLE pacientes (
-        id                  TEXT PRIMARY KEY,
+        id                  TEXT    PRIMARY KEY,
+        codigo              TEXT    NOT NULL,
+        institucion         TEXT    NOT NULL,
         edad                INTEGER NOT NULL,
         sexo                TEXT    NOT NULL,
         protocolo           TEXT    NOT NULL,
@@ -124,15 +126,21 @@ class SivapDatabase {
       );
     ''');
 
+    // Sin carné de identidad ni dirección: el Anexo 4 no los pide, y cada dato
+    // personal almacenado es superficie de riesgo a justificar ante el Comité
+    // de Ética (CLAUDE.md §9).
+    //
+    // `nombre` y `numero_historia_clinica` tampoco los pide, y se conservan por
+    // decisión explícita —el equipo necesita identificar al paciente en la
+    // sala—. Viven aquí y nunca en el dataset clínico.
     db.execute('''
       CREATE TABLE identidad (
         paciente_id             TEXT PRIMARY KEY
                                 REFERENCES pacientes(id) ON DELETE CASCADE,
         nombre                  TEXT NOT NULL,
-        carne_identidad         TEXT NOT NULL,
         numero_historia_clinica TEXT NOT NULL,
-        telefono                TEXT NOT NULL,
-        direccion               TEXT NOT NULL
+        telefono_principal      TEXT NOT NULL,
+        telefono_secundario     TEXT
       );
     ''');
 
@@ -146,6 +154,7 @@ class SivapDatabase {
         estado           TEXT    NOT NULL,
         sync             TEXT    NOT NULL,
         recolector_id    TEXT    NOT NULL,
+        institucion      TEXT    NOT NULL,
         fecha_captura    TEXT,
         correcciones     INTEGER NOT NULL DEFAULT 0,
         UNIQUE (paciente_id, tipo, ocurrencia)
@@ -248,6 +257,10 @@ class SivapDatabase {
     db.execute('CREATE INDEX idx_eventos_paciente '
         'ON eventos (paciente_id, fecha_ocurrencia);');
     db.execute('CREATE INDEX idx_eventos_sync ON eventos (sync);');
+    // Los análisis por centro son un requisito del diseño multicéntrico.
+    db.execute('CREATE INDEX idx_pacientes_institucion '
+        'ON pacientes (institucion);');
+    db.execute('CREATE INDEX idx_eventos_institucion ON eventos (institucion);');
     db.execute(
         'CREATE INDEX idx_auditoria_entidad ON auditoria (entidad_id, ocurrido_en);');
   }

@@ -207,6 +207,13 @@ Se actualizan aquí, no en el código.
    Sin esto el estudio puede quedar subpotenciado. Corresponde al bioestadista.
 3. **Semilla y longitud de la secuencia** (restricción 7). Fijarlas al activar el
    estudio, no antes.
+4. **Reparto de la secuencia entre dispositivos.** El contador de la secuencia
+   vive en cada dispositivo. Dos trabajando sin conexión asignan ambos la misma
+   posición, y al sincronizar el reparto deja de ser el que la secuencia
+   dictaba — **en silencio**. La salida es repartir rangos disjuntos por centro
+   o dispositivo, que es el equivalente digital de los sobres numerados. Es la
+   misma decisión que la de los sobres físicos (§7 de más abajo), y condiciona
+   qué envía el servidor a cada dispositivo. Ver `docs/REENCAMINAMIENTO.md`.
 
 **Contradicciones internas de los documentos fuente**
 
@@ -219,15 +226,30 @@ Se actualizan aquí, no en el código.
 
 **Decisiones de alcance**
 
-6. **Corriente cualitativa**: encuestas Likert al personal, entrevistas
+6. **Acumulación de funciones**: si un mismo médico puede cumplir varias.
+   Implementado como configuración (`StudyConfig.permiteAcumularRoles`), hoy en
+   `true`. El sistema ya identifica la combinación que rompe el cegamiento del
+   desenlace principal: aplicador + evaluador de desenlaces en la misma persona.
+7. **RSBI: categoría o número.** El Anexo 4 lo recoge por categorías
+   (> 105 · ≤ 105 · ≤ 58) y así está implementado. Un 92 y un 104 caen en la
+   misma y el dataset deja de distinguirlos. Recoger el número y calcular la
+   categoría cuesta lo mismo; al revés no tiene vuelta. Ver
+   `docs/RANGOS_PENDIENTES.md`.
+8. **Unidades de dos duraciones** (detención de sedación, tiempo entre PVE y
+   extubación). Hoy en horas con un decimal. Fijarlo antes del primer paciente:
+   mezclar unidades en una columna es un error que no se ve mirando los datos.
+9. **Corriente cualitativa**: encuestas Likert al personal, entrevistas
    semiestructuradas y checklist de adherencia con auditoría. Sujeto distinto (el
    investigador, no el paciente). ¿Entra al MVP?
-7. **Sobres sellados**: el proyecto describe sobres físicos numerados con el protocolo
-   dentro. ¿La app los reemplaza, o coexisten y la app registra el resultado? Cambia el
-   flujo de enrolamiento.
-8. **Rangos clínicos** de cada campo del Anexo 4. Los actuales son de paciente general,
-   no de paciente ventilado en UCI. Requiere validación por intensivista.
-9. **Nombre final del sistema.** "SIVAP" es provisional; el estudio se llama LIVERE.
+10. **Sobres sellados**: el proyecto describe sobres físicos numerados con el
+    protocolo dentro. ¿La app los reemplaza, o coexisten y la app registra el
+    resultado? Cambia el flujo de enrolamiento, y es la misma decisión que el
+    reparto de la secuencia entre dispositivos (bloqueante §4).
+11. **Rangos clínicos** de cada campo numérico. Van vacíos hasta que un
+    intensivista los fije: `docs/RANGOS_PENDIENTES.md` está listo para
+    rellenar. Hay una prueba que falla si alguien los pone sin pasar por ahí.
+12. **Nombre final del sistema.** "SIVAP" es provisional; el estudio se llama
+    LIVERE.
 
 ---
 
@@ -238,5 +260,7 @@ Estado en `docs/PENDIENTE.md`; plan de corrección de rumbo en
 `docs/REENCAMINAMIENTO.md`.
 
 **Regla de secuencia**: las correcciones estructurales (cegamiento, modelo por
-eventos, institución) se completan **antes** de escribir el backend. Una vez exista
-esquema en PostgreSQL con datos sincronizados, cada una pasa de refactor a migración.
+eventos, institución, roles) se completan **antes** de escribir el backend. Una vez
+exista esquema en PostgreSQL con datos sincronizados, cada una pasa de refactor a
+migración. Al 20 ago 2026 están todas hechas: el backend queda desbloqueado salvo
+por el reparto de la secuencia entre dispositivos (pendiente bloqueante §4).

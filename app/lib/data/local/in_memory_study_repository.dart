@@ -2,6 +2,7 @@ import '../../core/ids.dart';
 import '../../domain/models/audit_entry.dart';
 import '../../domain/models/consent.dart';
 import '../../domain/models/evento_clinico.dart';
+import '../../domain/models/institucion.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/role.dart';
 import '../../domain/repositories/study_repository.dart';
@@ -39,7 +40,7 @@ class InMemoryStudyRepository implements StudyRepository {
     final lista = _pacientes.values
         .where((p) => recolectorId == null || p.recolectorId == recolectorId)
         .toList();
-    lista.sort((a, b) => a.nombre.compareTo(b.nombre));
+    lista.sort((a, b) => a.codigo.compareTo(b.codigo));
     return lista;
   }
 
@@ -93,9 +94,8 @@ class InMemoryStudyRepository implements StudyRepository {
   Iterable<EventoClinico> get _todos => _eventos.values.expand((e) => e);
 
   @override
-  int get registrosEnCola => _todos
-      .where((e) => e.sync != SyncStatus.sincronizado && !e.vacio)
-      .length;
+  int get registrosEnCola =>
+      _todos.where((e) => e.sync != SyncStatus.sincronizado && !e.vacio).length;
 
   @override
   int get dispositivosConCola => _todos
@@ -109,31 +109,33 @@ class InMemoryStudyRepository implements StudyRepository {
   @override
   Patient enrolar({
     required Investigador autor,
+    required Institucion institucion,
     required String nombre,
-    required String carneIdentidad,
+    required String numeroHistoriaClinica,
+    required String telefonoPrincipal,
     required int edad,
     required Sexo sexo,
-    required String numeroHistoriaClinica,
-    required String telefono,
-    required String direccion,
+    String? telefonoSecundario,
   }) {
-    if (!autor.role.puedeEnrolar) {
-      throw PermissionDenied(autor.role, 'enrolar pacientes');
+    if (!autor.puedeEnrolar) {
+      throw PermissionDenied(autor, 'enrolar pacientes');
     }
     // La rama la decide el módulo de aleatorización. El llamante no la propone
     // ni puede sugerirla: no hay parámetro para ello, a propósito.
     final asignacion = _allocation.asignar(ahora: DateTime.now());
     final paciente = Patient(
       id: Ids.nuevo('p'),
+      codigo: _siguienteCodigo(institucion),
       nombre: nombre,
-      carneIdentidad: carneIdentidad,
+      numeroHistoriaClinica: numeroHistoriaClinica,
+      telefonoPrincipal: telefonoPrincipal,
+      telefonoSecundario: telefonoSecundario,
+      institucion: institucion,
       edad: edad,
       sexo: sexo,
-      numeroHistoriaClinica: numeroHistoriaClinica,
-      telefono: telefono,
-      direccion: direccion,
       protocolo: asignacion.protocolo,
-      bloqueAleatorizacion: asignacion.etiquetaSecuencia,
+      secuencia: asignacion.etiquetaSecuencia,
+      posicionSecuencia: asignacion.posicion,
       asignadoEn: asignacion.asignadoEn,
       recolectorId: autor.id,
       enroladoEn: DateTime.now(),
@@ -145,14 +147,27 @@ class InMemoryStudyRepository implements StudyRepository {
     return paciente;
   }
 
+  /// Correlativo por centro: «HC-004».
+  ///
+  /// Cuidado: sin conexión, dos dispositivos del mismo centro pueden emitir el
+  /// mismo código hasta que sincronicen. Es molesto pero no corrompe nada, la
+  /// clave real es el identificador aleatorio.
+  String _siguienteCodigo(Institucion institucion) {
+    final n = _pacientes.values
+            .where((p) => p.institucion == institucion)
+            .length +
+        1;
+    return '${institucion.codigo}-${n.toString().padLeft(3, '0')}';
+  }
+
   @override
   Consent registrarConsentimiento({
     required Investigador autor,
     required String patientId,
     required List<List<({double x, double y})>> firmaTrazos,
   }) {
-    if (!autor.role.puedeEnrolar) {
-      throw PermissionDenied(autor.role, 'registrar consentimientos');
+    if (!autor.puedeEnrolar) {
+      throw PermissionDenied(autor, 'registrar consentimientos');
     }
     final doc = config.documentoConsentimiento;
     final consent = Consent(
@@ -242,6 +257,7 @@ class InMemoryStudyRepository implements StudyRepository {
       sync: sync,
       valores: Map.unmodifiable(valores),
       recolectorId: autor.id,
+      institucion: autor.institucion,
       fechaCaptura: DateTime.now(),
     );
     lista.add(nuevo);
@@ -250,13 +266,14 @@ class InMemoryStudyRepository implements StudyRepository {
 
   void _verificarPuedeCapturar(
       Investigador autor, String patientId, TipoEvento tipo) {
-    if (!autor.role.puedeCapturarEventos) {
-      throw PermissionDenied(autor.role, 'capturar eventos clínicos');
-    }
+    // No es un permiso administrativo: es la separación de funciones que el
+    // cegamiento exige (BASES §4).
+    if (!autor.puedeCapturar(tipo)) throw FueraDeSuFuncion(autor, tipo);
+
     final p = _pacientes[patientId]!;
     if (!p.tieneConsentimiento) {
       throw StateError(
-          'No se pueden capturar eventos de ${p.nombre} sin consentimiento '
+          'No se pueden capturar eventos de ${p.codigo} sin consentimiento '
           'registrado.');
     }
     // Un hito no repetible que ya se registró no se duplica: se corrige, y la
@@ -282,8 +299,8 @@ class InMemoryStudyRepository implements StudyRepository {
     required Object? valorNuevo,
     required String motivo,
   }) {
-    if (!autor.role.puedeCorregirEnviado) {
-      throw PermissionDenied(autor.role, 'corregir registros ya enviados');
+    if (!autor.puedeCorregirRegistrado) {
+      throw PermissionDenied(autor, 'corregir registros ya enviados');
     }
     if (motivo.trim().isEmpty) {
       throw ArgumentError.value(motivo, 'motivo',
@@ -310,7 +327,9 @@ class InMemoryStudyRepository implements StudyRepository {
       autorNombre: autor.nombre,
       entidad: AuditEntity.evento,
       entidadId: eventoId,
-      descripcionObjetivo: '${paciente.apellidos} · ${actual.referenciaCorta}',
+      // El código del paciente, no su nombre: la auditoría es parte del
+      // dataset clínico (CLAUDE.md §1).
+      descripcionObjetivo: '${paciente.codigo} · ${actual.referenciaCorta}',
       campo: campo,
       valorAnterior: anterior?.toString(),
       valorNuevo: valorNuevo?.toString(),
@@ -325,15 +344,16 @@ class InMemoryStudyRepository implements StudyRepository {
     for (final d in Demo.pacientes) {
       _pacientes[d.id] = Patient(
         id: d.id,
+        codigo: d.codigo,
         nombre: d.nombre,
-        carneIdentidad: d.carneIdentidad,
+        numeroHistoriaClinica: d.hc,
+        telefonoPrincipal: d.telefono,
+        institucion: d.institucion,
         edad: d.edad,
         sexo: d.sexo,
-        numeroHistoriaClinica: d.hc,
-        telefono: d.telefono,
-        direccion: d.direccion,
         protocolo: d.protocolo,
-        bloqueAleatorizacion: Seed.secuenciaAleatorizacion.etiqueta,
+        secuencia: Seed.secuenciaAleatorizacion.etiqueta,
+        posicionSecuencia: Demo.pacientes.indexOf(d) + 1,
         asignadoEn: d.enroladoEn,
         recolectorId: d.recolectorId,
         enroladoEn: d.enroladoEn,
@@ -345,7 +365,9 @@ class InMemoryStudyRepository implements StudyRepository {
         for (final ev in d.eventos)
           () {
             final ocurrencia = (porTipo[ev.tipo] = (porTipo[ev.tipo] ?? 0) + 1);
-            final fecha = d.enroladoEn.add(Duration(days: ev.diaDesdeEnrolamiento));
+            final fecha =
+                d.enroladoEn.add(Duration(days: ev.diaDesdeEnrolamiento));
+            final autor = Seed.porId(ev.recolectorId ?? d.recolectorId);
             return EventoClinico(
               id: idEventoDemo(d.id, ev.tipo, ocurrencia),
               patientId: d.id,
@@ -356,9 +378,9 @@ class InMemoryStudyRepository implements StudyRepository {
                   ev.borrador ? EstadoEvento.borrador : EstadoEvento.registrado,
               sync: ev.borrador ? SyncStatus.local : d.sync,
               valores: ev.valores,
-              recolectorId: d.recolectorId,
-              fechaCaptura:
-                  DateTime(fecha.year, fecha.month, fecha.day, 9, 30),
+              recolectorId: autor.id,
+              institucion: d.institucion,
+              fechaCaptura: DateTime(fecha.year, fecha.month, fecha.day, 9, 30),
             );
           }()
       ];
@@ -373,7 +395,7 @@ class InMemoryStudyRepository implements StudyRepository {
         entidad: AuditEntity.evento,
         entidadId: idEventoDemo(a.pacienteId, a.tipo, a.ocurrencia),
         descripcionObjetivo:
-            '${Demo.porId(a.pacienteId).apellidos} · ${a.tipo.etiqueta}',
+            '${Demo.porId(a.pacienteId).codigo} · ${a.tipo.etiqueta}',
         campo: a.campo,
         valorAnterior: a.valorAnterior,
         valorNuevo: a.valorNuevo,
@@ -384,6 +406,7 @@ class InMemoryStudyRepository implements StudyRepository {
 
   /// Identificador estable de un evento de demostración, para que las entradas
   /// de auditoría sembradas apunten al evento correcto.
-  static String idEventoDemo(String pacienteId, TipoEvento tipo, int ocurrencia) =>
+  static String idEventoDemo(
+          String pacienteId, TipoEvento tipo, int ocurrencia) =>
       'e-$pacienteId-${tipo.name}-$ocurrencia';
 }

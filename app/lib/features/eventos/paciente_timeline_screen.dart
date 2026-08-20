@@ -25,15 +25,19 @@ class PacienteTimelineScreen extends StatelessWidget {
     final paciente = state.repo.paciente(patientId)!;
     final eventos = state.repo.eventosDe(patientId);
     final definicion = state.repo.config.definicionFormulario;
-    final puedeCapturar = state.usuarioActual.role.puedeCapturarEventos;
+    final usuario = state.usuarioActual;
 
     return Scaffold(
       backgroundColor: T.surface,
       appBar: AppTopBar(
-        titulo: paciente.nombre,
-        trailing: ProtocolChip(paciente.protocolo),
+        titulo: paciente.codigo,
+        // El evaluador de desenlaces no ve la rama (BASES §4).
+        trailing: usuario.veRamaAsignada
+            ? ProtocolChip(paciente.protocolo)
+            : const MetaChip('RAMA OCULTA'),
         subtitulo: Text(
-            'HC ${paciente.numeroHistoriaClinica} · ${paciente.demografia}',
+            '${paciente.nombre} · ${paciente.demografia} · '
+            '${paciente.institucion.codigo}',
             style: T.monoData),
       ),
       body: SafeArea(
@@ -61,8 +65,12 @@ class PacienteTimelineScreen extends StatelessWidget {
                 fase: fase,
                 patientId: patientId,
                 eventos: eventos.where((e) => e.tipo.fase == fase).toList(),
-                puedeCapturar: puedeCapturar,
-                tieneFormulario: definicion.tieneFormulario,
+                // La captura va por tipo de hito, no por «puede escribir»: el
+                // aplicador registra las fases del protocolo y el evaluador los
+                // desenlaces. Es la separación de funciones del ensayo, no una
+                // jerarquía de permisos (BASES §4).
+                puedeCapturar: (t) =>
+                    usuario.puedeCapturar(t) && definicion.tieneFormulario(t),
               ),
             ],
           ],
@@ -78,14 +86,12 @@ class _Fase extends StatelessWidget {
     required this.patientId,
     required this.eventos,
     required this.puedeCapturar,
-    required this.tieneFormulario,
   });
 
   final FaseEstudio fase;
   final String patientId;
   final List<EventoClinico> eventos;
-  final bool puedeCapturar;
-  final bool Function(TipoEvento) tieneFormulario;
+  final bool Function(TipoEvento) puedeCapturar;
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +118,7 @@ class _Fase extends StatelessWidget {
             tipo: tipo,
             patientId: patientId,
             ocurrencias: eventos.where((e) => e.tipo == tipo).toList(),
-            puedeCapturar: puedeCapturar && tieneFormulario(tipo),
+            puedeCapturar: puedeCapturar(tipo),
           ),
           const SizedBox(height: 8),
         ],

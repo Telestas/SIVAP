@@ -100,9 +100,14 @@ monitoreo institucional y auditoría externa.
 - Ningún rol puede consultar qué rama viene a continuación en la secuencia.
 - Ningún rol accede a la correspondencia A/B → LIVERE/control: no está en el sistema.
 
+Además del analista, que consulta y exporta el dataset completo sin identidad y
+sin capturar nada.
+
 > **Pendiente de decisión**: si un mismo médico puede acumular roles (frecuente en
-> equipos pequeños), y si eso compromete el cegamiento. Corresponde a la
-> investigadora principal, no al desarrollo.
+> equipos pequeños). Está implementado como configuración del estudio, no como
+> regla del código, y el sistema identifica la combinación que rompe el
+> cegamiento del desenlace principal: aplicador + evaluador en la misma persona.
+> Corresponde a la investigadora principal, no al desarrollo.
 
 ---
 
@@ -252,7 +257,14 @@ y regeneración desde semilla para auditoría externa. **Se conserva.** Lo únic
 cambia es el nombre de las ramas: `nuevo/vigente` → `A/B`.
 
 > El proyecto describe sobres físicos sellados y numerados. Decidir si la app los
-> reemplaza o coexisten (CLAUDE.md, pendientes §7).
+> reemplaza o coexisten (CLAUDE.md, pendientes §10).
+>
+> **Y hay una razón técnica para decidirlo pronto.** El contador de la secuencia
+> vive en cada dispositivo: dos trabajando sin conexión asignan ambos la misma
+> posición, y al sincronizar el reparto deja de ser el que la secuencia dictaba,
+> sin que nada lo detecte. La salida es repartir rangos disjuntos de la
+> secuencia por centro o dispositivo — que es exactamente lo que hacen los
+> sobres numerados, y por eso son la misma decisión.
 
 **Nota sobre aleatorización simple**: no equilibra las ramas por construcción. Con 60
 pacientes es normal terminar 33/27. Si el desequilibrio importa, la decisión es pasar

@@ -6,6 +6,7 @@ import '../../core/ids.dart';
 import '../../domain/models/audit_entry.dart';
 import '../../domain/models/consent.dart';
 import '../../domain/models/evento_clinico.dart';
+import '../../domain/models/institucion.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/protocolo.dart';
 import '../../domain/models/role.dart';
@@ -84,8 +85,8 @@ class SqliteStudyRepository implements StudyRepository {
   // ── Lectura ────────────────────────────────────────────────────
 
   static const _sqlPaciente = '''
-    SELECT p.*, i.nombre, i.carne_identidad, i.numero_historia_clinica,
-           i.telefono, i.direccion
+    SELECT p.*, i.nombre, i.numero_historia_clinica,
+           i.telefono_principal, i.telefono_secundario
     FROM pacientes p
     JOIN identidad i ON i.paciente_id = p.id
   ''';
@@ -96,7 +97,7 @@ class SqliteStudyRepository implements StudyRepository {
         ? _db.select(_sqlPaciente)
         : _db.select('$_sqlPaciente WHERE p.recolector_id = ?;', [recolectorId]);
     final lista = filas.map(_leerPaciente).toList()
-      ..sort((a, b) => a.nombre.compareTo(b.nombre));
+      ..sort((a, b) => a.codigo.compareTo(b.codigo));
     return lista;
   }
 
@@ -108,20 +109,33 @@ class SqliteStudyRepository implements StudyRepository {
 
   Patient _leerPaciente(Row f) => Patient(
         id: f['id'] as String,
+        codigo: f['codigo'] as String,
         nombre: f['nombre'] as String,
-        carneIdentidad: f['carne_identidad'] as String,
+        numeroHistoriaClinica: f['numero_historia_clinica'] as String,
+        telefonoPrincipal: f['telefono_principal'] as String,
+        telefonoSecundario: f['telefono_secundario'] as String?,
+        institucion: _institucion(f['institucion'] as String),
         edad: f['edad'] as int,
         sexo: Sexo.values.firstWhere((s) => s.name == f['sexo'] as String),
-        numeroHistoriaClinica: f['numero_historia_clinica'] as String,
-        telefono: f['telefono'] as String,
-        direccion: f['direccion'] as String,
         protocolo: Protocolo.values
             .firstWhere((p) => p.name == f['protocolo'] as String),
-        bloqueAleatorizacion: f['secuencia_etiqueta'] as String,
+        secuencia: f['secuencia_etiqueta'] as String,
+        posicionSecuencia: f['secuencia_posicion'] as int,
         asignadoEn: DateTime.parse(f['asignado_en'] as String),
         recolectorId: f['recolector_id'] as String,
         enroladoEn: DateTime.parse(f['enrolado_en'] as String),
         consentimientoId: f['consentimiento_id'] as String?,
+      );
+
+  /// Resuelve el código de centro contra el catálogo de la configuración.
+  ///
+  /// Si un registro llega con un centro que la configuración ya no declara —al
+  /// sincronizar desde un dispositivo con catálogo viejo— se conserva el código
+  /// en vez de perderlo: un dato clínico huérfano es preferible a un dato
+  /// clínico borrado.
+  Institucion _institucion(String codigo) => config.instituciones.firstWhere(
+        (i) => i.codigo == codigo,
+        orElse: () => Institucion(codigo: codigo, nombre: 'Centro $codigo'),
       );
 
   @override
@@ -160,6 +174,7 @@ class SqliteStudyRepository implements StudyRepository {
         sync: SyncStatus.values.firstWhere((s) => s.name == f['sync'] as String),
         valores: _leerValores(f['id'] as String),
         recolectorId: f['recolector_id'] as String,
+        institucion: _institucion(f['institucion'] as String),
         fechaCaptura: f['fecha_captura'] == null
             ? null
             : DateTime.parse(f['fecha_captura'] as String),
@@ -228,16 +243,16 @@ class SqliteStudyRepository implements StudyRepository {
   @override
   Patient enrolar({
     required Investigador autor,
+    required Institucion institucion,
     required String nombre,
-    required String carneIdentidad,
+    required String numeroHistoriaClinica,
+    required String telefonoPrincipal,
     required int edad,
     required Sexo sexo,
-    required String numeroHistoriaClinica,
-    required String telefono,
-    required String direccion,
+    String? telefonoSecundario,
   }) {
-    if (!autor.role.puedeEnrolar) {
-      throw PermissionDenied(autor.role, 'enrolar pacientes');
+    if (!autor.puedeEnrolar) {
+      throw PermissionDenied(autor, 'enrolar pacientes');
     }
 
     // Asignación y alta van en la misma transacción. Si se guardara el paciente
@@ -258,11 +273,13 @@ class SqliteStudyRepository implements StudyRepository {
       final id = Ids.nuevo('p');
 
       _db.execute(
-        'INSERT INTO pacientes (id, edad, sexo, protocolo, secuencia_etiqueta, '
-        'secuencia_posicion, asignado_en, recolector_id, enrolado_en) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
+        'INSERT INTO pacientes (id, codigo, institucion, edad, sexo, protocolo, '
+        'secuencia_etiqueta, secuencia_posicion, asignado_en, recolector_id, '
+        'enrolado_en) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
         [
           id,
+          _siguienteCodigo(institucion),
+          institucion.codigo,
           edad,
           sexo.name,
           asignacion.protocolo.name,
@@ -274,9 +291,9 @@ class SqliteStudyRepository implements StudyRepository {
         ],
       );
       _db.execute(
-        'INSERT INTO identidad (paciente_id, nombre, carne_identidad, '
-        'numero_historia_clinica, telefono, direccion) VALUES (?, ?, ?, ?, ?, ?);',
-        [id, nombre, carneIdentidad, numeroHistoriaClinica, telefono, direccion],
+        'INSERT INTO identidad (paciente_id, nombre, numero_historia_clinica, '
+        'telefono_principal, telefono_secundario) VALUES (?, ?, ?, ?, ?);',
+        [id, nombre, numeroHistoriaClinica, telefonoPrincipal, telefonoSecundario],
       );
 
       // Sin calendario que pre-crear: los eventos aparecen cuando ocurren
@@ -285,14 +302,26 @@ class SqliteStudyRepository implements StudyRepository {
     });
   }
 
+  /// Correlativo por centro: «HC-004».
+  ///
+  /// Cuidado: sin conexión, dos dispositivos del mismo centro pueden emitir el
+  /// mismo código hasta que sincronicen. Es molesto pero no corrompe nada, la
+  /// clave real es el identificador aleatorio.
+  String _siguienteCodigo(Institucion institucion) {
+    final n = _db.select(
+        'SELECT count(*) c FROM pacientes WHERE institucion = ?;',
+        [institucion.codigo]).first['c'] as int;
+    return '${institucion.codigo}-${(n + 1).toString().padLeft(3, '0')}';
+  }
+
   @override
   Consent registrarConsentimiento({
     required Investigador autor,
     required String patientId,
     required List<List<({double x, double y})>> firmaTrazos,
   }) {
-    if (!autor.role.puedeEnrolar) {
-      throw PermissionDenied(autor.role, 'registrar consentimientos');
+    if (!autor.puedeEnrolar) {
+      throw PermissionDenied(autor, 'registrar consentimientos');
     }
     final doc = config.documentoConsentimiento;
     final consent = Consent(
@@ -371,13 +400,14 @@ class SqliteStudyRepository implements StudyRepository {
     required EstadoEvento estado,
     required SyncStatus sync,
   }) {
-    if (!autor.role.puedeCapturarEventos) {
-      throw PermissionDenied(autor.role, 'capturar eventos clínicos');
-    }
+    // No es un permiso administrativo: es la separación de funciones que el
+    // cegamiento exige (BASES §4).
+    if (!autor.puedeCapturar(tipo)) throw FueraDeSuFuncion(autor, tipo);
+
     final p = paciente(patientId)!;
     if (!p.tieneConsentimiento) {
       throw StateError(
-          'No se pueden capturar eventos de ${p.nombre} sin consentimiento '
+          'No se pueden capturar eventos de ${p.codigo} sin consentimiento '
           'registrado.');
     }
     // Un hito no repetible que ya se registró no se duplica: se corrige, y la
@@ -393,8 +423,8 @@ class SqliteStudyRepository implements StudyRepository {
       if (abierto == null) {
         _db.execute(
           'INSERT INTO eventos (id, paciente_id, tipo, ocurrencia, '
-          'fecha_ocurrencia, estado, sync, recolector_id, fecha_captura) '
-          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
+          'fecha_ocurrencia, estado, sync, recolector_id, institucion, '
+          'fecha_captura) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
           [
             id,
             patientId,
@@ -404,6 +434,7 @@ class SqliteStudyRepository implements StudyRepository {
             estado.name,
             sync.name,
             autor.id,
+            autor.institucion.codigo,
             DateTime.now().toIso8601String(),
           ],
         );
@@ -456,8 +487,8 @@ class SqliteStudyRepository implements StudyRepository {
     required Object? valorNuevo,
     required String motivo,
   }) {
-    if (!autor.role.puedeCorregirEnviado) {
-      throw PermissionDenied(autor.role, 'corregir registros ya enviados');
+    if (!autor.puedeCorregirRegistrado) {
+      throw PermissionDenied(autor, 'corregir registros ya enviados');
     }
     if (motivo.trim().isEmpty) {
       throw ArgumentError.value(motivo, 'motivo',
@@ -496,7 +527,7 @@ class SqliteStudyRepository implements StudyRepository {
           autor.nombre,
           AuditEntity.evento.name,
           eventoId,
-          '${p.apellidos} · ${actual.referenciaCorta}',
+          '${p.codigo} · ${actual.referenciaCorta}',
           campo,
           anterior?.toString(),
           valorNuevo?.toString(),
@@ -565,11 +596,14 @@ class SqliteStudyRepository implements StudyRepository {
     _enTransaccion(() {
       for (final d in Demo.pacientes) {
         _db.execute(
-          'INSERT INTO pacientes (id, edad, sexo, protocolo, secuencia_etiqueta, '
-          'secuencia_posicion, asignado_en, recolector_id, enrolado_en, '
-          'consentimiento_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+          'INSERT INTO pacientes (id, codigo, institucion, edad, sexo, '
+          'protocolo, secuencia_etiqueta, secuencia_posicion, asignado_en, '
+          'recolector_id, enrolado_en, consentimiento_id) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
           [
             d.id,
+            d.codigo,
+            d.institucion.codigo,
             d.edad,
             d.sexo.name,
             d.protocolo.name,
@@ -582,10 +616,9 @@ class SqliteStudyRepository implements StudyRepository {
           ],
         );
         _db.execute(
-          'INSERT INTO identidad (paciente_id, nombre, carne_identidad, '
-          'numero_historia_clinica, telefono, direccion) '
-          'VALUES (?, ?, ?, ?, ?, ?);',
-          [d.id, d.nombre, d.carneIdentidad, d.hc, d.telefono, d.direccion],
+          'INSERT INTO identidad (paciente_id, nombre, '
+          'numero_historia_clinica, telefono_principal) VALUES (?, ?, ?, ?);',
+          [d.id, d.nombre, d.hc, d.telefono],
         );
         _db.execute(
           'INSERT INTO consentimientos (id, paciente_id, version_documento, '
@@ -610,17 +643,19 @@ class SqliteStudyRepository implements StudyRepository {
               d.enroladoEn.add(Duration(days: ev.diaDesdeEnrolamiento));
           _db.execute(
             'INSERT INTO eventos (id, paciente_id, tipo, ocurrencia, '
-            'fecha_ocurrencia, estado, sync, recolector_id, fecha_captura) '
-            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
+            'fecha_ocurrencia, estado, sync, recolector_id, institucion, '
+            'fecha_captura) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
             [
               id,
               d.id,
               ev.tipo.name,
               ocurrencia,
               fecha.toIso8601String(),
-              (ev.borrador ? EstadoEvento.borrador : EstadoEvento.registrado).name,
+              (ev.borrador ? EstadoEvento.borrador : EstadoEvento.registrado)
+                  .name,
               (ev.borrador ? SyncStatus.local : d.sync).name,
-              d.recolectorId,
+              ev.recolectorId ?? d.recolectorId,
+              d.institucion.codigo,
               DateTime(fecha.year, fecha.month, fecha.day, 9, 30)
                   .toIso8601String(),
             ],
@@ -649,7 +684,7 @@ class SqliteStudyRepository implements StudyRepository {
             a.autor.nombre,
             AuditEntity.evento.name,
             idEventoDemo(a.pacienteId, a.tipo, a.ocurrencia),
-            '${Demo.porId(a.pacienteId).apellidos} · ${a.tipo.etiqueta}',
+            '${Demo.porId(a.pacienteId).codigo} · ${a.tipo.etiqueta}',
             a.campo,
             a.valorAnterior,
             a.valorNuevo,

@@ -10,7 +10,6 @@ import '../../data/local/seed_data.dart';
 import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/protocolo.dart';
-import '../../domain/models/role.dart';
 import '../consent/consent_screen.dart';
 import '../enrollment/enrollment_screen.dart';
 import '../eventos/paciente_timeline_screen.dart';
@@ -40,10 +39,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final usuario = state.usuarioActual;
-    final soloLectura = usuario.role == Role.observador;
+    // Quien no captura ni enrola solo consulta: observador y analista.
+    final soloLectura = !usuario.puedeCapturarEventos && !usuario.puedeEnrolar;
 
     final propios = state.repo.pacientes(
-        recolectorId: usuario.role.veCohorteCompleta ? null : usuario.id);
+        recolectorId: usuario.veCohorteCompleta ? null : usuario.id);
     final visibles = propios.where((p) => _coincide(state, p)).toList();
 
     return Scaffold(
@@ -67,7 +67,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: usuario.role.puedeEnrolar
+      bottomNavigationBar: usuario.puedeEnrolar
           ? BottomActions(children: [
               Expanded(
                 child: AppButton('+ Enrolar paciente',
@@ -83,6 +83,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
     final q = _busqueda.trim().toLowerCase();
     if (q.isNotEmpty &&
         !p.nombre.toLowerCase().contains(q) &&
+        !p.codigo.toLowerCase().contains(q) &&
         !p.numeroHistoriaClinica.toLowerCase().contains(q)) {
       return false;
     }
@@ -134,7 +135,7 @@ class _Encabezado extends StatelessWidget {
                     Text(soloLectura ? 'Cohorte completa' : 'Mis pacientes',
                         style: T.h2),
                     const SizedBox(height: 2),
-                    Text('${usuario.nombre} · ${usuario.role.label}',
+                    Text('${usuario.nombre} · ${usuario.etiquetaRoles}',
                         style: const TextStyle(fontSize: 12, color: T.secondary)),
                   ],
                 ),
@@ -185,7 +186,7 @@ class _Encabezado extends StatelessWidget {
               isDense: true,
               hintText: soloLectura
                   ? 'Buscar en $total pacientes'
-                  : 'Buscar por nombre o código',
+                  : 'Buscar por código, nombre o historia clínica',
               hintStyle: const TextStyle(fontSize: 14, color: T.faint),
               filled: true,
               fillColor: T.card,
@@ -371,15 +372,17 @@ class _TarjetaCarga extends StatelessWidget {
                     children: [
                       Text(paciente.nombre, style: T.title),
                       const SizedBox(height: 3),
-                      Text(
-                          '${paciente.numeroHistoriaClinica} · '
-                          '${paciente.demografia}',
+                      Text('${paciente.codigo} · ${paciente.demografia}',
                           style: T.monoData),
                     ],
                   ),
                 ),
                 const SizedBox(width: 10),
-                ProtocolChip(paciente.protocolo),
+                // El evaluador de desenlaces no ve la rama: si la viera, su
+                // juicio sobre el desenlace principal dejaría de ser
+                // independiente (CLAUDE.md §2, BASES §4).
+                if (AppScope.of(context).usuarioActual.veRamaAsignada)
+                  ProtocolChip(paciente.protocolo),
               ],
             ),
             const SizedBox(height: 8),
@@ -439,17 +442,18 @@ class _ListaCohorte extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(p.nombre, style: T.title),
+                            Text(p.codigo, style: T.title),
                             const SizedBox(height: 3),
                             Text(
-                                '${p.numeroHistoriaClinica} · recolecta: '
+                                '${p.institucion.codigo} · '
                                 '${_recolector(p.recolectorId)}',
                                 style: T.monoData),
                           ],
                         ),
                       ),
                       const SizedBox(width: 10),
-                      ProtocolChip(p.protocolo),
+                      if (AppScope.of(context).usuarioActual.veRamaAsignada)
+                        ProtocolChip(p.protocolo),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -468,8 +472,7 @@ class _ListaCohorte extends StatelessWidget {
     );
   }
 
-  static String _recolector(String id) =>
-      Seed.investigadores.firstWhere((i) => i.id == id).nombre;
+  static String _recolector(String id) => Seed.porId(id).nombre;
 }
 
 class _AvancePorFases extends StatelessWidget {

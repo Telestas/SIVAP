@@ -3,6 +3,11 @@
 Inventario contra `BASES_MVP_SIVAP.md`, verificado contra el código el 20 ago 2026.
 Se actualiza al cerrar cada hito.
 
+> **Antes que nada**: `docs/REENCAMINAMIENTO.md` tiene los pasos 4, 5 y 6 pendientes
+> —campos del Anexo 4, ficha mínima e institución, y roles según cegamiento— y van
+> **antes** del backend. Una vez exista esquema en PostgreSQL con datos
+> sincronizados, cada uno pasa de refactor a migración.
+
 ## Hecho (Hito 1 — sin compilar todavía)
 
 | BASES | Qué hay |
@@ -10,8 +15,10 @@ Se actualiza al cerrar cada hito.
 | §2 Enrolamiento | Ficha de identidad completa, con contacto y dirección |
 | §2 Asignación | Aleatorización simple generada por computadora, semilla registrada, secuencia verificable |
 | §2 Consentimiento | Pantalla con documento versionado, declaraciones y firma con el dedo |
-| §2 Formularios configurables | El **mecanismo** está: la pantalla se construye desde `VisitFormDefinition` |
-| §2 Auditoría | Solo para corrección de visitas enviadas: valor anterior, nuevo, autor, fecha, motivo. En la base, con disparadores que impiden modificarla o borrarla |
+| §2 Formularios configurables | El **mecanismo** está: la pantalla se construye desde `EstudioFormDefinition`. Los campos son provisionales — paso 4 |
+| §2 Auditoría | Solo para corrección de eventos registrados: valor anterior, nuevo, autor, fecha, motivo. En la base, con disparadores que impiden modificarla o borrarla |
+| §2 Cegamiento | El sistema solo conoce Protocolo A y B, comprobado por `test/cegamiento_test.dart` |
+| §5 Captura por eventos | Línea de tiempo por fases, hitos repetibles, trayectorias incompletas |
 | §3 Persistencia cifrada | SQLite + SQLCipher en móvil y escritorio, clave en el Keystore/Keychain. Sin probar en dispositivo |
 | §3 Despliegue | Borrador de `deploy/compose.yaml`: Postgres, panel web y TLS con nginx. Falta el backend |
 | — | Integración continua | `verificar.yml` analiza y prueba en cada push; `apk.yml` compila y publica el APK como release |

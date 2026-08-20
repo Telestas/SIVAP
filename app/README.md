@@ -1,7 +1,7 @@
 # app · SIVAP (Flutter)
 
-Cliente de captura de datos del estudio. Hito 1: **interfaz completa + capa de
-datos local**, sin backend.
+Cliente de captura del ensayo LIVERE. Captura por eventos clínicos, sin conexión,
+con la base local cifrada. Sin backend todavía.
 
 ## Correr
 
@@ -42,19 +42,21 @@ Las pantallas nunca hablan con el almacén directamente, solo con
 `StudyRepository`. Cambiar "en memoria" por "SQLite cifrado + cola de
 sincronización" no toca ninguna pantalla.
 
-## Las siete pantallas del diseño
+## Las pantallas
 
-| # | Diseño | Código |
-|---|---|---|
-| 01 | Acceso y rol | `features/auth/login_screen.dart` |
-| 02 | Lista — recolector | `features/patients/patient_list_screen.dart` |
-| 03 | Lista — observador | la misma, en modo solo lectura |
-| 04 | Enrolamiento | `features/enrollment/enrollment_screen.dart` |
-| 05 | Captura de visita | `features/visits/visit_capture_screen.dart` |
-| 06 | Consentimiento | `features/consent/consent_screen.dart` |
-| 07 | Panel de administración | `features/admin/admin_dashboard_screen.dart` |
+| Pantalla | Código |
+|---|---|
+| Acceso y rol | `features/auth/login_screen.dart` |
+| Lista del recolector / cohorte del observador | `features/patients/patient_list_screen.dart` |
+| Enrolamiento | `features/enrollment/enrollment_screen.dart` |
+| Consentimiento | `features/consent/consent_screen.dart` |
+| Línea de tiempo del paciente | `features/eventos/paciente_timeline_screen.dart` |
+| Captura de un evento clínico | `features/eventos/evento_form_screen.dart` |
+| Panel de administración | `features/admin/admin_dashboard_screen.dart` |
 
-El canvas original está en [`../design/SIVAP.dc.html`](../design/SIVAP.dc.html).
+El canvas original está en [`../design/SIVAP.dc.html`](../design/SIVAP.dc.html). Ojo:
+retrata el modelo anterior, con pestañas de día fijo. La línea de tiempo por fases lo
+sustituye — ver `docs/REENCAMINAMIENTO.md`, paso 3.
 
 ## Dónde viven las restricciones no negociables
 
@@ -62,16 +64,21 @@ No son comentarios sueltos: cada una tiene un sitio concreto y una prueba.
 
 | CLAUDE.md | Dónde se hace valer | Prueba |
 |---|---|---|
-| §1 ficha ≠ visita | `Patient` y `Visit` son clases separadas; `Visit` solo guarda `patientId` | `test/restricciones_test.dart` |
-| §2 sin ediciones silenciosas | `SilentEditRejected`; `corregirVisitaEnviada` exige motivo | idem |
-| §3 formularios configurables | `VisitFormDefinition`; la pantalla de captura recorre la definición | idem |
-| §4 asignación desacoplada | `AllocationStrategy` + `SequentialAllocation` sobre una `AllocationSequence` generada desde semilla | idem |
-| §6 roles y permisos | `PermissionDenied` en el repositorio, no solo en la UI | idem |
-| §7 offline-first | no hay una sola llamada de red en el hito | — |
-| §8 consentimiento | `StudyConfig.consentimientoAprobadoPorCei`; sin consentimiento no hay captura | idem |
+| §1 ficha ≠ datos clínicos | `Patient` y `EventoClinico` separados; el evento solo guarda `patientId` | `test/restricciones_test.dart` |
+| §2 cegamiento | `Protocolo` es A/B y no tiene campo que describa la rama | `test/cegamiento_test.dart` |
+| §3 sin ediciones silenciosas | `EventoNoRepetible`; `corregirEventoRegistrado` exige motivo; disparadores en la base | `test/restricciones_test.dart` |
+| §4 captura por eventos | `TipoEvento` con ocurrencias repetibles y fecha real; enrolar no pre-crea nada | idem |
+| §5 formularios configurables | `EstudioFormDefinition`; la pantalla recorre la definición | idem |
+| §6 asignación desacoplada | `AllocationStrategy` + `SequentialAllocation`; sin forma de ver la rama siguiente | idem |
+| §7 semilla fuera del repositorio | `Seed.semillaDemostracion` está marcada como falsa | `test/cegamiento_test.dart` |
+| §10 cifrado | SQLCipher, clave en Keystore/Keychain, `PRAGMA cipher_version` verificado | `test/almacen_test.dart` |
+| §11 roles | `PermissionDenied` en el repositorio, no solo en la UI | `test/restricciones_test.dart` |
+| §12 offline-first | no hay una sola llamada de red | — |
+| §13 consentimiento | sin consentimiento no hay captura | `test/restricciones_test.dart` |
+| §14 el dato manda | `fueraDeRango` avisa, nunca bloquea | idem |
+| §15 nada identificable | datos de demostración inventados y marcados | `test/cegamiento_test.dart` |
 
-Si una de esas pruebas falla, no es un test roto: es el estudio dejando de ser
-válido.
+Si una de esas pruebas falla, no es un test roto: es el ensayo dejando de ser válido.
 
 ## Almacenamiento local
 
@@ -102,9 +109,16 @@ del estudio.
 - **Sin backend ni sincronización**: el estado "en cola" se simula con un
   interruptor para poder enseñar el comportamiento offline.
 - **Sin exportación**: el .xlsx se genera en el servidor (openpyxl), hito posterior.
-- **Los campos de visita son un borrador** (BASES §5). Están tomados de la
-  maqueta; el listado real lo debe entregar el equipo médico. Cambiarlos es
-  editar `Seed.formulario`, no tocar pantallas.
+- **Los campos son provisionales.** Hay un esqueleto por evento trazable a BASES §6;
+  el paso 4 del reencaminamiento lo sustituye por los cuatro módulos del Anexo 4.
+  Cambiarlos es editar `Seed.formulario`, no tocar pantallas.
+- **Los rangos clínicos van casi todos vacíos** a propósito: los que había eran de
+  paciente ambulatorio y en UCI producirían avisos falsos. Requieren validación por
+  un intensivista.
+- **La ficha todavía pide carné y dirección**, que el Anexo 4 no pide, y **no tiene
+  institución**, que el ensayo multicéntrico necesita. Es el paso 5.
+- **Los roles son los tres del modelo anterior.** El ensayo exige cuatro funciones
+  separadas por cegamiento. Es el paso 6.
 - **La semilla de aleatorización es de demostración** (`Seed.semillaAleatorizacion`).
   La del estudio real la fija el investigador principal una sola vez, antes del
   primer paciente, y va al acta. Cambiarla con pacientes ya enrolados invalida

@@ -1,9 +1,8 @@
 # Despliegue de SIVAP — BORRADOR
 #
-# Estado: el backend todavía no existe (ver docs/PENDIENTE.md). Este archivo
-# describe la forma que tendrá el despliegue y ya sirve para levantar el panel
-# web y la base de datos. El servicio `api` está aquí para que la estructura
-# quede fijada; arrancarlo falla hasta que exista `api/`.
+# Estado: existe el esquema de la base (`api/migraciones/`), no el servicio
+# FastAPI. Este archivo ya sirve para levantar el panel web y la base de datos;
+# el servicio `api` arranca cuando exista `api/Dockerfile`.
 #
 #   docker compose up -d                      → base y panel web (hoy)
 #   docker compose --profile completo up -d   → añade la api (cuando exista)
@@ -26,6 +25,10 @@ services:
       POSTGRES_INITDB_ARGS: "--locale=es_ES.UTF-8 --encoding=UTF8"
     volumes:
       - datos_postgres:/var/lib/postgresql/data
+      # Postgres ejecuta lo que haya aquí la primera vez que crea el volumen,
+      # en orden alfabético. Las migraciones posteriores las aplica la api: este
+      # montaje no vuelve a mirarse una vez la base existe.
+      - ../api/migraciones:/docker-entrypoint-initdb.d:ro
       # Copias de seguridad: este directorio es el que hay que llevarse fuera
       # del servidor. Una copia que vive en la misma máquina que el original
       # no es una copia de seguridad.
@@ -42,7 +45,7 @@ services:
   # ── Backend (todavía no existe) ──────────────────────────────────
   api:
     build:
-      context: ./api
+      context: ../api
     restart: unless-stopped
     depends_on:
       db:

@@ -3,12 +3,15 @@
 Inventario contra `BASES_MVP_SIVAP.md`, verificado contra el código el 20 ago 2026.
 Se actualiza al cerrar cada hito.
 
-> **El reencaminamiento está completo** (`docs/REENCAMINAMIENTO.md`, seis pasos).
-> El backend queda desbloqueado salvo por una cosa: **el reparto de la secuencia
-> de aleatorización entre dispositivos**. Sin resolverlo, dos dispositivos
-> trabajando sin conexión asignan la misma posición y el reparto entre ramas deja
-> de ser el que la secuencia dictaba, en silencio. Es bloqueante para enrolar
-> pacientes reales y condiciona el diseño del backend.
+> **El reencaminamiento está completo** (`docs/REENCAMINAMIENTO.md`, seis pasos)
+> y el **esquema central existe y está verificado** (`docs/BACKEND.md`).
+>
+> El reparto de la secuencia entre dispositivos —que era el pendiente
+> bloqueante— tiene solución en el esquema: tramos disjuntos por dispositivo,
+> con una restricción que hace imposible que se solapen, y una clave primaria
+> que convierte una colisión silenciosa en un error al sincronizar. Falta
+> decidir **quién reparte los tramos y qué hace la app cuando se queda sin
+> tramo y sin conexión** (debe dejar de enrolar, no improvisar).
 
 ## Hecho (Hito 1 — sin compilar todavía)
 
@@ -40,9 +43,9 @@ Ordenado por lo que más riesgo quita primero.
    en un dispositivo real. SQLite + SQLCipher, clave en el Keystore/Keychain.
    Ver la lista de comprobaciones que exigen dispositivo al final de
    `app/test/almacen_test.dart`.
-2. **Backend FastAPI + PostgreSQL** (BASES §3). Autenticación real por rol,
-   endpoints de ficha, visita, consentimiento y auditoría. Requiere decidir
-   dónde se despliega.
+2. **Backend FastAPI** (BASES §3). El esquema de PostgreSQL ya está y verificado
+   (`docs/BACKEND.md`); falta el servicio: autenticación, endpoints y
+   sincronización. Requiere decidir dónde se despliega.
 3. **Sincronización** (BASES §2, §3). Cola local con timestamp, resolución
    "último gana", log de auditoría. Hoy el estado "en cola" es un interruptor
    de demostración: no hay una sola llamada de red en la app.
@@ -56,7 +59,7 @@ Ordenado por lo que más riesgo quita primero.
 | BASES | Qué falta | Nota |
 |---|---|---|
 | §2 | **Registro de investigadores** | El acceso de hoy es de demostración: se elige la función al entrar. En producción viene del servidor con la credencial — y en un ensayo donde los permisos sostienen el cegamiento, que alguien elija los suyos no es aceptable |
-| §6 | **Reparto de la secuencia por dispositivo** | **Bloqueante.** Ver el aviso de arriba |
+| §6 | **Reparto de la secuencia por dispositivo** | Resuelto en el esquema; falta la política de reparto y el servicio que la aplique |
 | §4 | **Eliminar** pacientes y visitas (admin) | El repositorio no tiene ningún método de borrado |
 | §4 | **Editar la ficha con historial** (admin) | La auditoría hoy solo cubre visitas. `AuditEntity` ya contempla ficha, consentimiento y usuario; el repositorio no |
 | §4 | **Gestión de usuarios y roles** (admin) | Sección de la barra lateral sin contenido |

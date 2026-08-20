@@ -13,10 +13,12 @@ on:
   push:
     paths:
       - 'app/**'
+      - 'api/**'
       - '.github/workflows/verificar.yml'
   pull_request:
     paths:
       - 'app/**'
+      - 'api/**'
   workflow_dispatch:
 
 concurrency:
@@ -78,3 +80,47 @@ jobs:
           || [ "${{ steps.probar.outcome }}" != "success" ]; then
             exit 1
           fi
+
+  # ── Esquema central ────────────────────────────────────────────────
+  #
+  # Comprueba que la migración corre sobre PostgreSQL de verdad y que las
+  # garantías que promete el esquema se cumplen: auditoría de solo inserción,
+  # imposibilidad de que dos pacientes ocupen la misma posición de la secuencia,
+  # y que el analista no puede leer la identidad de los pacientes.
+  esquema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: verificacion
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    env:
+      PGPASSWORD: verificacion
+      PGHOST: localhost
+      PGUSER: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Aplicar la migración
+        run: psql -v ON_ERROR_STOP=1 -q -f api/migraciones/001_esquema_inicial.sql
+
+      - name: Comprobar las garantías del esquema
+        run: |
+          salida=$(psql -v ON_ERROR_STOP=1 -q -f api/pruebas/esquema_test.sql 2>&1)
+          echo "$salida"
+          # Cada prueba emite un NOTICE «OK ·». Si alguna falla, psql aborta;
+          # si alguien borra una prueba sin querer, esto lo detecta.
+          comprobadas=$(echo "$salida" | grep -c 'OK ·' || true)
+          echo "garantías comprobadas: $comprobadas"
+          test "$comprobadas" -ge 14

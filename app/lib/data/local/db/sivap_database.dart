@@ -238,6 +238,13 @@ class SivapDatabase {
 
     // Estado de la secuencia de aleatorización.
     //
+    // **No hay columna para la semilla, y es deliberado** (CLAUDE.md §7). Al
+    // dispositivo se carga la secuencia ya generada, nunca la semilla: quien
+    // tuviera la semilla podría calcular la secuencia entera y saber qué rama
+    // le toca al próximo paciente, que es el sesgo de selección que la
+    // aleatorización existe para evitar. La semilla vive en el expediente en
+    // papel y sirve después, para que un revisor externo verifique.
+    //
     // `consumidas` vive aquí y no en memoria por una razón que no es menor: si
     // el contador se reiniciara al abrir la app, el paciente siguiente
     // recibiría la posición 1 otra vez y la aleatorización quedaría destruida
@@ -248,7 +255,6 @@ class SivapDatabase {
         origen         TEXT    NOT NULL,
         generada_en    TEXT    NOT NULL,
         codigo_binario TEXT    NOT NULL,
-        semilla        INTEGER,
         consumidas     INTEGER NOT NULL DEFAULT 0,
         activa         INTEGER NOT NULL DEFAULT 1
       );

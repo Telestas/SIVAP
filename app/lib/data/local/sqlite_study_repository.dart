@@ -43,14 +43,15 @@ class SqliteStudyRepository implements StudyRepository {
 
     _db.execute(
       'INSERT INTO secuencia_aleatorizacion '
-      '(etiqueta, origen, generada_en, codigo_binario, semilla, consumidas, activa) '
-      'VALUES (?, ?, ?, ?, ?, 0, 1);',
+      '(etiqueta, origen, generada_en, codigo_binario, consumidas, activa) '
+      'VALUES (?, ?, ?, ?, 0, 1);',
       [
         secuencia.etiqueta,
         secuencia.origen.name,
         secuencia.generadaEn.toIso8601String(),
+        // La semilla NO se guarda: al dispositivo se carga la secuencia ya
+        // generada (CLAUDE.md §7).
         secuencia.codigoBinario,
-        secuencia.semilla,
       ],
     );
   }
@@ -70,7 +71,7 @@ class SqliteStudyRepository implements StudyRepository {
         origen: OrigenSecuencia.values
             .firstWhere((o) => o.name == fila['origen'] as String),
         generadaEn: DateTime.parse(fila['generada_en'] as String),
-        semilla: fila['semilla'] as int?,
+        // Sin semilla: el dispositivo no la conoce ni la necesita.
       ),
       consumidas: fila['consumidas'] as int,
     );

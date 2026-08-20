@@ -207,13 +207,13 @@ Se actualizan aquí, no en el código.
    Sin esto el estudio puede quedar subpotenciado. Corresponde al bioestadista.
 3. **Semilla y longitud de la secuencia** (restricción 7). Fijarlas al activar el
    estudio, no antes.
-4. **Reparto de la secuencia entre dispositivos.** El contador de la secuencia
-   vive en cada dispositivo. Dos trabajando sin conexión asignan ambos la misma
-   posición, y al sincronizar el reparto deja de ser el que la secuencia
-   dictaba — **en silencio**. La salida es repartir rangos disjuntos por centro
-   o dispositivo, que es el equivalente digital de los sobres numerados. Es la
-   misma decisión que la de los sobres físicos (§7 de más abajo), y condiciona
-   qué envía el servidor a cada dispositivo. Ver `docs/REENCAMINAMIENTO.md`.
+4. **Política de reparto de la secuencia.** El esquema central ya impide la
+   colisión: tramos disjuntos por dispositivo, con restricción de solapamiento,
+   y clave primaria por posición. Falta decidir **quién asigna los tramos, con
+   qué holgura, y qué hace la app cuando se queda sin tramo y sin conexión.**
+   La respuesta a lo último tiene que ser *dejar de enrolar*: improvisar una
+   asignación es exactamente lo que la aleatorización pre-generada evita. Ver
+   `docs/BACKEND.md`.
 
 **Contradicciones internas de los documentos fuente**
 

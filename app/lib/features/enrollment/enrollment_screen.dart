@@ -30,7 +30,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
 
   /// Se rellena al guardar. Hasta entonces no hay asignación: consumir una
   /// entrada de la secuencia de aleatorización por un formulario que quizá se
-  /// abandone dejaría huecos sin paciente en la lista del bioestadista.
+  /// abandone dejaría huecos sin paciente en la secuencia.
   Patient? _guardado;
   String? _error;
 
@@ -247,7 +247,8 @@ class _PanelAsignacion extends StatelessWidget {
             if (paciente == null)
               const Text(
                   'La rama se asigna automáticamente al guardar la ficha, '
-                  'consumiendo la siguiente entrada de la secuencia pre-generada.',
+                  'tomando la siguiente entrada de la secuencia aleatoria del '
+                  'estudio.',
                   style: TextStyle(fontSize: 12.5, color: T.secondary, height: 1.45))
             else
               Row(

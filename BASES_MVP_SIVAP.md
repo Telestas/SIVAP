@@ -19,7 +19,7 @@ Equipo de médicos investigadores de un hospital cubano, ejecutando una investig
 
 - Registro de investigadores con roles (ver sección 4).
 - Enrolamiento de paciente: ficha de identidad + datos de contacto.
-- Asignación de protocolo (viejo/nuevo) mediante **aleatorización simple pre-generada**, cargada como lista consumible por el sistema (ver sección 6 — módulo desacoplado, pendiente de confirmación del bioestadista).
+- Asignación de protocolo (viejo/nuevo) mediante **aleatorización simple generada por computadora** desde una semilla registrada, consumida en orden (ver sección 6 — módulo desacoplado).
 - Captura de consentimiento informado dentro del sistema (firma digital, fecha, versión del documento — ver sección 7).
 - Formularios de visita (Día 1, 3, 5, 10, 14) según **definición configurable de campos** (ver sección 5) — no hardcodeados, porque el equipo indicó que el formulario podría ajustarse durante el estudio.
 - Trabajo 100% offline en la app móvil, con sincronización a la nube cuando haya conexión.
@@ -81,9 +81,50 @@ Cada campo se define como un registro configurable (nombre, tipo, obligatoriedad
 
 ## 6. Módulo de asignación de protocolo (aleatorización)
 
-**Estado**: pendiente de definición por el bioestadista del equipo.
+**Estado**: **decidido por el equipo (20 ago 2026)**.
 
-El MVP implementa por defecto: **aleatorización simple pre-generada** (lista de secuencia cargada al sistema, consumida en orden por cada nuevo paciente elegible). Esta pieza se construye **desacoplada** del resto del sistema, de modo que si más adelante se decide que la asignación depende de criterios clínicos (edad, diagnóstico, gravedad), se reemplaza el módulo sin rediseñar el resto de la aplicación.
+El sistema implementa **aleatorización simple generada por computadora**. Cómo funciona, en concreto:
+
+1. Antes de enrolar al primer paciente, el investigador principal fija una **semilla** (un número) y una **longitud** de secuencia holgada frente al tamaño previsto de la cohorte.
+2. El sistema genera de una vez la secuencia completa: un **código binario** donde `0` = protocolo vigente (rama control) y `1` = protocolo nuevo. Cada posición se sortea de forma independiente.
+3. Cada paciente enrolado consume la siguiente posición, en orden estricto. El investigador no ve qué rama toca antes de enrolar, y no puede modificarla.
+4. La semilla, la longitud y el código binario quedan **en el acta del estudio**.
+
+### Cómo verificar la aleatorización sin fiarse de la app
+
+El generador no es el del lenguaje de programación, sino uno fijado en el
+código del proyecto (**splitmix32**), precisamente para que la secuencia no
+dependa de qué versión de qué herramienta se usó. Cualquiera puede
+reimplementarlo y comprobar el resultado. La especificación completa, sobre
+enteros de 32 bits sin signo:
+
+```
+estado = semilla
+repetir para cada asignación:
+    estado = (estado + 0x9E3779B9) mod 2^32
+    z = estado
+    z = ((z XOR (z >>> 16)) * 0x21F0AAAD) mod 2^32
+    z = ((z XOR (z >>> 15)) * 0x735A2D97) mod 2^32
+    z = z XOR (z >>> 15)
+    bit = z AND 1          # 1 = protocolo nuevo, 0 = protocolo vigente
+```
+
+Vectores de comprobación, para saber que la reimplementación es correcta:
+
+| Semilla | Primeros bits |
+|---|---|
+| 12345 | `1101101100000100` (16) |
+| 987 | `10111100101110101111001101000111` (32) |
+
+Con eso, un revisor externo con Python o R regenera la secuencia del estudio
+desde la semilla del acta y la compara contra las asignaciones registradas,
+paciente a paciente, sin tener que confiar en el software.
+
+Por qué la semilla: es lo que convierte el azar en algo verificable. Un revisor, un comité o el propio equipo pueden regenerar la secuencia con esa semilla y comprobar, paciente a paciente, que las asignaciones registradas son exactamente las que la secuencia dictaba. Sin semilla registrada, "fue aleatorio" es una afirmación que nadie puede comprobar.
+
+Nota metodológica: la aleatorización simple **no garantiza un reparto 50/50**. Con 60 pacientes es normal terminar 33/27 o similar. Eso es correcto y esperado; forzar el equilibrio exacto dejaría de ser aleatorización simple. Si el desequilibrio llegara a preocupar al equipo, la alternativa es aleatorización por bloques.
+
+Esta pieza se construye **desacoplada** del resto del sistema: si más adelante se decide pasar a bloques, a estratificación, o a una asignación que dependa de criterios clínicos (edad, diagnóstico, gravedad), se reemplaza el módulo sin rediseñar el resto de la aplicación.
 
 **No implementado y explícitamente descartado para el MVP**: que el investigador elija manualmente el protocolo al crear el paciente sin una regla objetiva detrás — esto introduce sesgo de selección y compromete la validez del estudio como ensayo aleatorizado.
 
@@ -110,7 +151,8 @@ Dado que se manejará nombre y contacto completos del paciente:
 ## 9. Condición de fallo
 
 Este diseño asume:
-- Que la aleatorización final será simple (no por bloques ni estratificada) — si el bioestadista pide estratificación, el módulo de asignación (sección 6) debe ajustarse antes de enrolar pacientes.
+- Que la aleatorización es simple (no por bloques ni estratificada), decidido por el equipo — si más adelante se pidiera estratificación, el módulo de asignación (sección 6) debe ajustarse **antes** de enrolar pacientes, nunca a mitad del estudio.
+- Que la semilla de aleatorización se fija una vez y queda registrada. Cambiarla con pacientes ya enrolados invalida la trazabilidad de las asignaciones previas.
 - Que 4–10 investigadores en paralelo es el volumen real — un crecimiento significativo del equipo requeriría revisar la estrategia de sync.
 - Que el CEI aprobará el consentimiento en un plazo razonable — el sistema puede construirse en paralelo, pero no reclutar pacientes reales hasta esa aprobación.
 
@@ -119,7 +161,7 @@ Este diseño asume:
 ## 10. Próximos pasos
 
 1. Confirmar campos exactos por visita (sección 5).
-2. Confirmar con bioestadista el método de aleatorización (sección 6).
+2. ~~Confirmar el método de aleatorización~~ — **hecho** (sección 6). Queda fijar la semilla y la longitud de la secuencia del estudio real, y dejarlas en el acta.
 3. Definir nombre final del proyecto.
 4. Generar `CLAUDE.md` (constitución del repositorio) y prompts secuenciados por hito para Claude Code.
 

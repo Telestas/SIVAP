@@ -151,32 +151,117 @@ void main() {
     });
   });
 
-  group('§4 · asignación desacoplada', () {
-    test('la secuencia pre-generada se consume en orden', () {
-      final estrategia = PreGeneratedSequenceAllocation(
-        secuencia: const [Protocolo.nuevo, Protocolo.vigente, Protocolo.nuevo],
-        etiquetaBloque: 'bloque de prueba',
-      );
+  group('§4 · asignación aleatoria por computadora, desacoplada', () {
+    test('la secuencia se genera desde una semilla y se consume en orden', () {
+      final secuencia = AllocationSequence.generada(
+          semilla: 12345, longitud: 8, ahora: DateTime(2026));
+      final estrategia = SequentialAllocation(secuencia: secuencia);
 
-      expect(estrategia.asignar(ahora: DateTime(2026)).protocolo, Protocolo.nuevo);
-      expect(estrategia.asignar(ahora: DateTime(2026)).protocolo, Protocolo.vigente);
-      expect(estrategia.asignar(ahora: DateTime(2026)).protocolo, Protocolo.nuevo);
+      for (var i = 0; i < secuencia.longitud; i++) {
+        expect(estrategia.asignar(ahora: DateTime(2026)).protocolo,
+            secuencia.valores[i]);
+      }
       expect(estrategia.restantes, 0);
     });
 
+    test('la misma semilla reproduce exactamente la misma secuencia', () {
+      // Esta es la propiedad que hace auditable la aleatorización: un tercero
+      // regenera la secuencia con la semilla del acta y comprueba que las
+      // asignaciones registradas son las que tocaban.
+      final a = AllocationSequence.generada(
+          semilla: 987, longitud: 64, ahora: DateTime(2026));
+      final b = AllocationSequence.generada(
+          semilla: 987, longitud: 64, ahora: DateTime(2027));
+
+      expect(a.codigoBinario, b.codigoBinario);
+      expect(a.verificaContraSemilla(), isTrue);
+    });
+
+    test('el generador reproduce sus vectores de verificación', () {
+      // Si esto falla, el algoritmo de sorteo cambió: toda secuencia generada
+      // antes deja de poder regenerarse, y con ella la auditoría de las
+      // asignaciones ya hechas. No se ajusta el vector — se investiga por qué
+      // cambió el generador.
+      expect(
+        AllocationSequence.generada(
+                semilla: 12345, longitud: 16, ahora: DateTime(2026))
+            .codigoBinario,
+        '1101101100000100',
+      );
+      expect(
+        AllocationSequence.generada(
+                semilla: 987, longitud: 32, ahora: DateTime(2026))
+            .codigoBinario,
+        '10111100101110101111001101000111',
+      );
+    });
+
+    test('semillas distintas dan secuencias distintas', () {
+      final a = AllocationSequence.generada(
+          semilla: 1, longitud: 64, ahora: DateTime(2026));
+      final b = AllocationSequence.generada(
+          semilla: 2, longitud: 64, ahora: DateTime(2026));
+
+      expect(a.codigoBinario, isNot(b.codigoBinario));
+    });
+
+    test('el código binario tiene una cifra por asignación', () {
+      final s = AllocationSequence.generada(
+          semilla: 42, longitud: 30, ahora: DateTime(2026));
+
+      expect(s.codigoBinario.length, 30);
+      expect(RegExp(r'^[01]+$').hasMatch(s.codigoBinario), isTrue);
+      expect(s.reparto.vigente + s.reparto.nuevo, 30);
+    });
+
+    test('la secuencia reparte las dos ramas sin fijar proporción exacta', () {
+      // Aleatorización simple: se espera un reparto cercano a la mitad, pero
+      // NO exactamente la mitad. Si alguien "arregla" esto para que salga
+      // 50/50 clavado, ha dejado de ser aleatorización simple.
+      final s = AllocationSequence.generada(
+          semilla: 20260814, longitud: 200, ahora: DateTime(2026));
+
+      expect(s.reparto.vigente, 106);
+      expect(s.reparto.nuevo, 94);
+    });
+
+    test('una secuencia cargada desde fuera no lleva semilla ni se autoverifica',
+        () {
+      final s = AllocationSequence.cargada(
+          valores: const [Protocolo.nuevo, Protocolo.vigente],
+          etiqueta: 'lista del bioestadista',
+          ahora: DateTime(2026));
+
+      expect(s.semilla, isNull);
+      expect(s.verificaContraSemilla(), isFalse);
+      expect(s.codigoBinario, '10');
+    });
+
     test('agotar la secuencia es un error, no una improvisación', () {
-      final estrategia = PreGeneratedSequenceAllocation(
-          secuencia: const [Protocolo.nuevo], etiquetaBloque: 'b');
+      final estrategia = SequentialAllocation(
+        secuencia: AllocationSequence.generada(
+            semilla: 7, longitud: 1, ahora: DateTime(2026)),
+      );
       estrategia.asignar(ahora: DateTime(2026));
 
       expect(() => estrategia.asignar(ahora: DateTime(2026)),
           throwsA(isA<AllocationExhausted>()));
     });
 
-    test('la asignación queda trazada con bloque y hora', () {
+    test('cada asignación queda trazada con secuencia, posición y hora', () {
       final p = enrolarDemo();
-      expect(p.bloqueAleatorizacion, isNotEmpty);
+      expect(p.bloqueAleatorizacion, Seed.secuenciaAleatorizacion.etiqueta);
       expect(p.asignadoEn, isNotNull);
+    });
+
+    test('la asignación del estudio coincide con la secuencia sembrada', () {
+      // El octavo paciente enrolado recibe la octava entrada: los siete
+      // primeros son los de demostración.
+      final p = enrolarDemo();
+      expect(Seed.secuenciaAleatorizacion.codigoBinario.substring(0, 12),
+          '110111110001');
+      expect(p.protocolo, Seed.secuenciaAleatorizacion.valores[7]);
+      expect(p.protocolo, Protocolo.nuevo);
     });
   });
 

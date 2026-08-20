@@ -65,7 +65,7 @@ No son comentarios sueltos: cada una tiene un sitio concreto y una prueba.
 | §1 ficha ≠ visita | `Patient` y `Visit` son clases separadas; `Visit` solo guarda `patientId` | `test/restricciones_test.dart` |
 | §2 sin ediciones silenciosas | `SilentEditRejected`; `corregirVisitaEnviada` exige motivo | idem |
 | §3 formularios configurables | `VisitFormDefinition`; la pantalla de captura recorre la definición | idem |
-| §4 asignación desacoplada | `AllocationStrategy` + `PreGeneratedSequenceAllocation` | idem |
+| §4 asignación desacoplada | `AllocationStrategy` + `SequentialAllocation` sobre una `AllocationSequence` generada desde semilla | idem |
 | §6 roles y permisos | `PermissionDenied` en el repositorio, no solo en la UI | idem |
 | §7 offline-first | no hay una sola llamada de red en el hito | — |
 | §8 consentimiento | `StudyConfig.consentimientoAprobadoPorCei`; sin consentimiento no hay captura | idem |
@@ -83,5 +83,9 @@ válido.
 - **Los campos de visita son un borrador** (BASES §5). Están tomados de la
   maqueta; el listado real lo debe entregar el equipo médico. Cambiarlos es
   editar `Seed.formulario`, no tocar pantallas.
+- **La semilla de aleatorización es de demostración** (`Seed.semillaAleatorizacion`).
+  La del estudio real la fija el investigador principal una sola vez, antes del
+  primer paciente, y va al acta. Cambiarla con pacientes ya enrolados invalida
+  la trazabilidad de todo lo asignado.
 - **El selector de rol en el acceso es de demostración.** En producción el rol
   llega del servidor con la credencial: un investigador no elige sus permisos.

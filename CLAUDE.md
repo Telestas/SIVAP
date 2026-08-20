@@ -30,7 +30,17 @@ Ver `01_BASES_MVP_SIVAP.md` para el alcance completo.
 
 3. **Formularios de visita configurables, no hardcodeados**: los campos de cada visita se definen como datos (nombre, tipo, obligatoriedad, validación), no como estructuras fijas en el código de la app. Un ajuste de protocolo se resuelve editando la definición, no recompilando la app.
 
-4. **Módulo de asignación desacoplado**: la lógica que decide qué protocolo recibe un paciente vive en un componente aislado y reemplazable. Por defecto: aleatorización simple pre-generada (lista consumida en orden). Nunca implementar selección manual del protocolo por el investigador sin una regla objetiva documentada — esto introduce sesgo de selección.
+4. **Módulo de asignación desacoplado**: la lógica que decide qué protocolo recibe un paciente vive en un componente aislado y reemplazable.
+
+   **Método vigente** (decisión del equipo, 20 ago 2026): **aleatorización simple generada por computadora**. La secuencia completa —un código binario, `0` = protocolo vigente, `1` = protocolo nuevo— se genera a partir de una **semilla registrada**, antes de enrolar al primer paciente, y se consume en orden.
+
+   Tres condiciones que no se relajan:
+
+   - **La secuencia se genera entera antes del primer paciente.** Nunca se sortea en el momento de enrolar: sortear sobre la marcha permite repetir el sorteo hasta obtener la rama que se prefiere, y eso no deja rastro.
+   - **La semilla queda por escrito** en el acta del estudio. Es lo que hace la aleatorización auditable: cualquiera puede regenerar la misma secuencia y verificar que las asignaciones registradas son las que tocaban. Un azar irreproducible no se puede auditar.
+   - **La semilla no se cambia a mitad del estudio.** Hacerlo invalida la trazabilidad de todo lo asignado hasta ese momento.
+
+   Nunca implementar selección manual del protocolo por el investigador sin una regla objetiva documentada — esto introduce sesgo de selección. Y no "corregir" el reparto para que quede 50/50 exacto: en aleatorización simple el desequilibrio moderado es esperado y legítimo. Si el desequilibrio llegara a importar, la salida es aleatorización por bloques, que es otra implementación del mismo módulo — no un parche sobre esta.
 
 5. **Cifrado obligatorio**: base de datos local (dispositivo) cifrada en reposo. Comunicación cliente-servidor siempre por TLS. Nunca almacenar contraseñas ni tokens en texto plano.
 
@@ -53,7 +63,7 @@ Ver `01_BASES_MVP_SIVAP.md` para el alcance completo.
 
 ## Estado de decisiones pendientes (actualizar aquí, no en el código)
 
-- **Método de aleatorización final**: pendiente de confirmación del bioestadista. Por defecto: aleatorización simple.
+- **Método de aleatorización**: ~~pendiente~~ **decidido (20 ago 2026)**: aleatorización simple generada por computadora desde semilla registrada (ver restricción 4). Queda pendiente que el equipo fije la semilla y la longitud de la secuencia del estudio real, y lo deje en el acta.
 - **Campos exactos por visita**: pendiente de listado del equipo médico.
 - **Nombre final del proyecto**: provisional "SIVAP".
 - **Aprobación del CEI**: pendiente (consentimiento en borrador).

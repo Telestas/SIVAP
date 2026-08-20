@@ -12,6 +12,10 @@ desde el panel de administración.
 
 ## Qué hay que mirar en la revisión
 
+0. **La semilla y la longitud de la secuencia.** Antes de enrolar al primer
+   paciente real, el investigador principal tiene que fijar ambas y dejarlas en
+   el acta del estudio. Hasta entonces la app usa una semilla de demostración.
+
 1. **Los campos de visita** (pantalla 05). Son los de la maqueta, no los
    definitivos. Es la decisión pendiente más bloqueante: hasta que el equipo
    médico entregue el listado real por visita, el dataset exportable no queda
@@ -28,6 +32,13 @@ desde el panel de administración.
 
 ## Decisiones tomadas en este hito
 
+- **Aleatorización simple generada por computadora, desde semilla registrada**
+  (decisión del equipo, 20 ago 2026 — ver BASES §6). La secuencia completa se
+  genera antes del primer paciente como un código binario (`0` = vigente,
+  `1` = nuevo) y se consume en orden. La semilla queda registrada porque es lo
+  que hace la aleatorización auditable: con ella se regenera la misma secuencia
+  y se verifica que cada asignación fue la que tocaba. La app no sortea nada en
+  el momento de enrolar.
 - **La rama se asigna al guardar la ficha**, no al abrir el formulario. Si se
   asignara al abrir, un formulario abandonado dejaría un hueco sin paciente en
   la secuencia del bioestadista.

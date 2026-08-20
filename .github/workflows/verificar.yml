@@ -1,0 +1,76 @@
+# Analiza y prueba la app sin necesidad de tener Flutter instalado.
+#
+# Existe porque la conexión del equipo no da para descargar 1,5 GB de SDK. El
+# análisis corre aquí y los errores se leen en el registro de la ejecución:
+#
+#   gh workflow run verificar.yml
+#   gh run watch
+#   gh run view --log-failed
+
+name: Verificar
+
+on:
+  push:
+    paths:
+      - 'app/**'
+      - '.github/workflows/verificar.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+  workflow_dispatch:
+
+concurrency:
+  # Un push nuevo cancela el análisis del anterior: no interesa el resultado
+  # de un commit ya superado.
+  group: verificar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.1'
+          channel: stable
+          cache: true
+
+      # El repositorio no versiona android/, ios/ ni web/: los genera Flutter.
+      # `--org` fija el identificador de aplicación (cu.sivap.sivap). Cambiarlo
+      # más adelante crea una app distinta a ojos de Android, así que conviene
+      # decidirlo antes de repartir nada.
+      - name: Generar andamiaje de plataforma
+        run: flutter create --platforms=android,web --org cu.sivap .
+
+      - name: Resolver dependencias
+        run: flutter pub get
+
+      # `continue-on-error` a propósito: si el análisis corta el trabajo, no se
+      # ven los fallos de las pruebas y hay que esperar otra vuelta entera.
+      # Interesa la lista completa de una sola vez.
+      - name: Analizar
+        id: analizar
+        continue-on-error: true
+        run: flutter analyze --no-fatal-infos
+
+      - name: Probar
+        id: probar
+        continue-on-error: true
+        run: flutter test --reporter expanded
+
+      - name: Resultado
+        run: |
+          echo "análisis: ${{ steps.analizar.outcome }}"
+          echo "pruebas:  ${{ steps.probar.outcome }}"
+          if [ "${{ steps.analizar.outcome }}" != "success" ] \
+          || [ "${{ steps.probar.outcome }}" != "success" ]; then
+            exit 1
+          fi

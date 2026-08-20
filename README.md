@@ -13,15 +13,28 @@ fijas (Día 1, 3, 5, 10, 14), sincronización posterior y exportación a Excel p
 | [CLAUDE.md](CLAUDE.md) | Constitución del repositorio: restricciones no negociables, glosario y convenciones |
 | [BASES_MVP_SIVAP.md](BASES_MVP_SIVAP.md) | Alcance del MVP, arquitectura, roles y decisiones pendientes |
 | [docs/HITO_1.md](docs/HITO_1.md) | Qué se entrega en este hito y qué revisar |
+| [docs/PENDIENTE.md](docs/PENDIENTE.md) | Qué falta para completar el MVP |
+| [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md) | Cómo llega el APK a los investigadores, y qué decidir antes |
 | [app/README.md](app/README.md) | Cómo correr la app y dónde vive cada restricción |
 | [design/](design/) | El canvas de Claude Design del que sale la interfaz |
 
 ## Estructura
 
 ```
-app/      cliente Flutter (móvil + web)
-design/   canvas de diseño, como referencia
-docs/     notas por hito
+app/           cliente Flutter (móvil + web)
+deploy/        despliegue con Docker: Postgres, panel web, TLS
+design/        canvas de diseño, como referencia
+docs/          notas por hito y decisiones
+web-descarga/  página de descarga del APK
+```
+
+## Verificación
+
+Cada push analiza y prueba la app en GitHub Actions — el equipo no tiene ancho
+de banda para descargar el SDK de Flutter:
+
+```bash
+gh workflow run verificar.yml && gh run watch
 ```
 
 ## Arquitectura

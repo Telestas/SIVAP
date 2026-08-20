@@ -13,7 +13,9 @@ Se actualiza al cerrar cada hito.
 | §2 Formularios configurables | El **mecanismo** está: la pantalla se construye desde `VisitFormDefinition` |
 | §2 Auditoría | Solo para corrección de visitas enviadas: valor anterior, nuevo, autor, fecha, motivo. En la base, con disparadores que impiden modificarla o borrarla |
 | §3 Persistencia cifrada | SQLite + SQLCipher en móvil y escritorio, clave en el Keystore/Keychain. Sin probar en dispositivo |
-| §3 Despliegue | Borrador de `deploy/compose.yaml`: Postgres, panel web y TLS con Caddy. Falta el backend |
+| §3 Despliegue | Borrador de `deploy/compose.yaml`: Postgres, panel web y TLS con nginx. Falta el backend |
+| — | Integración continua | `verificar.yml` analiza y prueba en cada push; `apk.yml` compila y publica el APK como release |
+| — | Página de descarga | `web-descarga/` con la estética de la app. Bloqueada por la visibilidad del repositorio — ver `DISTRIBUCION.md` |
 | §4 Observador | Solo lectura, cohorte completa |
 | §4 Recolector | Crea pacientes y visitas propias, no edita lo enviado |
 | §8 Separación ficha/clínica | `Patient` y `Visit` separados, unidos solo por ID interno |

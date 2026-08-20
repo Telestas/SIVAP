@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIVAP — Descargar la app</title>
+<meta name="description" content="Descarga de la aplicación de campo del estudio de cohorte SIVAP.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<style>
+/* Tipografía empaquetada, no traída de un CDN: la conexión desde el hospital
+   puede no alcanzar servidores externos, y una fuente que no carga deja la
+   página con un aspecto que no es el suyo. */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('fonts/IBMPlexSans-Variable.ttf') format('truetype-variations');
+  font-weight: 100 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('fonts/IBMPlexMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('fonts/IBMPlexMono-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-display: swap;
+}
+
+:root {
+  --canvas: #ececeb;
+  --surface: #fbfbfa;
+  --card: #ffffff;
+  --ink: #16181a;
+  --body: #4a5158;
+  --secondary: #5f6771;
+  --muted: #7a828c;
+  --faint: #8b929a;
+  --line: #dcdfe3;
+  --line-soft: #e0e2e5;
+  --accent: #17615a;
+  --warn-bg: #fdf1da;
+  --warn-line: #eed9ac;
+  --warn-fg: #7a5710;
+  --warn-dot: #c98a1a;
+  --ok-bg: #e6f1ea;
+  --ok-line: #c6ddcf;
+  --ok-fg: #2f6b46;
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  padding: 40px 20px 72px;
+  display: flex;
+  justify-content: center;
+}
+
+main { width: 100%; max-width: 560px; }
+
+.marca {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.entradilla {
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--secondary);
+  text-wrap: pretty;
+}
+
+/* Banda de estado: el mismo elemento que usa la app para decir en qué
+   condiciones está trabajando. */
+.banda {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border-radius: 8px;
+  padding: 13px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 24px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  color: var(--warn-fg);
+}
+.banda .punto {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--warn-dot);
+  margin-top: 6px;
+  flex: none;
+}
+.banda strong { font-weight: 600; }
+
+.tarjeta {
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  padding: 22px;
+  margin-bottom: 20px;
+}
+
+.boton {
+  display: block;
+  background: var(--ink);
+  color: var(--surface);
+  text-decoration: none;
+  text-align: center;
+  border-radius: 8px;
+  padding: 17px;
+  font-size: 16px;
+  font-weight: 600;
+  transition: opacity .12s ease;
+}
+.boton:hover { opacity: .88; }
+.boton:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.datos {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  font-size: 13px;
+  align-items: baseline;
+}
+.datos dt {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.datos dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+h2 {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+
+ol { margin: 0; padding-left: 20px; }
+ol li {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--body);
+  margin-bottom: 10px;
+}
+ol li:last-child { margin-bottom: 0; }
+
+code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--canvas);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.pie {
+  margin-top: 32px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--faint);
+}
+.pie a { color: var(--accent); }
+
+@media (prefers-color-scheme: dark) {
+  /* Deliberadamente sin tema oscuro: la app es de superficie clara y esta
+     página es su puerta de entrada. Dos estéticas distintas confundirían. */
+}
+</style>
+</head>
+<body>
+<main>
+  <p class="marca">Sistema SIVAP · nombre de trabajo</p>
+  <h1>Aplicación de campo</h1>
+  <p class="entradilla">
+    Registro clínico del estudio de cohorte. Captura de visitas sin conexión,
+    con la base de datos del dispositivo cifrada.
+  </p>
+
+  <div class="banda">
+    <span class="punto" aria-hidden="true"></span>
+    <span>
+      <strong>Versión de prueba. No para pacientes reales.</strong><br>
+      El estudio está pendiente de aprobación del Comité de Ética de la
+      Investigación. La app arranca en modo demostración: los pacientes que
+      aparecen son inventados.
+    </span>
+  </div>
+
+  <div class="tarjeta">
+    <a class="boton" id="descarga" href="#" rel="noopener">Descargar para Android</a>
+    <dl class="datos">
+      <dt>Versión</dt><dd id="version">—</dd>
+      <dt>Publicada</dt><dd id="fecha">—</dd>
+      <dt>Tamaño</dt><dd id="tamano">—</dd>
+      <dt>SHA-256</dt><dd id="sha">—</dd>
+    </dl>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Instalación</h2>
+    <ol>
+      <li>Descargue el archivo tocando el botón de arriba.</li>
+      <li>
+        Ábralo. Android avisará de que la instalación viene de fuera de Play
+        Store; hay que permitirlo una vez para el navegador.
+      </li>
+      <li>
+        Si la descarga se cortó, la instalación falla con un error que no
+        explica el motivo. Compruebe el <code>SHA-256</code> del archivo antes
+        de instalar: debe coincidir con el de arriba.
+      </li>
+    </ol>
+  </div>
+
+  <p class="pie">
+    Los datos capturados se guardan cifrados en el propio dispositivo y no
+    salen de él hasta que haya conexión. Al desinstalar la app se borra la
+    clave de cifrado, y con ella todo lo que no se hubiera enviado.
+  </p>
+</main>
+
+<script>
+// El repositorio y la etiqueta se sustituyen al desplegar (ver pages.yml).
+const REPO = '__REPO__';
+const enlaceReleases = `https://github.com/${REPO}/releases/latest`;
+
+const $ = (id) => document.getElementById(id);
+
+// Enlace de reserva: si la consulta a GitHub falla —repositorio privado, sin
+// conexión, límite de peticiones— el botón sigue llevando a algún sitio útil
+// en vez de quedarse muerto.
+$('descarga').href = enlaceReleases;
+
+function formatoTamano(bytes) {
+  return (bytes / 1048576).toFixed(1).replace('.', ',') + ' MB';
+}
+
+function formatoFecha(iso) {
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const d = new Date(iso);
+  return `${d.getDate()} ${meses[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
+  .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+  .then((release) => {
+    const apk = (release.assets || []).find((a) => a.name.endsWith('.apk'));
+    if (!apk) return Promise.reject('sin apk');
+
+    $('descarga').href = apk.browser_download_url;
+    $('descarga').setAttribute('download', apk.name);
+    $('version').textContent = release.tag_name;
+    $('fecha').textContent = formatoFecha(release.published_at);
+    $('tamano').textContent = formatoTamano(apk.size);
+
+    // El SHA-256 lo escribe el workflow en el cuerpo de la release.
+    const m = (release.body || '').match(/\b([a-f0-9]{64})\b/);
+    $('sha').textContent = m ? m[1] : 'ver la página de la versión';
+  })
+  .catch(() => {
+    for (const id of ['version', 'fecha', 'tamano', 'sha']) {
+      $(id).textContent = 'ver la página de la versión';
+    }
+  });
+</script>
+</body>
+</html>

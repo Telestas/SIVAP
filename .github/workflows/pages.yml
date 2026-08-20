@@ -1,0 +1,64 @@
+# Publica la página de descarga en GitHub Pages.
+#
+# AVISO: GitHub Pages no está disponible para repositorios privados en el plan
+# gratuito, y los archivos de una release privada tampoco se pueden descargar
+# sin autenticación. Es decir: mientras SIVAP sea privado, este workflow no
+# sirve de nada aunque se ejecute. Ver docs/DISTRIBUCION.md para las salidas.
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web-descarga/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar el sitio
+        env:
+          # De dónde lee la página las versiones publicadas. Si el APK acaba
+          # en otro repositorio (el público de distribución), se cambia aquí.
+          REPO_RELEASES: ${{ vars.REPO_RELEASES || github.repository }}
+        run: |
+          mkdir -p sitio/fonts
+          cp web-descarga/index.html sitio/
+
+          # Las tipografías van servidas desde el propio sitio, no desde un
+          # CDN: la conexión desde el hospital puede no alcanzar servidores
+          # externos.
+          cp app/assets/fonts/IBMPlexSans-Variable.ttf  sitio/fonts/
+          cp app/assets/fonts/IBMPlexMono-Regular.ttf   sitio/fonts/
+          cp app/assets/fonts/IBMPlexMono-SemiBold.ttf  sitio/fonts/
+          cp app/assets/fonts/OFL-IBMPlex.txt           sitio/fonts/
+
+          sed -i "s|__REPO__|${REPO_RELEASES}|g" sitio/index.html
+
+          # Jekyll ignoraría cualquier archivo que empiece por guion bajo.
+          touch sitio/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: sitio
+      - id: deploy
+        uses: actions/deploy-pages@v4

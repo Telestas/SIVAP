@@ -482,6 +482,21 @@ CREATE VIEW dataset_clinico WITH (security_invoker = true) AS
   JOIN evento_valor_vigente v ON v.evento_id = e.id;
 
 -- ══════════════════════════════════════════════════════════════════
+-- Registro de migraciones
+-- ══════════════════════════════════════════════════════════════════
+--
+-- Qué versión del esquema tiene esta base. Sin esto, averiguarlo obliga a
+-- inspeccionar tablas y adivinar, que es justo lo que no se quiere hacer con
+-- un servidor en producción y datos de un ensayo dentro.
+
+CREATE TABLE migracion (
+  version     TEXT PRIMARY KEY,
+  aplicada_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO migracion (version) VALUES ('001');
+
+-- ══════════════════════════════════════════════════════════════════
 -- Roles de base de datos
 -- ══════════════════════════════════════════════════════════════════
 --

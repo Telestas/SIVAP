@@ -17,11 +17,9 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:?falta POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER:?falta POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
-      # Ordenación e idioma en español, para que los listados salgan como se
-      # espera y no con la ficha de "Álvarez" detrás de la de "Zamora".
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--locale=es_ES.UTF-8 --encoding=UTF8"
     volumes:
       - datos_postgres:/var/lib/postgresql/data
@@ -38,9 +36,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # Sin `ports`: la base no se asoma a la red. Solo la alcanza `api`, por la
-    # red interna de compose. Para administrarla, túnel SSH.
-    networks: [interna]
 
   # ── Backend (todavía no existe) ──────────────────────────────────
   api:
@@ -52,13 +47,12 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      SIVAP_SECRET_KEY: ${SIVAP_SECRET_KEY:?falta SIVAP_SECRET_KEY}
       SIVAP_ENTORNO: ${SIVAP_ENTORNO:-produccion}
+      SIVAP_TAMANO_TRAMO: ${SIVAP_TAMANO_TRAMO:-25}
+      SIVAP_HORAS_SESION: ${SIVAP_HORAS_SESION:-720}
     # Solo en la red interna: no publica puertos y tampoco tiene salida a
     # internet. Se llega a ella por el proxy, con TLS. Si algún día necesita
     # salir (correo, por ejemplo), habrá que añadirla a `publica`.
-    networks: [interna]
-    profiles: [completo]
 
   # ── Panel web + TLS ──────────────────────────────────────────────
   #
@@ -79,8 +73,7 @@ services:
       # declaradas aquí.
       NGINX_ENVSUBST_TEMPLATE_SUFFIX: .template
     ports:
-      - "80:80"
-      - "443:443"
+      - "${PORT}:80"
     volumes:
       - ./tls:/etc/nginx/tls:ro
     healthcheck:
@@ -88,12 +81,6 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    networks: [interna, publica]
 
 volumes:
   datos_postgres:
-
-networks:
-  interna:
-    internal: true
-  publica:

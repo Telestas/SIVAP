@@ -108,8 +108,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Aplicar la migración
-        run: psql -v ON_ERROR_STOP=1 -q -f api/migraciones/001_esquema_inicial.sql
+      - name: Aplicar las migraciones
+        run: |
+          for m in api/migraciones/*.sql; do
+            echo "→ $m"
+            psql -v ON_ERROR_STOP=1 -q -f "$m"
+          done
 
       - name: Comprobar las garantías del esquema
         run: |
@@ -120,3 +124,47 @@ jobs:
           comprobadas=$(echo "$salida" | grep -c 'OK ·' || true)
           echo "garantías comprobadas: $comprobadas"
           test "$comprobadas" -ge 14
+
+  # ── Servicio de la api ─────────────────────────────────────────────
+  #
+  # Contra PostgreSQL de verdad, no contra un doble: el esquema hace valer
+  # garantías que ningún simulacro reproduce —disparadores, restricción de
+  # solapamiento de tramos, privilegios por rol—, y probar contra otra cosa
+  # daría una confianza que no existe.
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: verificacion
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://postgres:verificacion@localhost:5432/postgres
+
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -e '.[pruebas]'
+
+      - name: Probar
+        run: python -m pytest pruebas -q

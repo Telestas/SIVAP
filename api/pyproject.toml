@@ -1,0 +1,20 @@
+[project]
+name = "sivap-api"
+version = "0.1.0"
+description = "Servicio central del ensayo LIVERE"
+requires-python = ">=3.11"
+
+# Sin ORM: el SQL va escrito a mano, igual que el esquema. Un sistema con datos
+# clínicos debe poder leerse sin descifrar la capa de abstracción de nadie.
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "psycopg[binary]>=3.2",
+  "argon2-cffi>=23.1",
+]
+
+[project.optional-dependencies]
+pruebas = ["pytest>=8.0", "httpx>=0.27"]
+
+[tool.pytest.ini_options]
+testpaths = ["pruebas"]

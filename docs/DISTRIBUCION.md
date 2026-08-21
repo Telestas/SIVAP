@@ -47,16 +47,39 @@ identificable entra al repositorio.
 
 ## La firma del APK: decidir antes de repartir nada
 
-`apk.yml` firma con el llavero del estudio si están estos secretos:
+`apk.yml` firma con el llavero del estudio si están **los cuatro** secretos:
 
 | Secreto | Contenido |
 |---|---|
-| `ANDROID_KEYSTORE_BASE64` | El archivo `.jks` codificado en base64 |
+| `ANDROID_KEYSTORE_BASE64` | El archivo `.jks` codificado en base64, **sin saltos de línea** |
 | `ANDROID_KEYSTORE_PASSWORD` | Contraseña del llavero |
 | `ANDROID_KEY_ALIAS` | Alias de la clave |
 | `ANDROID_KEY_PASSWORD` | Contraseña de la clave |
 
-Si no están, el APK sale firmado con la clave de depuración que genera Flutter.
+Van juntos o no va ninguno: si el llavero está pero falta la contraseña, la
+compilación **se corta**. Continuar publicaría un APK con la clave de
+depuración mientras el equipo cree que lleva la del estudio, y ese equívoco solo
+se descubre el día que hace falta actualizar la app — cuando ya es tarde.
+
+Tras firmar, el pipeline comprueba que el certificado resultante no es el de
+depuración. Un APK mal firmado se instala igual: sin esa comprobación, nadie lo
+notaría.
+
+Para añadirlos sin que la clave pase por el portapapeles ni por el historial del
+intérprete de comandos:
+
+```bash
+base64 -w0 sivap.jks | gh secret set ANDROID_KEYSTORE_BASE64 --repo Telestas/SIVAP
+gh secret set ANDROID_KEYSTORE_PASSWORD --repo Telestas/SIVAP   # la pide por teclado
+gh secret set ANDROID_KEY_ALIAS         --repo Telestas/SIVAP
+gh secret set ANDROID_KEY_PASSWORD      --repo Telestas/SIVAP
+```
+
+El `-w0` de `base64` es lo que evita los saltos de línea. Con ellos, el
+`base64 -d` del pipeline falla con un error que no dice lo que pasa.
+
+Si no están los cuatro, el APK sale firmado con la clave de depuración que
+genera Flutter.
 Se instala igual, y para enseñar la app es suficiente. Pero:
 
 > El día que se pase a una clave propia, Android tratará la app como una

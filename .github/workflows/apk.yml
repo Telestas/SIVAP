@@ -115,18 +115,38 @@ jobs:
       # incluso con el secreto configurado— y la release decía «clave de
       # depuración» sin que nadie entendiera por qué. Se comprueba en un paso
       # aparte, cuya salida sí se puede consultar.
+      # Los cuatro secretos van juntos o no va ninguno.
+      #
+      # Si el llavero está pero falta la contraseña o el alias, esto **corta la
+      # compilación** en vez de continuar. La alternativa sería seguir y
+      # publicar un APK firmado con la clave de depuración mientras el equipo
+      # cree que va firmado con el llavero del estudio, y ese equívoco solo se
+      # descubriría el día que hiciera falta actualizar la app.
       - name: ¿Hay llavero del estudio?
         id: llavero
         env:
           LLAVERO: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          CLAVE_LLAVERO: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          CLAVE_ALIAS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$LLAVERO" ]; then
+          faltan=''
+          [ -z "$LLAVERO" ]       && faltan="$faltan ANDROID_KEYSTORE_BASE64"
+          [ -z "$CLAVE_LLAVERO" ] && faltan="$faltan ANDROID_KEYSTORE_PASSWORD"
+          [ -z "$ALIAS" ]         && faltan="$faltan ANDROID_KEY_ALIAS"
+          [ -z "$CLAVE_ALIAS" ]   && faltan="$faltan ANDROID_KEY_PASSWORD"
+
+          if [ -z "$faltan" ]; then
             echo 'hay=si' >> "$GITHUB_OUTPUT"
             echo 'Se firmará con el llavero del estudio.'
-          else
+          elif [ -z "$LLAVERO" ] && [ -z "$CLAVE_LLAVERO" ] \
+            && [ -z "$ALIAS" ] && [ -z "$CLAVE_ALIAS" ]; then
             echo 'hay=no' >> "$GITHUB_OUTPUT"
-            echo '::warning::Sin llavero en los secretos: el APK saldrá firmado'\
-                 'con la clave de depuración. No repartir para captura sostenida.'
+            echo "::warning::Sin llavero configurado: el APK saldrá firmado con la clave de depuración. Sirve para probar, no para repartir."
+          else
+            echo "::error::Configuración de firma a medias. Faltan:$faltan"
+            echo "Añádalos con: gh secret set <NOMBRE> --repo ${{ github.repository }}"
+            exit 1
           fi
 
       - name: Firmar con el llavero del estudio
@@ -146,7 +166,17 @@ jobs:
               --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
               --key-pass "pass:${{ secrets.ANDROID_KEY_PASSWORD }}" \
               --out "$APK" /tmp/alineado.apk
-            "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
+
+            # Comprobar que el resultado NO va firmado con la clave de
+            # depuración. Si el llavero no se hubiera aplicado por lo que fuera,
+            # el APK saldría instalable igual y nadie lo notaría hasta la
+            # primera actualización, cuando ya es tarde.
+            certs=$("$BUILD_TOOLS/apksigner" verify --print-certs "$APK")
+            echo "$certs"
+            if echo "$certs" | grep -qi 'CN=Android Debug'; then
+              echo "::error::$APK quedó firmado con la clave de depuración"
+              exit 1
+            fi
           done
           rm -f /tmp/sivap.jks /tmp/alineado.apk
 

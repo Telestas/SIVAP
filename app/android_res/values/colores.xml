@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fondo del icono, según la entrega de diseño. -->
+    <color name="fondo_icono">#16181A</color>
+</resources>

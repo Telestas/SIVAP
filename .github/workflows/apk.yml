@@ -57,9 +57,7 @@ jobs:
       # de cifrado del dispositivo y con ella los datos sin sincronizar.
       - name: Generar andamiaje de plataforma
         working-directory: app
-        run: |
-          flutter create --platforms=android --org cu.sivap .
-          rm -f test/widget_test.dart
+        run: tool/preparar_android.sh android
 
       - name: Resolver dependencias
         working-directory: app

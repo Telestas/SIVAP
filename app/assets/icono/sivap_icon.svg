@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>SIVAP app icon</title>
+  <defs>
+    <clipPath id="vbar">
+      <rect x="411" y="194" width="202" height="636" rx="23" ry="23"></rect>
+    </clipPath>
+  </defs>
+  <rect width="1024" height="1024" fill="#16181a"></rect>
+  <g clip-path="url(#vbar)">
+    <rect x="411" y="194" width="202" height="318" fill="#3F9C92"></rect>
+    <rect x="411" y="512" width="202" height="318" fill="#5B86C4"></rect>
+  </g>
+  <rect x="194" y="411" width="636" height="202" rx="23" ry="23" fill="#fbfbfa"></rect>
+</svg>

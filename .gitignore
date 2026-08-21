@@ -11,6 +11,17 @@ env/
 htmlcov/
 .coverage
 
+# ── Andamiaje de plataforma ───────────────────────
+# Lo regenera `app/tool/preparar_android.sh` en cada compilación. Lo que sí se
+# versiona es el diseño del icono, en `app/assets/icono/`, y lo que sale de él,
+# en `app/android_res/`.
+/app/android/
+/app/ios/
+/app/web/
+/app/linux/
+/app/macos/
+/app/windows/
+
 # ── Flutter / Dart ────────────────────────────────
 .dart_tool/
 .packages
@@ -34,6 +45,10 @@ build/
 .env.*
 !.env.example
 /deploy/.env
+
+# Entregas de diseño comprimidas: lo que hace falta se extrae a
+# app/assets/icono/, versionar el .zip además sería duplicarlo.
+/design/*.zip
 
 # ── TLS ───────────────────────────────────────────
 # Certificados y claves del despliegue. Una clave privada versionada deja de

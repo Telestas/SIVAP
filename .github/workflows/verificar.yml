@@ -50,11 +50,7 @@ jobs:
       # más adelante crea una app distinta a ojos de Android, así que conviene
       # decidirlo antes de repartir nada.
       - name: Generar andamiaje de plataforma
-        run: |
-          flutter create --platforms=android,web --org cu.sivap .
-          # `flutter create` añade su test de ejemplo, que referencia una clase
-          # MyApp que este proyecto no tiene. No es código nuestro: se quita.
-          rm -f test/widget_test.dart
+        run: tool/preparar_android.sh android,web
 
       - name: Resolver dependencias
         run: flutter pub get

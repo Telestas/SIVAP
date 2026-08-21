@@ -126,7 +126,7 @@ class AppButton extends StatelessWidget {
 }
 
 /// Campo de texto con la etiqueta monoespaciada del diseño.
-class LabeledField extends StatelessWidget {
+class LabeledField extends StatefulWidget {
   const LabeledField({
     super.key,
     required this.label,
@@ -136,6 +136,8 @@ class LabeledField extends StatelessWidget {
     this.keyboardType,
     this.maxLines = 1,
     this.readOnly = false,
+    this.oculto = false,
+    this.onSubmitted,
   });
 
   final String label;
@@ -146,25 +148,42 @@ class LabeledField extends StatelessWidget {
   final int maxLines;
   final bool readOnly;
 
+  /// Oculta lo tecleado y añade el botón para mostrarlo.
+  ///
+  /// Con el botón, no sin él: escribir una contraseña a ciegas en el teclado de
+  /// un teléfono, de pie en una sala, es una fuente de errores gratuita.
+  final bool oculto;
+
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  State<LabeledField> createState() => _LabeledFieldState();
+}
+
+class _LabeledFieldState extends State<LabeledField> {
+  bool _mostrar = false;
+
   @override
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionLabel(label),
+          SectionLabel(widget.label),
           const SizedBox(height: 6),
           TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            maxLines: maxLines,
-            readOnly: readOnly,
+            controller: widget.controller,
+            keyboardType: widget.keyboardType,
+            maxLines: widget.oculto ? 1 : widget.maxLines,
+            readOnly: widget.readOnly,
+            obscureText: widget.oculto && !_mostrar,
+            onSubmitted: widget.onSubmitted,
             style: TextStyle(
                 fontSize: 15,
                 color: T.ink,
-                fontFamily: mono ? T.mono : null,
+                fontFamily: widget.mono ? T.mono : null,
                 height: 1.35),
             decoration: InputDecoration(
               isDense: true,
-              hintText: hint,
+              hintText: widget.hint,
               hintStyle: const TextStyle(fontSize: 15, color: T.faint),
               filled: true,
               fillColor: T.card,
@@ -173,11 +192,24 @@ class LabeledField extends StatelessWidget {
               border: fieldBorder(T.line),
               enabledBorder: fieldBorder(T.line),
               focusedBorder: fieldBorder(T.accent, ancho: 1.5),
+              suffixIcon: widget.oculto
+                  ? IconButton(
+                      icon: Icon(
+                          _mostrar
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: 19,
+                          color: T.muted),
+                      tooltip: _mostrar ? 'Ocultar' : 'Mostrar',
+                      onPressed: () => setState(() => _mostrar = !_mostrar),
+                    )
+                  : null,
+              suffixIconConstraints:
+                  const BoxConstraints(minWidth: 44, minHeight: 44),
             ),
           ),
         ],
       );
-
 }
 
 /// Borde de los campos de texto, compartido por todas las pantallas.

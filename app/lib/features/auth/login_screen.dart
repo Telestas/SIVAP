@@ -23,26 +23,65 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _usuario = TextEditingController();
-  final _clave = TextEditingController(text: '········');
+  final _clave = TextEditingController();
   Investigador _seleccionado = Seed.investigadores.first;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _usuario.text = _seleccionado.usuario;
+    // Teclear un usuario selecciona su función, y elegir función rellena el
+    // usuario. Los dos controles miran lo mismo y tienen que ir a la par.
+    _usuario.addListener(_sincronizarDesdeUsuario);
   }
 
   @override
   void dispose() {
-    _usuario.dispose();
+    _usuario
+      ..removeListener(_sincronizarDesdeUsuario)
+      ..dispose();
     _clave.dispose();
     super.dispose();
   }
 
+  void _sincronizarDesdeUsuario() {
+    final encontrado = _buscar(_usuario.text);
+    setState(() {
+      if (encontrado != null) _seleccionado = encontrado;
+      _error = null;
+    });
+  }
+
+  Investigador? _buscar(String usuario) {
+    final u = usuario.trim().toLowerCase();
+    for (final i in Seed.investigadores) {
+      if (i.usuario.toLowerCase() == u) return i;
+    }
+    return null;
+  }
+
   void _elegir(Investigador i) => setState(() {
         _seleccionado = i;
-        _usuario.text = i.usuario;
+        _error = null;
+        if (_usuario.text != i.usuario) _usuario.text = i.usuario;
       });
+
+  void _entrar() {
+    final encontrado = _buscar(_usuario.text);
+    if (encontrado == null) {
+      setState(() => _error =
+          'No hay ningún investigador con el usuario «${_usuario.text.trim()}». '
+          'Elija una función de la lista o escriba uno de los usuarios que '
+          'aparecen en ella.');
+      return;
+    }
+    if (_clave.text.isEmpty) {
+      setState(() => _error = 'Escriba la contraseña.');
+      return;
+    }
+    AppScope.read(context).iniciarSesion(encontrado);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,9 +142,22 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
 
             const SizedBox(height: 22),
-            LabeledField(label: 'Usuario', controller: _usuario, readOnly: true),
+            LabeledField(
+                label: 'Usuario',
+                controller: _usuario,
+                hint: 'Ej.: investigador.uno'),
             const SizedBox(height: 14),
-            LabeledField(label: 'Contraseña', controller: _clave),
+            LabeledField(
+              label: 'Contraseña',
+              controller: _clave,
+              oculto: true,
+              onSubmitted: (_) => _entrar(),
+            ),
+
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              StatusBanner(texto: _error!, alineaArriba: true),
+            ],
 
             const SizedBox(height: 22),
             const SectionLabel('Función en el ensayo'),
@@ -113,7 +165,8 @@ class _LoginScreenState extends State<LoginScreen> {
             const Text(
                 'El diseño del ensayo separa funciones por razones '
                 'metodológicas: quien selecciona pacientes está cegado a la '
-                'secuencia, y quien evalúa desenlaces, a la rama asignada.',
+                'secuencia, y quien evalúa desenlaces, a la rama asignada. '
+                'Elegir una rellena el usuario, y al revés.',
                 style: TextStyle(fontSize: 12, color: T.secondary, height: 1.45)),
             const SizedBox(height: 12),
             for (final i in Seed.investigadores) ...[
@@ -126,8 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
 
             const SizedBox(height: 20),
-            AppButton('Entrar',
-                onTap: () => AppScope.read(context).iniciarSesion(_seleccionado)),
+            AppButton('Entrar', onTap: _entrar),
             const SizedBox(height: 12),
             Text('v0.2 · ${config.definicionFormulario.version}',
                 textAlign: TextAlign.center,

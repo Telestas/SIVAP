@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'app.dart';
 import 'core/app_state.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/tokens.dart';
 import 'core/widgets/controls.dart';
 import 'data/local/abrir_almacen.dart';
 import 'data/local/almacen_local.dart';
-import 'features/admin/admin_dashboard_screen.dart';
-import 'features/auth/login_screen.dart';
-import 'features/patients/patient_list_screen.dart';
 
 /// Modo de almacén con el que arranca esta compilación.
 ///
@@ -46,11 +44,23 @@ class _SivapAppState extends State<SivapApp> {
   }
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
+  Widget build(BuildContext context) => FutureBuilder<AppState>(
+        future: _arranque,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return _sinEstado(_FalloDeArranque(error: snapshot.error!));
+          }
+          if (!snapshot.hasData) return _sinEstado(const _Abriendo());
+          return raizDeLaApp(snapshot.data!);
+        },
+      );
+
+  /// Mientras la base se abre —o si no se pudo abrir— no hay estado que
+  /// ofrecer, así que estas dos pantallas van sin ámbito. Ninguna lo usa.
+  Widget _sinEstado(Widget pantalla) => MaterialApp(
         title: 'SIVAP',
         debugShowCheckedModeBanner: false,
         theme: appTheme,
-        // Toda la interfaz en español, incluidos los diálogos que pone Flutter.
         locale: const Locale('es'),
         supportedLocales: const [Locale('es')],
         localizationsDelegates: const [
@@ -58,38 +68,8 @@ class _SivapAppState extends State<SivapApp> {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: FutureBuilder<AppState>(
-          future: _arranque,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return _FalloDeArranque(error: snapshot.error!);
-            }
-            if (!snapshot.hasData) return const _Abriendo();
-            return AppScope(state: snapshot.data!, child: const _Raiz());
-          },
-        ),
+        home: pantalla,
       );
-}
-
-/// Decide qué pantalla corresponde: sin sesión, acceso; con sesión, la lista de
-/// campo o el panel de administración.
-class _Raiz extends StatelessWidget {
-  const _Raiz();
-
-  @override
-  Widget build(BuildContext context) {
-    final state = AppScope.of(context);
-    if (state.usuario == null) return const LoginScreen();
-
-    // Quien administra o analiza trabaja en escritorio; en pantalla estrecha
-    // recibe la misma lista que el resto, para no dejarlo sin app en el móvil.
-    final usuario = state.usuarioActual;
-    final ancha = MediaQuery.sizeOf(context).width >= 900;
-    final panel = usuario.puedeGestionarUsuarios || usuario.puedeExportar;
-    return panel && ancha
-        ? const AdminDashboardScreen()
-        : const PatientListScreen();
-  }
 }
 
 class _Abriendo extends StatelessWidget {
@@ -122,9 +102,9 @@ class _Abriendo extends StatelessWidget {
 
 /// La app no pudo abrir su almacén. No entra igualmente.
 ///
-/// El caso que más importa es [CifradoNoDisponible]: seguir adelante
-/// significaría escribir nombres, carnés y datos clínicos en claro. Es
-/// preferible una app que no arranca a una que guarda eso sin cifrar.
+/// El caso que más importa es `CifradoNoDisponible`: seguir adelante
+/// significaría escribir nombres y datos clínicos en claro. Es preferible una
+/// app que no arranca a una que guarda eso sin cifrar.
 class _FalloDeArranque extends StatelessWidget {
   const _FalloDeArranque({required this.error});
 

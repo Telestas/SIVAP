@@ -254,3 +254,55 @@ jobs:
           name: sivap-${{ steps.version.outputs.numero }}
           path: app/build/entrega/*.apk
           retention-days: 90
+
+      # ── Aviso al equipo ──────────────────────────────────────────────
+      #
+      # `if: always()` a propósito: avisar de que la compilación falló importa
+      # más que avisar de que salió bien. Un pipeline que solo habla cuando
+      # todo va bien enseña a no mirarlo.
+      #
+      # Si no hay secretos de Telegram configurados, el paso se salta sin
+      # ruido: nadie debería quedarse sin APK por no tener bot.
+      - name: Avisar por Telegram
+        if: always()
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          HILO: ${{ secrets.TELEGRAM_THREAD_ID }}
+          VERSION: ${{ steps.version.outputs.numero }}
+          RESULTADO: ${{ job.status }}
+          FIRMA: ${{ steps.llavero.outputs.hay }}
+          ARM64: ${{ steps.apk.outputs.arm64_tam }}
+          SHA: ${{ steps.apk.outputs.arm64_sha }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$CHAT" ]; then
+            echo 'Sin secretos de Telegram: no se avisa.'
+            exit 0
+          fi
+
+          if [ "$RESULTADO" = 'success' ]; then
+            firma=$([ "$FIRMA" = 'si' ] \
+              && echo 'llavero del estudio' \
+              || echo '⚠️ clave de depuración')
+            texto=$(printf '✅ <b>SIVAP %s</b> publicada\n\n' "$VERSION")
+            texto="$texto$(printf 'Descarga: https://telestas.github.io/SIVAP/\n')"
+            texto="$texto$(printf 'Tamaño: %s · Firma: %s\n\n' "$ARM64" "$firma")"
+            texto="$texto$(printf '<code>%s</code>\n' "$SHA")"
+            texto="$texto$(printf '<i>Versión de prueba. Sin aprobación del CEI no se enrolan pacientes reales.</i>')"
+          else
+            texto=$(printf '❌ <b>SIVAP %s</b> no se pudo publicar\n\n' "$VERSION")
+            texto="$texto$(printf 'Registro: %s/%s/actions/runs/%s' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+          fi
+
+          # --fail para que un error de Telegram no pase desapercibido, pero sin
+          # tumbar la compilación: el APK ya está publicado, y no avisar es
+          # molesto, no grave.
+          curl -sS --fail-with-body -X POST \
+            "https://api.telegram.org/bot$TOKEN/sendMessage" \
+            -d "chat_id=$CHAT" \
+            ${HILO:+-d "message_thread_id=$HILO"} \
+            -d 'parse_mode=HTML' \
+            -d 'disable_web_page_preview=true' \
+            --data-urlencode "text=$texto" \
+            || echo '::warning::No se pudo avisar por Telegram.'

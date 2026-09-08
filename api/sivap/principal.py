@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from .rutas import dispositivos, estudio, salud, sesion
+from .rutas import dispositivos, estudio, salud, sesion, sincronizacion
 
 app = FastAPI(
     title='SIVAP — api del ensayo LIVERE',
@@ -18,7 +18,8 @@ app = FastAPI(
     openapi_url=None,
 )
 
-for router in (salud.router, sesion.router, dispositivos.router, estudio.router):
+for router in (salud.router, sesion.router, dispositivos.router,
+               estudio.router, sincronizacion.router):
     app.include_router(router, prefix='/api')
 
 

@@ -78,3 +78,20 @@ def exigir_rol(*roles: str):
         return quien
 
     return comprobar
+
+
+def dispositivo_propio(con, dispositivo_id, quien) -> None:
+    """Corta si el dispositivo no existe o es de otra persona.
+
+    Un dispositivo pertenece a una sola persona. Si dos comparten teléfono se
+    registra dos veces, con identificadores distintos: si no, no habría forma de
+    saber quién capturó qué.
+    """
+    fila = bd.uno(con, 'SELECT investigador_id FROM dispositivo WHERE id = %s',
+                  (dispositivo_id,))
+    if fila is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail='Dispositivo no registrado.')
+    if fila['investigador_id'] != quien['investigador_id']:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail='Ese dispositivo no es suyo.')

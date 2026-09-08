@@ -130,11 +130,14 @@ Queda lo que ninguna prueba automática puede hacer:
 
 1. Que el archivo `.db` **no contenga el nombre del paciente en claro**.
 2. Que reabrir con otra clave falle.
-3. Que el disparador de auditoría aborte un `UPDATE`.
-4. Que dos borradores del mismo hito no puedan coexistir.
-5. **Enrolar → cerrar la app → reabrir → enrolar.** El segundo paciente debe
+3. **Enrolar → cerrar la app → reabrir → enrolar.** El segundo paciente debe
    recibir la posición siguiente de la secuencia, no la primera. Es el fallo
    que más daño haría y sigue sin comprobarse.
+
+Dos que estaban en esta lista ya no lo están: que dos borradores del mismo hito
+no puedan coexistir y que una corrección sin motivo no entre. Las comprueba
+`test/esquema_local_test.dart` contra un SQLite de verdad, sin cifrar — la
+forma del esquema se puede probar sin teléfono; el cifrado no.
 
 Y la que más vale de todas: **que un intensivista capture una PVE completa**.
 Mientras no haya sincronización ni exportación, todavía se pueden cambiar los

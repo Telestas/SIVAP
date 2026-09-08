@@ -27,7 +27,7 @@ class SivapDatabase {
   /// dispositivo: no hay base existente que migrar. En cuanto la app corra en
   /// un teléfono real, cualquier cambio de esquema exige subir el número y
   /// escribir su migración.
-  static const int versionEsquema = 1;
+  static const int versionEsquema = 2;
 
   /// Abre la base cifrada en [ruta] con [claveHex] (64 caracteres hex).
   ///
@@ -93,6 +93,13 @@ class SivapDatabase {
   // tocar `identidad`. La separación no es un adorno: es lo que permite
   // compartir los datos clínicos sin exponer a nadie.
 
+  /// Crea o actualiza el esquema hasta [versionEsquema].
+  ///
+  /// Público para poder comprobarlo sin teléfono: `test/esquema_local_test.dart`
+  /// lo aplica sobre una base en memoria y le hace las mismas consultas que el
+  /// repositorio. Hasta ahora, un error aquí solo se descubría instalando.
+  static void aplicarEsquema(Database db) => _migrar(db);
+
   static void _migrar(Database db) {
     final actual = db.select('PRAGMA user_version;').first.values.first as int;
     if (actual >= versionEsquema) return;
@@ -100,12 +107,33 @@ class SivapDatabase {
     db.execute('BEGIN;');
     try {
       if (actual < 1) _crearVersion1(db);
+      if (actual < 2) _crearVersion2(db);
       db.execute('PRAGMA user_version = $versionEsquema;');
       db.execute('COMMIT;');
     } catch (_) {
       db.execute('ROLLBACK;');
       rethrow;
     }
+  }
+
+  /// Qué registros ha acusado el servidor, y en qué lote iban.
+  ///
+  /// Es el equivalente en el dispositivo del diario de lotes del servidor, y
+  /// sirve para lo mismo: responder «esto llegó o no llegó» meses después. Sin
+  /// esta tabla, «pendiente de envío» habría que deducirlo, y lo deducido se
+  /// equivoca en cuanto algo se sale de lo previsto.
+  ///
+  /// No lleva clave foránea a propósito: un acuse sobrevive a que el registro
+  /// se reescriba, y saber que algo se envió sigue valiendo aunque lo enviado
+  /// haya cambiado después.
+  static void _crearVersion2(Database db) {
+    db.execute('''
+      CREATE TABLE enviados (
+        id         TEXT PRIMARY KEY,
+        lote_id    TEXT NOT NULL,
+        enviado_en TEXT NOT NULL
+      );
+    ''');
   }
 
   static void _crearVersion1(Database db) {

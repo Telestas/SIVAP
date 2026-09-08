@@ -101,6 +101,36 @@ class EventoNoRepetible implements Exception {
 ///
 /// El MVP la implementa en memoria y sobre SQLite cifrado. Las pantallas hablan
 /// solo con esta interfaz, así que sustituir el almacén no las toca.
+/// Lo que el dispositivo tiene y el servidor todavía no.
+///
+/// Va todo junto porque se envía junto: un evento sin su paciente no tiene
+/// dónde colgarse, y un consentimiento sin su paciente tampoco.
+class Pendiente {
+  const Pendiente({
+    required this.pacientes,
+    required this.consentimientos,
+    required this.eventos,
+    required this.auditoria,
+  });
+
+  final List<Patient> pacientes;
+  final List<Consent> consentimientos;
+  final List<EventoClinico> eventos;
+  final List<AuditEntry> auditoria;
+
+  bool get vacio =>
+      pacientes.isEmpty &&
+      consentimientos.isEmpty &&
+      eventos.isEmpty &&
+      auditoria.isEmpty;
+
+  int get registros =>
+      pacientes.length +
+      consentimientos.length +
+      eventos.length +
+      auditoria.length;
+}
+
 abstract class StudyRepository {
   StudyConfig get config;
 
@@ -173,5 +203,27 @@ abstract class StudyRepository {
     required String campo,
     required Object? valorNuevo,
     required String motivo,
+  });
+
+  // ── Sincronización ─────────────────────────────────────────────
+
+  /// Lo que el servidor todavía no ha acusado.
+  ///
+  /// **Los borradores no entran** (BASES, y el esquema central lo repite):
+  /// sincronizar datos a medio teclear llenaría el estudio de registros que
+  /// nadie sabría si son definitivos.
+  ///
+  /// Tampoco entran los datos de demostración. Sus identificadores no son UUID
+  /// a propósito, y esa es justamente la propiedad que los mantiene fuera.
+  Pendiente pendienteDeEnvio();
+
+  /// Anota que el servidor recibió estos registros, en este lote.
+  ///
+  /// Se guarda el lote y no solo un «sí»: cuando alguien pregunte por qué un
+  /// paciente no aparece en el servidor, la respuesta empieza por saber en qué
+  /// envío iba.
+  void anotarEnviados({
+    required String loteId,
+    required Iterable<String> ids,
   });
 }

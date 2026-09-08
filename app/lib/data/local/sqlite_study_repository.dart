@@ -581,6 +581,97 @@ class SqliteStudyRepository implements StudyRepository {
           ]
       ]);
 
+  // ── Sincronización ─────────────────────────────────────────────
+
+  @override
+  Pendiente pendienteDeEnvio() => Pendiente(
+        pacientes: _db
+            .select('$_sqlPaciente WHERE p.id NOT IN (SELECT id FROM enviados);')
+            .map(_leerPaciente)
+            .where(_sincronizable)
+            .toList(),
+        consentimientos: _db
+            .select('SELECT * FROM consentimientos '
+                'WHERE id NOT IN (SELECT id FROM enviados);')
+            .map(_leerConsentimiento)
+            .where(_sincronizable)
+            .toList(),
+        // Solo lo registrado. Un borrador es un dato a medio teclear, y
+        // sincronizarlo llenaría el estudio de registros que nadie sabría si
+        // son definitivos.
+        eventos: _db
+            .select("SELECT * FROM eventos WHERE estado = 'registrado' "
+                'AND id NOT IN (SELECT id FROM enviados);')
+            .map(_leerEvento)
+            .where(_sincronizable)
+            .toList(),
+        auditoria: _db
+            .select('SELECT * FROM auditoria '
+                'WHERE id NOT IN (SELECT id FROM enviados);')
+            .map(_leerAuditoria)
+            .where(_sincronizable)
+            .toList(),
+      );
+
+  @override
+  void anotarEnviados({required String loteId, required Iterable<String> ids}) {
+    if (ids.isEmpty) return;
+    final ahora = DateTime.now().toIso8601String();
+    _enTransaccion(() {
+      for (final id in ids) {
+        _db.execute(
+          'INSERT INTO enviados (id, lote_id, enviado_en) VALUES (?, ?, ?) '
+          'ON CONFLICT(id) DO UPDATE SET lote_id = excluded.lote_id, '
+          'enviado_en = excluded.enviado_en;',
+          [id, loteId, ahora],
+        );
+      }
+      // Los eventos llevan además su propio indicador, que es lo que la
+      // pantalla enseña. Se pone aquí para que no haya dos verdades.
+      _db.execute(
+        "UPDATE eventos SET sync = 'sincronizado' "
+        'WHERE id IN (SELECT id FROM enviados);',
+      );
+      return null;
+    });
+  }
+
+  /// Los datos de demostración no se envían nunca.
+  ///
+  /// Sus identificadores no son UUID a propósito, y comprobarlo aquí evita que
+  /// dependa de acordarse. El servidor los rechazaría de todas formas, pero
+  /// rechazaría con ellos el lote entero.
+  static bool _sincronizable(Object registro) => Ids.esSincronizable(
+        switch (registro) {
+          Patient p => p.id,
+          Consent c => c.id,
+          EventoClinico e => e.id,
+          AuditEntry a => a.id,
+          _ => '',
+        },
+      );
+
+  Consent _leerConsentimiento(Row f) => Consent(
+        id: f['id'] as String,
+        patientId: f['paciente_id'] as String,
+        versionDocumento: f['version_documento'] as String,
+        codigoCei: f['codigo_cei'] as String,
+        firmadoEn: DateTime.parse(f['firmado_en'] as String),
+        testigoId: f['testigo_id'] as String,
+        firmaTrazos: _decodificarFirma(f['firma_json'] as String),
+      );
+
+  static List<List<({double x, double y})>> _decodificarFirma(String json) => [
+        for (final trazo in jsonDecode(json) as List)
+          [
+            for (final punto in trazo as List)
+              (
+                x: (punto['x'] as num).toDouble(),
+                y: (punto['y'] as num).toDouble()
+              ),
+          ],
+      ];
+
   void cerrar() => _base.cerrar();
 
   // ── Siembra de demostración ────────────────────────────────────

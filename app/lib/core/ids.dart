@@ -34,4 +34,18 @@ class Ids {
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
+
+  static final RegExp _uuid = RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-'
+      r'[0-9a-f]{12}$',
+      caseSensitive: false);
+
+  /// Si este identificador puede viajar al servidor central.
+  ///
+  /// La base central declara `uuid` en cada clave, así que un identificador
+  /// que no lo sea sería rechazado — y con él, el lote entero. Los del juego de
+  /// demostración (`p-demo-01`) están escritos así a propósito: **que no se
+  /// puedan sincronizar es la propiedad que se quiere**, y comprobarlo aquí
+  /// evita que dependa de acordarse.
+  static bool esSincronizable(String id) => _uuid.hasMatch(id);
 }

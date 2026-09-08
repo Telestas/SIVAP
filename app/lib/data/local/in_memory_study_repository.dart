@@ -124,7 +124,7 @@ class InMemoryStudyRepository implements StudyRepository {
     // ni puede sugerirla: no hay parámetro para ello, a propósito.
     final asignacion = _allocation.asignar(ahora: DateTime.now());
     final paciente = Patient(
-      id: Ids.nuevo('p'),
+      id: Ids.nuevo(),
       codigo: _siguienteCodigo(institucion),
       nombre: nombre,
       numeroHistoriaClinica: numeroHistoriaClinica,
@@ -171,7 +171,7 @@ class InMemoryStudyRepository implements StudyRepository {
     }
     final doc = config.documentoConsentimiento;
     final consent = Consent(
-      id: Ids.nuevo('c'),
+      id: Ids.nuevo(),
       patientId: patientId,
       versionDocumento: doc.version,
       codigoCei: doc.codigoCei,
@@ -248,7 +248,7 @@ class InMemoryStudyRepository implements StudyRepository {
     }
 
     final nuevo = EventoClinico(
-      id: Ids.nuevo('e'),
+      id: Ids.nuevo(),
       patientId: patientId,
       tipo: tipo,
       ocurrencia: _siguienteOcurrencia(patientId, tipo),
@@ -321,7 +321,7 @@ class InMemoryStudyRepository implements StudyRepository {
     lista[lista.indexWhere((e) => e.id == eventoId)] = corregido;
 
     _auditoria.add(AuditEntry(
-      id: Ids.nuevo('a'),
+      id: Ids.nuevo(),
       ocurridoEn: DateTime.now(),
       autorId: autor.id,
       autorNombre: autor.nombre,
@@ -388,7 +388,7 @@ class InMemoryStudyRepository implements StudyRepository {
 
     for (final a in Demo.auditoria) {
       _auditoria.add(AuditEntry(
-        id: Ids.nuevo('a'),
+        id: Ids.nuevo(),
         ocurridoEn: a.ocurridoEn,
         autorId: a.autor.id,
         autorNombre: a.autor.nombre,

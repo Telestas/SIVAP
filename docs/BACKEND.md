@@ -1,7 +1,9 @@
 # Backend — esquema central y decisiones
 
-Estado: **el esquema existe y está verificado** (`api/migraciones/001_esquema_inicial.sql`).
-El servicio FastAPI todavía no.
+Estado: **el esquema existe y está verificado** (`api/migraciones/001_esquema_inicial.sql`)
+y el servicio FastAPI cubre sesiones, dispositivos, reparto de la secuencia y
+recepción de lotes. Falta la mitad del cliente: la app todavía no hace una sola
+llamada de red.
 
 El esquema corre sobre PostgreSQL 16 y sus garantías se comprueban en cada push
 (`api/pruebas/esquema_test.sql`, trabajo `esquema` de la integración continua).
@@ -113,25 +115,64 @@ corresponde a exactamente una versión de la definición. Trocearla en tablas
 haría posible tener media definición vieja y media nueva conviviendo, y entonces
 nadie sabría contra qué se capturó cada dato.
 
-## Lo que falta decidir antes de escribir la api
+### La recepción rechaza registros, no lotes
 
-1. **Identificadores.** El esquema usa `uuid`; la app genera cadenas con prefijo
-   (`p-3f9a…`). Hay que pasar `Ids.nuevo` a UUIDv4 antes de la primera
-   sincronización. Es preferible cambiar el cliente que aflojar el tipo de la
-   columna: `uuid` valida, indexa mejor y ocupa la mitad.
-2. **Quién reparte los tramos de secuencia y cuándo.** Lo natural es que el
-   investigador principal asigne un tramo a cada dispositivo al registrarlo, y
-   que el dispositivo pida uno nuevo cuando le queden pocas posiciones. Falta
-   decidir el umbral y qué hace la app si se queda sin tramo y sin conexión.
-   **Esa última es la pregunta importante**: o deja de enrolar, o improvisa. Debe
-   dejar de enrolar.
-3. **Autenticación.** Tokens de sesión con caducidad, y qué pasa cuando un
-   dispositivo lleva semanas sin conectar. La captura no puede depender de un
-   token vivo (CLAUDE.md §12), así que la credencial se valida contra el
-   dispositivo y el token solo hace falta para sincronizar.
-4. **Qué hace el servidor con un conflicto.** «Último gana» está decidido, pero
-   falta si el servidor genera una entrada de auditoría cuando descarta una
-   versión, y quién la firma.
+`POST /api/sincronizacion` guarda cada registro en su propio punto de guardado.
+Lo que falla se rechaza con el motivo que dio PostgreSQL, escrito en
+`lote_sincronizacion.detalle`, y lo demás entra.
+
+La alternativa —todo o nada— parece más limpia y es peor: un teléfono con un
+solo registro problemático no conseguiría sincronizar nunca, y con esta
+conectividad eso no es una hipótesis. Además así la respuesta a «¿esto llegó?»
+queda escrita, que es la pregunta que se hace sola cuando la conexión va y
+viene.
+
+Con una excepción deliberada: un envío que ni siquiera se puede leer —un tipo
+de evento que no existe, una fecha imposible— corta el lote entero con un 422.
+Eso no es un dato de campo discutible, es la app enviando algo que no debería
+existir, y conviene verlo de golpe y no diluido entre los rechazos.
+
+### La autoría sale de la sesión, no del envío
+
+El evento dice qué se capturó; **quién lo capturó lo decide el token**. Aceptar
+un `recolector_id` del cuerpo de la petición permitiría a cualquier dispositivo
+atribuir capturas a cualquier persona, y entonces el registro de auditoría
+dejaría de significar algo.
+
+Se sostiene porque un dispositivo pertenece a una sola persona, que es la
+decisión que ya tomaba el registro de dispositivos: si dos médicos comparten
+teléfono, se registra dos veces con identificadores distintos.
+
+### El CEI se comprueba también aquí
+
+La app sabe qué centros están aprobados —lo recibe en la configuración del
+estudio— y aun así el servidor lo vuelve a mirar antes de admitir un paciente.
+Un dispositivo con configuración vieja, o con una versión de la app anterior a
+la comprobación, no debe poder meter pacientes reales donde todavía no se puede
+reclutar.
+
+Se rechaza ese paciente, no el lote: queda en la cola del dispositivo y entra
+solo en cuanto el centro quede aprobado.
+
+## Lo que falta decidir
+
+1. **Quién reparte los tramos de secuencia y cuándo.** El dispositivo pide y el
+   servidor entrega; falta el umbral con el que la app pide el siguiente, y qué
+   hace si se queda sin tramo y sin conexión. **Esa última es la pregunta
+   importante**: o deja de enrolar, o improvisa. Debe dejar de enrolar.
+2. **Autenticación en la app.** El token de sincronización ya existe y caduca.
+   Falta que la app valide la credencial contra el dispositivo para abrirse sin
+   conexión: la captura no puede depender de un token vivo (CLAUDE.md §12).
+3. **Auditoría de lo que el servidor descarta.** «Último gana» resuelve el
+   conflicto y la versión anterior se conserva, así que no se pierde nada. Falta
+   decidir si además queda una entrada de auditoría cuando dos dispositivos
+   corrigen el mismo campo, y quién la firma: el conflicto lo resolvió el
+   servidor, no una persona.
+
+**Resuelto**: los identificadores. `Ids.nuevo` genera UUIDv4 y el esquema los
+recibe tal cual. Aflojar el tipo de la columna a texto habría costado la
+validación, la mitad del índice y el doble de espacio a cambio de que un
+registro se leyera algo mejor.
 
 ## Cómo probar el esquema en local
 

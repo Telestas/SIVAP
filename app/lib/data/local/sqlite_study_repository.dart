@@ -271,7 +271,7 @@ class SqliteStudyRepository implements StudyRepository {
       );
 
       final ahora = DateTime.now();
-      final id = Ids.nuevo('p');
+      final id = Ids.nuevo();
 
       _db.execute(
         'INSERT INTO pacientes (id, codigo, institucion, edad, sexo, protocolo, '
@@ -326,7 +326,7 @@ class SqliteStudyRepository implements StudyRepository {
     }
     final doc = config.documentoConsentimiento;
     final consent = Consent(
-      id: Ids.nuevo('c'),
+      id: Ids.nuevo(),
       patientId: patientId,
       versionDocumento: doc.version,
       codigoCei: doc.codigoCei,
@@ -419,7 +419,7 @@ class SqliteStudyRepository implements StudyRepository {
 
     return _enTransaccion(() {
       final abierto = borradorAbierto(patientId, tipo);
-      final id = abierto?.id ?? Ids.nuevo('e');
+      final id = abierto?.id ?? Ids.nuevo();
 
       if (abierto == null) {
         _db.execute(
@@ -522,7 +522,7 @@ class SqliteStudyRepository implements StudyRepository {
         'entidad, entidad_id, descripcion_objetivo, campo, valor_anterior, '
         'valor_nuevo, motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
         [
-          Ids.nuevo('a'),
+          Ids.nuevo(),
           DateTime.now().toIso8601String(),
           autor.id,
           autor.nombre,
@@ -679,7 +679,7 @@ class SqliteStudyRepository implements StudyRepository {
           'entidad, entidad_id, descripcion_objetivo, campo, valor_anterior, '
           'valor_nuevo, motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
           [
-            Ids.nuevo('a'),
+            Ids.nuevo(),
             a.ocurridoEn.toIso8601String(),
             a.autor.id,
             a.autor.nombre,

@@ -1,12 +1,13 @@
 # Qué falta
 
-Inventario verificado contra el código el 21 ago 2026. Se actualiza al cerrar
+Inventario verificado contra el código el 8 sep 2026. Se actualiza al cerrar
 cada hito.
 
-> **El riesgo mayor hoy no es que falte una funcionalidad: es que la app no
-> sincroniza.** Lo que se capture ahora vive en un solo teléfono. Si ese
-> teléfono se rompe o se pierde, se pierde con él — y la clave de cifrado va en
-> su Keystore, así que no hay forma de recuperarlo desde otro sitio.
+> **El riesgo mayor sigue siendo que lo capturado vive en un solo teléfono.**
+> El servidor ya sabe recibirlo; la app todavía no sabe enviarlo. Hasta que las
+> dos mitades se junten, un teléfono roto o perdido se lleva sus datos consigo
+> — la clave de cifrado va en su Keystore, así que no hay de dónde
+> recuperarlos.
 
 ---
 
@@ -25,6 +26,7 @@ cada hito.
 | Esquema central | PostgreSQL, 14 garantías comprobadas en cada push |
 | Api: sesiones, dispositivos, tramos | 30 pruebas contra Postgres real |
 | Reparto de la secuencia | Tramos disjuntos; la colisión pasa de silenciosa a error |
+| Api: recepción de lotes | Idempotente, rechazo por registro con su motivo escrito |
 | Distribución | APK firmado, con icono, publicado y descargable sin cuenta |
 | Integración continua | App, esquema y api en cada push; aviso por Telegram al publicar |
 
@@ -34,18 +36,22 @@ cada hito.
 
 Ordenado por cuánto riesgo quita.
 
-### 1. Sincronización
+### 1. Sincronización — falta la mitad del cliente
 
-Hoy la app **no hace una sola llamada de red**: el «en cola» es un interruptor
-de demostración.
+El servidor ya recibe: `POST /api/sincronizacion` acepta pacientes, identidad,
+asignación, consentimientos, eventos, valores y auditoría; reenviar un lote no
+duplica nada, y lo que se rechaza queda escrito con su motivo en el diario de
+lotes.
 
-- **En la app**: cliente HTTP, cola de envío, `Ids.nuevo` a UUIDv4 (el esquema
-  usa `uuid` y la app genera `p-3f9a…`), pedir el tramo al servidor en vez de
-  llevar la secuencia entera, y **dejar de enrolar** cuando se quede sin tramo
-  y sin conexión. Improvisar una asignación es lo que la aleatorización
-  pre-generada existe para evitar.
-- **En la api**: recepción idempotente de eventos y auditoría, y el diario de
-  lotes que el esquema ya prevé.
+La app **sigue sin hacer una sola llamada de red**: el «en cola» es un
+interruptor de demostración. Falta:
+
+- cliente HTTP y cola de envío, con reintento;
+- que la cola deje fuera los datos de demostración, cuyos identificadores no son
+  UUID a propósito y el servidor rechazaría;
+- pedir el tramo de secuencia al servidor en vez de llevar la secuencia entera;
+- **dejar de enrolar** cuando se quede sin tramo y sin conexión. Improvisar una
+  asignación es lo que la aleatorización pre-generada existe para evitar.
 
 ### 2. Exportación `.xlsx`
 

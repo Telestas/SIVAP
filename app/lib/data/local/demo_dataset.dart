@@ -15,6 +15,12 @@ import 'seed_data.dart';
 /// Los desenlaces los captura el evaluador y no quien aplicó el protocolo:
 /// es la separación de funciones del ensayo, y conviene que la demostración la
 /// refleje (BASES §4).
+///
+/// Los identificadores de aquí —`p-demo-01`— **no son UUID a propósito**: se
+/// leen, y así se distingue de un vistazo lo inventado de lo capturado. La
+/// contrapartida es que el servidor los rechazaría, y por eso la cola de envío
+/// tiene que dejarlos fuera. Que no se puedan sincronizar es la propiedad que
+/// se quiere, no un descuido.
 class Demo {
   const Demo._();
 

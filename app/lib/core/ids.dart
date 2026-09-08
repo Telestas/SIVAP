@@ -6,15 +6,32 @@ import 'dart:math';
 /// sin conexión, unos identificadores del tipo `p-0001` chocarían en cuanto se
 /// sincronizara el segundo teléfono: dos pacientes distintos con el mismo id.
 /// El coste de equivocarse aquí se paga mucho más tarde y es carísimo.
+///
+/// **En formato UUID versión 4**, que es lo que la base central declara para
+/// cada clave (`api/migraciones/001_esquema_inicial.sql`). Antes llevaban un
+/// prefijo por comodidad al leer registros —`p-3f9a…`—, y era el cliente el que
+/// tenía que ceder: aflojar el tipo de la columna a texto habría perdido la
+/// validación, la mitad del índice y el doble de espacio, a cambio de que un
+/// log se leyera algo mejor.
 class Ids {
   const Ids._();
 
   static final Random _azar = Random.secure();
 
-  /// `p-3f9a2c...` — el prefijo solo sirve para leer logs con comodidad.
-  static String nuevo(String prefijo) {
+  /// `3f9a2c48-7d61-4e0b-9c2a-5f81b3d7e604`
+  static String nuevo() {
     final bytes = List<int>.generate(16, (_) => _azar.nextInt(256));
-    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    return '$prefijo-$hex';
+
+    // Los cuatro bits de versión y los dos de variante que exige la RFC 4122.
+    // Sin ellos PostgreSQL acepta el valor igual —solo mira que sean 128 bits—
+    // pero deja de ser un UUIDv4 y cualquier herramienta que lo compruebe lo
+    // dirá.
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    final hex =
+        bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 }

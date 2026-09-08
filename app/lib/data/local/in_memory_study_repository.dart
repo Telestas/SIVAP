@@ -112,6 +112,14 @@ class InMemoryStudyRepository implements StudyRepository {
 
   // ── Sincronización ─────────────────────────────────────────────
 
+  final Map<String, String> _ajustes = {};
+
+  @override
+  String? ajuste(String clave) => _ajustes[clave];
+
+  @override
+  void guardarAjuste(String clave, String valor) => _ajustes[clave] = valor;
+
   @override
   Pendiente pendienteDeEnvio() => Pendiente(
         pacientes: _pacientes.values.where(_faltaEnviar).toList(),

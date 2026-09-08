@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../sync/sincronizacion_screen.dart';
 import '../../core/app_state.dart';
 import '../../core/collections.dart';
 import '../../core/format.dart';
@@ -166,19 +167,15 @@ class _Encabezado extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          if (state.sinConexion)
-            StatusBanner(
-              texto: '${state.textoSync} · se enviará al recuperar señal',
-              accion: 'VER',
-              onAccion: state.alternarConexion,
-            )
-          else
-            StatusBanner(
-              texto: state.textoSync,
-              tono: BannerTone.ok,
-              accion: 'VER',
-              onAccion: state.alternarConexion,
-            ),
+          StatusBanner(
+            texto: state.hayCola
+                ? '${state.textoSync} · se enviará cuando haya conexión'
+                : state.textoSync,
+            tono: state.hayCola ? BannerTone.aviso : BannerTone.ok,
+            accion: 'SINCRONIZAR',
+            onAccion: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const SincronizacionScreen())),
+          ),
           if (soloLectura) ...[
             const SizedBox(height: 12),
             const _ResumenRamas(),

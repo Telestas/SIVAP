@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sivap/app.dart';
 import 'package:sivap/core/app_state.dart';
+import 'package:sivap/core/widgets/controls.dart';
 import 'package:sivap/data/local/seed_data.dart';
 import 'package:sivap/domain/models/evento_clinico.dart';
+import 'package:sivap/domain/models/patient.dart';
 import 'package:sivap/features/admin/admin_dashboard_screen.dart';
 import 'package:sivap/features/auth/login_screen.dart';
 import 'package:sivap/domain/models/role.dart';
@@ -11,6 +13,7 @@ import 'package:sivap/features/enrollment/enrollment_screen.dart';
 import 'package:sivap/features/eventos/evento_form_screen.dart';
 import 'package:sivap/features/eventos/paciente_timeline_screen.dart';
 import 'package:sivap/features/patients/patient_list_screen.dart';
+import 'package:sivap/features/sync/sincronizacion_screen.dart';
 
 /// Pruebas de pantalla: que cada una levante y muestre lo que promete.
 void main() {
@@ -146,6 +149,47 @@ void main() {
     await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
 
     expect(find.text('PENDIENTE'), findsNothing);
+  });
+
+  testWidgets('desde la cola se llega a la pantalla de sincronización',
+      (tester) async {
+    lienzo(tester, alto: 2400);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
+
+    await tester.tap(find.text('SINCRONIZAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sincronización'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('la pantalla de sincronización dice que no bloquea la captura',
+      (tester) async {
+    lienzo(tester, alto: 2400);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    // Un paciente de verdad, para que haya algo esperando: los de
+    // demostración no se envían nunca.
+    state.repo.enrolar(
+      autor: Seed.reclutador,
+      institucion: Seed.coordinador,
+      nombre: 'Nombre Inventado',
+      numeroHistoriaClinica: 'HC-9',
+      telefonoPrincipal: '55512345',
+      edad: 62,
+      sexo: Sexo.masculino,
+    );
+    await tester.pumpWidget(
+        montar(const SincronizacionScreen(), estado: state));
+
+    // Que no se pueda enviar no impide trabajar, y tiene que decirlo
+    // (CLAUDE.md §12).
+    expect(find.textContaining('seguir capturando sin conexión'),
+        findsOneWidget);
+    // Sin sesión con el servidor no se puede enviar, y el botón lo refleja.
+    final boton = tester.widget<AppButton>(
+        find.widgetWithText(AppButton, 'Enviar lo pendiente'));
+    expect(boton.enabled, isFalse);
   });
 
   testWidgets('el usuario se puede escribir y selecciona su función',

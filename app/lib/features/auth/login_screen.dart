@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../sync/sincronizacion_screen.dart';
 import '../../core/app_state.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
@@ -106,21 +107,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     fontSize: 13, color: T.secondary, height: 1.5)),
             const SizedBox(height: 22),
 
-            if (state.sinConexion)
-              StatusBanner(
-                texto: 'Sin conexión de datos. Se validará su credencial '
-                    'guardada en el dispositivo; los envíos quedarán en cola.',
-                alineaArriba: true,
-                accion: 'CAMBIAR',
-                onAccion: state.alternarConexion,
-              )
-            else
-              StatusBanner(
-                texto: 'Conectado. La credencial se validará contra el servidor.',
-                tono: BannerTone.ok,
-                accion: 'CAMBIAR',
-                onAccion: state.alternarConexion,
-              ),
+            // Entrar aquí no habla con el servidor, y conviene decirlo: la
+            // app trabaja sin conexión y el envío es otra cosa (CLAUDE.md §12).
+            StatusBanner(
+              texto: 'El acceso a la app no necesita conexión. El envío al '
+                  'servidor se hace aparte, cuando la haya.',
+              alineaArriba: true,
+              accion: state.hayCola ? state.textoSyncCorto : null,
+              onAccion: state.hayCola
+                  ? () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const SincronizacionScreen()))
+                  : null,
+            ),
 
             // Qué garantiza el almacén de esta compilación. Si no cifra o no
             // persiste, se dice aquí y no en letra pequeña.

@@ -217,6 +217,17 @@ abstract class StudyRepository {
   /// a propósito, y esa es justamente la propiedad que los mantiene fuera.
   Pendiente pendienteDeEnvio();
 
+  /// Ajustes del aparato: a qué servidor habla y con qué identidad.
+  ///
+  /// Viven aquí, y no en un almacén aparte, porque tienen que durar lo mismo
+  /// que los datos y desaparecer con ellos: un dispositivo cuya base se borra
+  /// es un dispositivo nuevo, y debe pedir su propio tramo de secuencia.
+  ///
+  /// No son para credenciales. El token de sesión se queda en memoria.
+  String? ajuste(String clave);
+
+  void guardarAjuste(String clave, String valor);
+
   /// Anota que el servidor recibió estos registros, en este lote.
   ///
   /// Se guarda el lote y no solo un «sí»: cuando alguien pregunte por qué un

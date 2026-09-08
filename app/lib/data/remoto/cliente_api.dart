@@ -106,9 +106,19 @@ class ClienteApi {
   /// identificador y devuelve el resultado que ya había guardado. Eso es lo que
   /// hace recuperable el caso que va a ocurrir de verdad — que el servidor
   /// guarde y la respuesta no llegue.
-  Future<ResultadoLote> enviar(Lote lote) async =>
-      ResultadoLote.desdeJson(await _pedir('POST', 'sincronizacion',
-          json: lote.aJson()));
+  Future<ResultadoLote> enviar(Lote lote) async {
+    final cuerpo = await _pedir('POST', 'sincronizacion', json: lote.aJson());
+    try {
+      return ResultadoLote.desdeJson(cuerpo);
+    } on Object {
+      // Una respuesta con la forma que no es —un proxy que devuelve su propia
+      // página, una versión del servidor que no cuadra— no debe reventar la
+      // app con un error de tipo. Es un error del servidor como cualquier
+      // otro, y lo importante es que no se dé nada por enviado.
+      throw const ErrorDelServidor(
+          200, 'El servidor respondió algo que no se puede interpretar.');
+    }
+  }
 
   // ── Fontanería ──────────────────────────────────────────────────
 

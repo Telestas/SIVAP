@@ -2,12 +2,18 @@ import 'package:flutter/widgets.dart';
 
 import '../data/local/almacen_local.dart';
 import '../data/local/in_memory_study_repository.dart';
+import '../data/remoto/sincronizacion.dart';
 import '../domain/models/role.dart';
 import '../domain/repositories/study_repository.dart';
 
 /// Estado de sesión de la app.
 class AppState extends ChangeNotifier {
-  AppState(this.almacen);
+  AppState(this.almacen, {Sincronizacion? sincronizacion})
+      : sincronizacion = sincronizacion ?? Sincronizacion(almacen.repo) {
+    // Lo que pasa en la sincronización cambia lo que se ve en pantalla: el
+    // contador de la cola, sobre todo.
+    this.sincronizacion.addListener(notifyListeners);
+  }
 
   /// Almacén volátil, para pruebas y para el arranque en navegador.
   factory AppState.enMemoria() => AppState(AlmacenLocal(
@@ -20,17 +26,14 @@ class AppState extends ChangeNotifier {
 
   final AlmacenLocal almacen;
 
+  /// A qué servidor habla este aparato y qué le falta por enviar.
+  final Sincronizacion sincronizacion;
+
   StudyRepository get repo => almacen.repo;
 
   Investigador? _usuario;
   Investigador? get usuario => _usuario;
   Investigador get usuarioActual => _usuario!;
-
-  /// Modo sin conexión. En el MVP es un interruptor manual para poder
-  /// demostrar el comportamiento offline; después lo dictará la conectividad
-  /// real. La captura de datos NO depende de esto en ningún caso
-  /// (CLAUDE.md §7): sin conexión se trabaja igual, solo cambia el envío.
-  bool sinConexion = true;
 
   void iniciarSesion(Investigador investigador) {
     _usuario = investigador;
@@ -42,21 +45,29 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void alternarConexion() {
-    sinConexion = !sinConexion;
-    notifyListeners();
-  }
+  /// Cuántos registros esperan a salir del aparato.
+  ///
+  /// Sale del almacén, no de un interruptor: es cierto aunque nunca se haya
+  /// hablado con el servidor, que es justo cuando importa saberlo.
+  int get enCola => sincronizacion.pendientes;
 
-  int get enCola => sinConexion ? repo.registrosEnCola : 0;
+  bool get hayCola => enCola > 0;
 
-  String get textoSync => sinConexion
-      ? '$enCola ${enCola == 1 ? 'visita pendiente' : 'visitas pendientes'} de envío'
-      : 'Datos al día · sincronizado 09:01';
+  String get textoSync => hayCola
+      ? '$enCola ${enCola == 1 ? 'registro pendiente' : 'registros pendientes'} '
+          'de envío'
+      : 'Todo enviado al servidor';
 
-  String get textoSyncCorto => sinConexion ? '$enCola en cola' : 'AL DÍA';
+  String get textoSyncCorto => hayCola ? '$enCola en cola' : 'AL DÍA';
 
   /// Refresca tras una escritura en el repositorio.
   void refrescar() => notifyListeners();
+
+  @override
+  void dispose() {
+    sincronizacion.removeListener(notifyListeners);
+    super.dispose();
+  }
 }
 
 /// Acceso al [AppState] desde cualquier punto del árbol.

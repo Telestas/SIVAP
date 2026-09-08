@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../sync/sincronizacion_screen.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
 import '../../core/theme/tokens.dart';
@@ -236,7 +237,9 @@ class _Cabecera extends StatelessWidget {
                     texto: '${state.enCola} registros en cola desde '
                         '${state.repo.dispositivosConCola} dispositivos',
                     accion: 'SINCRONIZAR',
-                    onAccion: state.alternarConexion,
+                    onAccion: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const SincronizacionScreen())),
                   ),
                 ),
                 const SizedBox(width: 9),

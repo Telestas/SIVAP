@@ -39,6 +39,7 @@ void main() {
     expect(
       tablas,
       containsAll([
+        'ajustes',
         'auditoria',
         'consentimientos',
         'enviados',
@@ -57,10 +58,19 @@ void main() {
 
   test('una base vieja se migra sin perder lo que tenía', () {
     // El caso que va a ocurrir en los teléfonos que ya tienen la app: la base
-    // está en la versión 1 y hay que añadirle lo nuevo sin tocar los datos.
+    // se quedó en una versión anterior y hay que ponerla al día sin tocar los
+    // datos que ya guardó.
+    //
+    // Cada versión nueva del esquema añade su tabla a esta lista. Es a
+    // propósito: una migración merece que alguien piense en ella, no que la
+    // prueba se adapte sola.
+    const anadidasDespuesDeLa1 = ['enviados', 'ajustes'];
+
     final vieja = sqlite3.openInMemory();
     SivapDatabase.aplicarEsquema(vieja);
-    vieja.execute('DROP TABLE enviados;');
+    for (final tabla in anadidasDespuesDeLa1) {
+      vieja.execute('DROP TABLE $tabla;');
+    }
     vieja.execute('PRAGMA user_version = 1;');
     vieja.execute(
         'INSERT INTO pacientes (id, codigo, institucion, edad, sexo, protocolo,'
@@ -71,10 +81,30 @@ void main() {
     SivapDatabase.aplicarEsquema(vieja);
 
     expect(vieja.select('SELECT count(*) c FROM pacientes;').first['c'], 1);
-    expect(vieja.select('SELECT count(*) c FROM enviados;').first['c'], 0);
+    for (final tabla in anadidasDespuesDeLa1) {
+      expect(vieja.select('SELECT count(*) c FROM $tabla;').first['c'], 0,
+          reason: tabla);
+    }
     expect(vieja.select('PRAGMA user_version;').first['user_version'],
         SivapDatabase.versionEsquema);
     vieja.dispose();
+  });
+
+  test('los ajustes del aparato se guardan y se releen', () {
+    // El identificador del dispositivo tiene que sobrevivir al cierre de la
+    // app: si se regenerara, el servidor le daría un tramo nuevo de la
+    // secuencia de aleatorización en cada arranque.
+    void guardar(String clave, String valor) => db.execute(
+        'INSERT INTO ajustes (clave, valor) VALUES (?, ?) '
+        'ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor;',
+        [clave, valor]);
+
+    guardar('dispositivo_id', 'uno');
+    guardar('dispositivo_id', 'dos');
+
+    final filas = db.select('SELECT * FROM ajustes;');
+    expect(filas, hasLength(1));
+    expect(filas.first['valor'], 'dos');
   });
 
   test('dos borradores del mismo hito no pueden coexistir', () {

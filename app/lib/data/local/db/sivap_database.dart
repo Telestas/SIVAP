@@ -27,7 +27,7 @@ class SivapDatabase {
   /// dispositivo: no hay base existente que migrar. En cuanto la app corra en
   /// un teléfono real, cualquier cambio de esquema exige subir el número y
   /// escribir su migración.
-  static const int versionEsquema = 2;
+  static const int versionEsquema = 3;
 
   /// Abre la base cifrada en [ruta] con [claveHex] (64 caracteres hex).
   ///
@@ -108,6 +108,7 @@ class SivapDatabase {
     try {
       if (actual < 1) _crearVersion1(db);
       if (actual < 2) _crearVersion2(db);
+      if (actual < 3) _crearVersion3(db);
       db.execute('PRAGMA user_version = $versionEsquema;');
       db.execute('COMMIT;');
     } catch (_) {
@@ -132,6 +133,25 @@ class SivapDatabase {
         id         TEXT PRIMARY KEY,
         lote_id    TEXT NOT NULL,
         enviado_en TEXT NOT NULL
+      );
+    ''');
+  }
+
+  /// Ajustes del propio aparato: a qué servidor habla y con qué identidad.
+  ///
+  /// **El identificador del dispositivo tiene que sobrevivir al cierre de la
+  /// app.** Si se regenerara en cada arranque, el servidor vería un aparato
+  /// nuevo cada vez y le entregaría un tramo nuevo de la secuencia de
+  /// aleatorización — quemando posiciones que nadie va a usar y dejando huecos
+  /// permanentes en el estudio.
+  ///
+  /// No guarda credenciales. El token de sesión vive en memoria y se vuelve a
+  /// pedir; una base que se pueda copiar no debe llevar dentro con qué entrar.
+  static void _crearVersion3(Database db) {
+    db.execute('''
+      CREATE TABLE ajustes (
+        clave TEXT PRIMARY KEY,
+        valor TEXT NOT NULL
       );
     ''');
   }

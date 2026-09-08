@@ -584,6 +584,20 @@ class SqliteStudyRepository implements StudyRepository {
   // ── Sincronización ─────────────────────────────────────────────
 
   @override
+  String? ajuste(String clave) {
+    final filas =
+        _db.select('SELECT valor FROM ajustes WHERE clave = ?;', [clave]);
+    return filas.isEmpty ? null : filas.first['valor'] as String;
+  }
+
+  @override
+  void guardarAjuste(String clave, String valor) => _db.execute(
+        'INSERT INTO ajustes (clave, valor) VALUES (?, ?) '
+        'ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor;',
+        [clave, valor],
+      );
+
+  @override
   Pendiente pendienteDeEnvio() => Pendiente(
         pacientes: _db
             .select('$_sqlPaciente WHERE p.id NOT IN (SELECT id FROM enviados);')

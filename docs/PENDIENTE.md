@@ -28,6 +28,7 @@ cada hito.
 | Reparto de la secuencia | Tramos disjuntos; la colisión pasa de silenciosa a error |
 | Api: recepción de lotes | Idempotente, rechazo por registro con su motivo escrito |
 | Cola de envío | Acuse por registro; los datos de demostración quedan fuera |
+| Sincronización en la app | Pantalla propia: servidor, sesión, envío y motivos de rechazo |
 | Alertas | Seguimiento a los 7, 14 y 28 días, y paciente listo para evaluar |
 | Distribución | APK firmado, con icono, publicado y descargable sin cuenta |
 | Integración continua | App, esquema y api en cada push; aviso por Telegram al publicar |
@@ -49,15 +50,25 @@ Del lado del cliente ya están el cliente HTTP y la cola: reúne lo pendiente, l
 manda en un lote y marca solo lo que el servidor aceptó. Los datos de
 demostración quedan fuera y los borradores tampoco viajan.
 
-Falta lo que ata la cola a la app:
+La app ya la usa: hay pantalla de sincronización con la dirección del servidor,
+el acceso, el envío y —lo que más importa— el motivo por el que el servidor no
+admitió algo. El identificador del aparato se guarda entre arranques, que era
+necesario: si se regenerara, el servidor le daría un tramo nuevo de la
+secuencia cada vez.
 
-- **llamarla**: hoy nadie la invoca. Hace falta decidir cuándo —al abrir, al
-  registrar, a mano— y una pantalla donde se vea qué está esperando y por qué
-  se rechazó lo que se rechazó;
-- guardar la sesión y el identificador del dispositivo entre arranques;
+El envío es **manual, a propósito**. Un reintento automático en bucle sobre una
+conexión que va y viene gasta batería y no añade nada que un botón no dé; y la
+captura no depende de él en ningún caso.
+
+Falta la parte de la aleatorización:
+
 - pedir el tramo de secuencia al servidor en vez de llevar la secuencia entera;
 - **dejar de enrolar** cuando se quede sin tramo y sin conexión. Improvisar una
   asignación es lo que la aleatorización pre-generada existe para evitar.
+
+Y dos cosas menores: que el detalle de los rechazos sobreviva a cerrar la app
+—hoy vive en memoria, aunque el dato rechazado no se pierde— y poner etiqueta
+al aparato para distinguirlo en el panel.
 
 ### 2. Exportación `.xlsx`
 

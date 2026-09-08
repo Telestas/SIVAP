@@ -117,7 +117,7 @@ void main() {
     expect(find.text('Aplicador'), findsOneWidget);
     expect(find.text('Evaluador de desenlaces'), findsOneWidget);
     expect(find.text('Investigador principal'), findsOneWidget);
-    expect(find.text('Observador'), findsOneWidget);
+    expect(find.text('Analista'), findsOneWidget);
     // El CEI no ha aprobado: la advertencia tiene que estar a la vista.
     expect(find.textContaining('Modo demostración'), findsOneWidget);
   });
@@ -134,9 +134,9 @@ void main() {
     expect(find.textContaining('IC-001'), findsNothing);
   });
 
-  testWidgets('el observador ve la cohorte y no puede enrolar', (tester) async {
+  testWidgets('el analista ve la cohorte y no puede enrolar', (tester) async {
     lienzo(tester);
-    final state = AppState.enMemoria()..iniciarSesion(Seed.observador);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.analista);
     await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
 
     expect(find.text('Cohorte completa'), findsOneWidget);
@@ -156,7 +156,7 @@ void main() {
         const PacienteTimelineScreen(patientId: 'p-demo-01'),
         estado: state));
 
-    expect(find.text('FASE 2 · CRIBADO'), findsOneWidget);
+    expect(find.text('MÓDULO 2 · CRIBADO'), findsOneWidget);
     expect(find.text('Prueba de ventilación espontánea'), findsWidgets);
     // Hito repetible: se anuncia como tal.
     expect(find.text('REPETIBLE'), findsWidgets);
@@ -191,10 +191,13 @@ void main() {
       estado: state,
     ));
 
-    expect(find.text('MONITORIZACIÓN AL INICIO DE LA PVE'), findsOneWidget);
-    expect(find.text('MONITORIZACIÓN AL FINAL DE LA PVE'), findsOneWidget);
+    expect(find.text('LA PRUEBA'), findsOneWidget);
     expect(find.text('Tubo en T'), findsOneWidget);
     expect(find.text('FECHA EN QUE OCURRIÓ'), findsOneWidget);
+
+    // La causa del fallo solo aparece cuando la prueba falló: es un campo
+    // condicional, y en blanco el formulario no lo enseña.
+    expect(find.text('SI LA PRUEBA FALLÓ'), findsNothing);
   });
 
   testWidgets('un evento registrado no ofrece captura al recolector',
@@ -225,10 +228,10 @@ void main() {
     await tester.pumpWidget(montar(const AdminDashboardScreen(), estado: state));
 
     expect(find.text('Pacientes del ensayo'), findsOneWidget);
-    expect(find.text('AVANCE POR FASES'), findsOneWidget);
+    expect(find.text('AVANCE POR MÓDULOS'), findsOneWidget);
     expect(find.text('Historial de auditoría — últimas correcciones'),
         findsOneWidget);
-    expect(find.textContaining('cifras transpuestas'), findsOneWidget);
+    expect(find.textContaining('hoja de enfermería'), findsOneWidget);
     // El recuento por rama no dice cuál es cuál.
     expect(find.textContaining('A: '), findsOneWidget);
   });

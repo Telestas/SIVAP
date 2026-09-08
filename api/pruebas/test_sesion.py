@@ -2,15 +2,23 @@
 
 import uuid
 
-from conftest import CONTRASENA
+from conftest import CONTRASENA, RAIZ
 
 
 def test_salud_responde_con_la_version_del_esquema(cliente):
+    """La base está a la última migración que hay en el repositorio.
+
+    Se lee del directorio y no se escribe a mano: si no, cada migración nueva
+    rompería esta prueba y acabaría actualizándose sin mirar, que es la clase
+    de comprobación que deja de comprobar nada.
+    """
+    ultima = max(p.name[:3] for p in (RAIZ / 'migraciones').glob('*.sql'))
+
     r = cliente.get('/api/salud')
 
     assert r.status_code == 200
     assert r.json()['estado'] == 'ok'
-    assert r.json()['esquema'] == '002'
+    assert r.json()['esquema'] == ultima
 
 
 def test_credenciales_correctas_devuelven_token_y_funciones(cliente, investigador):

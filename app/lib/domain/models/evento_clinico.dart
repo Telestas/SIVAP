@@ -6,26 +6,22 @@ import 'institucion.dart';
 /// calendario: una fase dura lo que la clínica determine, y un paciente puede
 /// salir del proceso en cualquiera de ellas.
 enum FaseEstudio {
-  inclusion('Inclusión'),
-  fase1('Fase 1 · Estratificación de riesgo'),
-  fase2('Fase 2 · Cribado'),
-  fase3('Fase 3 · Weaning y PVE'),
-  extubacion('Extubación'),
-  desenlaces('Desenlaces'),
-  seguimiento('Seguimiento post-egreso');
+  inclusion('Módulo 1 · Inclusión'),
+  cribado('Módulo 2 · Cribado'),
+  destete('Módulo 3 · Destete'),
+  extubacion('Módulo 4 · Extubación'),
+  desenlaces('Módulo 5 · Desenlaces');
 
   const FaseEstudio(this.etiqueta);
   final String etiqueta;
 
   /// Abreviatura para los indicadores compactos de las listas.
   String get abreviatura => switch (this) {
-        FaseEstudio.inclusion => 'INC',
-        FaseEstudio.fase1 => 'F1',
-        FaseEstudio.fase2 => 'F2',
-        FaseEstudio.fase3 => 'F3',
-        FaseEstudio.extubacion => 'EXT',
-        FaseEstudio.desenlaces => 'DES',
-        FaseEstudio.seguimiento => 'SEG',
+        FaseEstudio.inclusion => 'M1',
+        FaseEstudio.cribado => 'M2',
+        FaseEstudio.destete => 'M3',
+        FaseEstudio.extubacion => 'M4',
+        FaseEstudio.desenlaces => 'M5',
       };
 }
 
@@ -44,63 +40,38 @@ enum TipoEvento {
   enrolamiento(
     etiqueta: 'Enrolamiento',
     fase: FaseEstudio.inclusion,
-    cuando: 'Al cumplir criterios de inclusión',
-  ),
-  estratificacionRiesgo(
-    etiqueta: 'Estratificación de riesgo',
-    fase: FaseEstudio.fase1,
-    cuando: 'Primeras 24 h de VMI',
+    cuando: 'Al descartar los criterios de exclusión',
   ),
   cribado(
     etiqueta: 'Cribado',
-    fase: FaseEstudio.fase2,
-    cuando: 'Desde las 24–48 h, a diario',
-    repetible: true,
-    sustantivoOcurrencia: 'día',
-  ),
-  evaluacionDiaria(
-    etiqueta: 'Evaluación diaria',
-    fase: FaseEstudio.fase3,
-    cuando: 'Tras superar el cribado, a diario',
+    fase: FaseEstudio.cribado,
+    cuando: 'A diario, hasta que cumpla los criterios',
     repetible: true,
     sustantivoOcurrencia: 'día',
   ),
   pruebaVentilacionEspontanea(
     etiqueta: 'Prueba de ventilación espontánea',
-    fase: FaseEstudio.fase3,
-    cuando: 'Al concluir la evaluación diaria con éxito',
+    fase: FaseEstudio.destete,
+    cuando: 'Al cumplir los criterios de cribado',
     repetible: true,
     sustantivoOcurrencia: 'intento',
   ),
-  traqueostomia(
-    etiqueta: 'Traqueostomía',
-    fase: FaseEstudio.fase3,
-    cuando: 'Si procede — cambia la trayectoria del paciente',
-  ),
   extubacion(
-    etiqueta: 'Extubación',
+    etiqueta: 'Extubación y post-extubación',
     fase: FaseEstudio.extubacion,
     cuando: 'Tras una PVE exitosa',
   ),
-  soportePostExtubacion(
-    etiqueta: 'Soporte post-extubación',
-    fase: FaseEstudio.extubacion,
-    cuando: 'Inmediato a la extubación',
-  ),
-  reintubacion(
-    etiqueta: 'Reintubación',
+  desenlaces(
+    etiqueta: 'Desenlaces',
     fase: FaseEstudio.desenlaces,
-    cuando: 'Dentro de las 72 h posteriores a la extubación',
-  ),
-  egresoUci(
-    etiqueta: 'Egreso de UCI',
-    fase: FaseEstudio.desenlaces,
-    cuando: 'Al alta de la unidad',
+    cuando: 'Al egreso de la unidad',
   ),
   seguimientoPostEgreso(
     etiqueta: 'Seguimiento post-egreso',
-    fase: FaseEstudio.seguimiento,
-    cuando: 'Hasta 28 días tras el egreso',
+    fase: FaseEstudio.desenlaces,
+    cuando: 'Contacto a los 7, 14 y 28 días del egreso',
+    repetible: true,
+    sustantivoOcurrencia: 'contacto',
   );
 
   const TipoEvento({
@@ -224,8 +195,7 @@ class EventoClinico {
 
   static String _siglas(TipoEvento t) => switch (t) {
         TipoEvento.pruebaVentilacionEspontanea => 'PVE',
-        TipoEvento.estratificacionRiesgo => 'Estratificación',
-        TipoEvento.soportePostExtubacion => 'Soporte post-ext.',
+        TipoEvento.extubacion => 'Extubación',
         TipoEvento.seguimientoPostEgreso => 'Seguimiento',
         _ => t.etiqueta,
       };

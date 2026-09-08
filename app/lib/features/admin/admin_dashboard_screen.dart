@@ -343,7 +343,7 @@ class _TablaPacientes extends StatelessWidget {
     'Paciente',
     'Centro',
     'Rama',
-    'Avance por fases',
+    'Avance por módulos',
     'Recolector',
     'Sincronización',
     'Auditoría'

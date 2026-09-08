@@ -15,7 +15,7 @@ import '../enrollment/enrollment_screen.dart';
 import '../eventos/paciente_timeline_screen.dart';
 
 /// Lista de pacientes, con dos caras: la carga del recolector y la cohorte
-/// completa en solo lectura para el observador. Es la misma información leída
+/// completa en solo lectura para el analista. Es la misma información leída
 /// con permisos distintos.
 class PatientListScreen extends StatefulWidget {
   const PatientListScreen({super.key});
@@ -39,7 +39,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final usuario = state.usuarioActual;
-    // Quien no captura ni enrola solo consulta: observador y analista.
+    // Quien no captura ni enrola solo consulta: el analista.
     final soloLectura = !usuario.puedeCapturarEventos && !usuario.puedeEnrolar;
 
     final propios = state.repo.pacientes(
@@ -412,7 +412,7 @@ class _TarjetaCarga extends StatelessWidget {
   }
 }
 
-/// Vista del observador: una fila por paciente con el avance por fases.
+/// Vista de solo lectura: una fila por paciente con el avance por módulos.
 class _ListaCohorte extends StatelessWidget {
   const _ListaCohorte({required this.pacientes});
 

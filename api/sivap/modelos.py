@@ -91,11 +91,12 @@ Sexo = Literal['masculino', 'femenino']
 
 Protocolo = Literal['a', 'b']
 
+# Los cinco módulos del Anexo 4 revisado. La lista tiene que coincidir con el
+# enum `tipo_evento` del esquema (migración 003) y con `TipoEvento` de la app:
+# es el mismo vocabulario en los tres sitios.
 TipoEvento = Literal[
-    'enrolamiento', 'estratificacion_riesgo', 'cribado', 'evaluacion_diaria',
-    'prueba_ventilacion_espontanea', 'traqueostomia', 'extubacion',
-    'soporte_post_extubacion', 'reintubacion', 'egreso_uci',
-    'seguimiento_post_egreso',
+    'enrolamiento', 'cribado', 'prueba_ventilacion_espontanea', 'extubacion',
+    'desenlaces', 'seguimiento_post_egreso',
 ]
 
 TipoValor = Literal['numero', 'texto', 'booleano', 'fecha', 'lista']

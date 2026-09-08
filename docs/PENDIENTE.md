@@ -16,7 +16,7 @@ cada hito.
 | | |
 |---|---|
 | Captura por eventos clínicos | Línea de tiempo por fases, hitos repetibles, trayectorias incompletas |
-| Campos del Anexo 4 | Los cuatro módulos con sus categorías reales |
+| Campos del Anexo 4 | Los cinco módulos de la revisión, con condicionales y cálculos |
 | Cegamiento | Solo Protocolo A y B; el evaluador de desenlaces no ve la rama |
 | Separación de funciones | Seis funciones; la captura va por tipo de hito |
 | Multicéntrico | Centro en ficha, evento e investigador |
@@ -108,11 +108,12 @@ Ninguna la puede resolver quien programa, y todas bloquean pacientes reales.
    corto obliga a pedir otro más a menudo, y hace falta conexión para pedirlo;
    tramo largo quema más posiciones si se pierde un teléfono.
 5. **Rangos clínicos** de cada campo numérico → `docs/RANGOS_PENDIENTES.md`.
-6. **RSBI: número o categoría.** Hoy categoría, como dice el Anexo 4. Un 92 y
-   un 104 caen en la misma y el dataset deja de distinguirlos. Al revés no
-   tiene vuelta.
-7. **Unidades** de la detención de sedación y del tiempo entre PVE y
-   extubación. Hoy horas con un decimal.
+6. **RSBI**: la revisión del Anexo 4 lo retiró junto con el resto de la
+   monitorización de la PVE. Decidir si vuelve como número al final de la
+   prueba → `docs/ANEXO4_CAMBIOS.md`.
+7. **Acceso del evaluador al Módulo 1** y **qué significa retirar a un
+   paciente**. Las dos salen de la revisión del Anexo 4, y las dos afectan a la
+   validez del estudio → `docs/ANEXO4_CAMBIOS.md`.
 8. **Umbral de VMI para incluir**: el protocolo dice >24 h, el proyecto >48 h.
 9. **Acumulación de funciones**: si un médico puede cumplir varias. Está como
    configuración; la combinación peligrosa está identificada.

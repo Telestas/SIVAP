@@ -38,11 +38,6 @@ enum Rol {
     etiqueta: 'Investigador principal',
     descripcion: 'Administra el estudio, corrige con auditoría y gestiona usuarios.',
     cegadoA: 'Nadie. Aun así, el sistema no almacena la correspondencia A/B.',
-  ),
-  observador(
-    etiqueta: 'Observador',
-    descripcion: 'Consulta la cohorte completa en solo lectura.',
-    cegadoA: 'Qué protocolo terapéutico hay detrás de A y de B.',
   );
 
   const Rol({
@@ -69,6 +64,9 @@ enum Rol {
   bool get puedeCorregirRegistrado => this == investigadorPrincipal;
 
   /// El aplicador solo ve su propia carga; el resto ve la cohorte completa.
+  ///
+  /// Quien recluta no ve más que lo suyo, y es lo que pide el protocolo: su
+  /// función termina al enrolar.
   bool get veCohorteCompleta => this != aplicador && this != reclutador;
 
   /// **El evaluador de desenlaces no ve la rama.** Es la parte del cegamiento
@@ -78,24 +76,26 @@ enum Rol {
   bool get veRamaAsignada => this != evaluadorDesenlaces;
 
   /// Qué hitos captura esta función.
+  ///
+  /// El reparto sigue los módulos del Anexo 4. Las dos funciones que el
+  /// protocolo nombra —«reclutador» y «reclutador-aplicador»— no son dos
+  /// valores de aquí sino uno y la suma de dos: quien solo recluta lleva
+  /// [reclutador]; quien además aplica, [reclutador] y [aplicador]. Es la
+  /// combinación habitual en un equipo pequeño y no compromete el cegamiento
+  /// — la que sí lo rompe es aplicador + evaluador de desenlaces.
   Set<TipoEvento> get eventosQueCaptura => switch (this) {
         reclutador => {TipoEvento.enrolamiento},
         aplicador => {
-            TipoEvento.estratificacionRiesgo,
             TipoEvento.cribado,
-            TipoEvento.evaluacionDiaria,
             TipoEvento.pruebaVentilacionEspontanea,
-            TipoEvento.traqueostomia,
             TipoEvento.extubacion,
-            TipoEvento.soportePostExtubacion,
           },
         evaluadorDesenlaces => {
-            TipoEvento.reintubacion,
-            TipoEvento.egresoUci,
+            TipoEvento.desenlaces,
             TipoEvento.seguimientoPostEgreso,
           },
         investigadorPrincipal => TipoEvento.values.toSet(),
-        analista || observador => const {},
+        analista => const {},
       };
 }
 

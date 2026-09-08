@@ -30,6 +30,12 @@ class InMemoryStudyRepository implements StudyRepository {
   final Map<String, Consent> _consentimientos = {};
   final List<AuditEntry> _auditoria = [];
 
+  /// Identificadores que el servidor ya acusó, con el lote que los llevó.
+  ///
+  /// Es el equivalente en el dispositivo del diario de lotes del servidor, y
+  /// sirve para lo mismo: responder «esto llegó o no llegó» meses después.
+  final Map<String, String> _acusados = {};
+
   @override
   StudyConfig get config => Seed.config;
 
@@ -104,6 +110,58 @@ class InMemoryStudyRepository implements StudyRepository {
       .toSet()
       .length;
 
+  // ── Sincronización ─────────────────────────────────────────────
+
+  final Map<String, String> _ajustes = {};
+
+  @override
+  String? ajuste(String clave) => _ajustes[clave];
+
+  @override
+  void guardarAjuste(String clave, String valor) => _ajustes[clave] = valor;
+
+  @override
+  Pendiente pendienteDeEnvio() => Pendiente(
+        pacientes: _pacientes.values.where(_faltaEnviar).toList(),
+        consentimientos: _consentimientos.values.where(_faltaEnviar).toList(),
+        // Solo lo registrado: un borrador es un dato a medio teclear, y el
+        // estudio no debe llenarse de registros que nadie sabe si son
+        // definitivos.
+        eventos: _todos
+            .where((e) => e.estado == EstadoEvento.registrado)
+            .where(_faltaEnviar)
+            .toList(),
+        auditoria: _auditoria.where(_faltaEnviar).toList(),
+      );
+
+  @override
+  void anotarEnviados({required String loteId, required Iterable<String> ids}) {
+    for (final id in ids) {
+      _acusados[id] = loteId;
+    }
+    // Los eventos llevan además su propio indicador, que es lo que la pantalla
+    // enseña. Sale de aquí para que no haya dos verdades sobre lo mismo.
+    for (final entrada in _eventos.entries) {
+      _eventos[entrada.key] = [
+        for (final e in entrada.value)
+          _acusados.containsKey(e.id) && e.sync != SyncStatus.sincronizado
+              ? e.copyWith(sync: SyncStatus.sincronizado)
+              : e,
+      ];
+    }
+  }
+
+  bool _faltaEnviar(Object registro) {
+    final id = switch (registro) {
+      Patient p => p.id,
+      Consent c => c.id,
+      EventoClinico e => e.id,
+      AuditEntry a => a.id,
+      _ => null,
+    };
+    return id != null && !_acusados.containsKey(id) && Ids.esSincronizable(id);
+  }
+
   // ── Escritura ──────────────────────────────────────────────────
 
   @override
@@ -124,7 +182,7 @@ class InMemoryStudyRepository implements StudyRepository {
     // ni puede sugerirla: no hay parámetro para ello, a propósito.
     final asignacion = _allocation.asignar(ahora: DateTime.now());
     final paciente = Patient(
-      id: Ids.nuevo('p'),
+      id: Ids.nuevo(),
       codigo: _siguienteCodigo(institucion),
       nombre: nombre,
       numeroHistoriaClinica: numeroHistoriaClinica,
@@ -171,7 +229,7 @@ class InMemoryStudyRepository implements StudyRepository {
     }
     final doc = config.documentoConsentimiento;
     final consent = Consent(
-      id: Ids.nuevo('c'),
+      id: Ids.nuevo(),
       patientId: patientId,
       versionDocumento: doc.version,
       codigoCei: doc.codigoCei,
@@ -248,7 +306,7 @@ class InMemoryStudyRepository implements StudyRepository {
     }
 
     final nuevo = EventoClinico(
-      id: Ids.nuevo('e'),
+      id: Ids.nuevo(),
       patientId: patientId,
       tipo: tipo,
       ocurrencia: _siguienteOcurrencia(patientId, tipo),
@@ -321,7 +379,7 @@ class InMemoryStudyRepository implements StudyRepository {
     lista[lista.indexWhere((e) => e.id == eventoId)] = corregido;
 
     _auditoria.add(AuditEntry(
-      id: Ids.nuevo('a'),
+      id: Ids.nuevo(),
       ocurridoEn: DateTime.now(),
       autorId: autor.id,
       autorNombre: autor.nombre,
@@ -386,9 +444,13 @@ class InMemoryStudyRepository implements StudyRepository {
       ];
     }
 
-    for (final a in Demo.auditoria) {
+    for (var i = 0; i < Demo.auditoria.length; i++) {
+      final a = Demo.auditoria[i];
       _auditoria.add(AuditEntry(
-        id: Ids.nuevo('a'),
+        // Identificador de demostración, no un UUID. Es lo que impide que
+        // acabe en la cola de envío: los eventos sembrados ya lo hacían así y
+        // estas entradas se habían quedado atrás.
+        id: 'a-demo-${i + 1}',
         ocurridoEn: a.ocurridoEn,
         autorId: a.autor.id,
         autorNombre: a.autor.nombre,

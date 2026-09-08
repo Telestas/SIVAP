@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../sync/sincronizacion_screen.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
 import '../../core/theme/tokens.dart';
@@ -45,19 +46,15 @@ class PacienteTimelineScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(T.gutter, 12, T.gutter, 28),
           children: [
-            if (state.sinConexion)
-              StatusBanner(
-                texto: 'Sin conexión · guardando en el dispositivo',
-                accion: state.textoSyncCorto,
-                onAccion: state.alternarConexion,
-              )
-            else
-              StatusBanner(
-                texto: 'Conectado · los registros se envían al cerrarlos',
-                tono: BannerTone.ok,
-                accion: state.textoSyncCorto,
-                onAccion: state.alternarConexion,
-              ),
+            StatusBanner(
+              texto: state.hayCola
+                  ? 'Guardado en el dispositivo · falta enviarlo'
+                  : 'Todo lo registrado está en el servidor',
+              tono: state.hayCola ? BannerTone.aviso : BannerTone.ok,
+              accion: state.textoSyncCorto,
+              onAccion: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const SincronizacionScreen())),
+            ),
             const SizedBox(height: 8),
 
             for (final fase in FaseEstudio.values) ...[

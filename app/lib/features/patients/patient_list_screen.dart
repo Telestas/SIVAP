@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../sync/sincronizacion_screen.dart';
 import '../../core/app_state.dart';
 import '../../core/collections.dart';
 import '../../core/format.dart';
@@ -7,6 +8,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
 import '../../core/widgets/controls.dart';
 import '../../data/local/seed_data.dart';
+import '../../domain/alertas.dart';
 import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/protocolo.dart';
@@ -15,7 +17,7 @@ import '../enrollment/enrollment_screen.dart';
 import '../eventos/paciente_timeline_screen.dart';
 
 /// Lista de pacientes, con dos caras: la carga del recolector y la cohorte
-/// completa en solo lectura para el observador. Es la misma información leída
+/// completa en solo lectura para el analista. Es la misma información leída
 /// con permisos distintos.
 class PatientListScreen extends StatefulWidget {
   const PatientListScreen({super.key});
@@ -39,7 +41,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final usuario = state.usuarioActual;
-    // Quien no captura ni enrola solo consulta: observador y analista.
+    // Quien no captura ni enrola solo consulta: el analista.
     final soloLectura = !usuario.puedeCapturarEventos && !usuario.puedeEnrolar;
 
     final propios = state.repo.pacientes(
@@ -58,6 +60,10 @@ class _PatientListScreenState extends State<PatientListScreen> {
               filtro: _filtro,
               onFiltro: (f) => setState(() => _filtro = f),
               onBuscar: (v) => setState(() => _busqueda = v),
+            ),
+            _Pendientes(
+              alertas: Alertas.pendientes(state.repo,
+                  hoy: Seed.hoy, para: usuario),
             ),
             Expanded(
               child: soloLectura
@@ -161,19 +167,15 @@ class _Encabezado extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          if (state.sinConexion)
-            StatusBanner(
-              texto: '${state.textoSync} · se enviará al recuperar señal',
-              accion: 'VER',
-              onAccion: state.alternarConexion,
-            )
-          else
-            StatusBanner(
-              texto: state.textoSync,
-              tono: BannerTone.ok,
-              accion: 'VER',
-              onAccion: state.alternarConexion,
-            ),
+          StatusBanner(
+            texto: state.hayCola
+                ? '${state.textoSync} · se enviará cuando haya conexión'
+                : state.textoSync,
+            tono: state.hayCola ? BannerTone.aviso : BannerTone.ok,
+            accion: 'SINCRONIZAR',
+            onAccion: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const SincronizacionScreen())),
+          ),
           if (soloLectura) ...[
             const SizedBox(height: 12),
             const _ResumenRamas(),
@@ -412,7 +414,7 @@ class _TarjetaCarga extends StatelessWidget {
   }
 }
 
-/// Vista del observador: una fila por paciente con el avance por fases.
+/// Vista de solo lectura: una fila por paciente con el avance por módulos.
 class _ListaCohorte extends StatelessWidget {
   const _ListaCohorte({required this.pacientes});
 
@@ -547,4 +549,86 @@ class _Vacio extends StatelessWidget {
               style: const TextStyle(fontSize: 13.5, color: T.faint)),
         ),
       );
+}
+
+/// Lo que el estudio espera de quien está mirando la pantalla.
+///
+/// Solo lo suyo: una lista con avisos que uno no puede atender se aprende a
+/// ignorar, y entonces deja de servir también para los que sí.
+///
+/// No es un calendario guardado. Cada aviso se deduce de los eventos que hay,
+/// así que desaparece solo en cuanto se registra el hito que lo cierra — nadie
+/// tiene que acordarse de tacharlo.
+class _Pendientes extends StatelessWidget {
+  const _Pendientes({required this.alertas});
+
+  final List<Alerta> alertas;
+
+  @override
+  Widget build(BuildContext context) {
+    if (alertas.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      color: T.warnBg,
+      padding: const EdgeInsets.fromLTRB(T.gutter, 12, T.gutter, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const SectionLabel('Pendiente'),
+              const SizedBox(width: 8),
+              MetaChip('${alertas.length}', tono: MetaTone.aviso),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final a in alertas.take(4)) ...[
+            _FilaAlerta(alerta: a),
+            const SizedBox(height: 6),
+          ],
+          if (alertas.length > 4)
+            Text('y ${alertas.length - 4} más', style: T.small),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilaAlerta extends StatelessWidget {
+  const _FilaAlerta({required this.alerta});
+
+  final Alerta alerta;
+
+  @override
+  Widget build(BuildContext context) {
+    final dias = alerta.diasEsperando(Seed.hoy);
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => PacienteTimelineScreen(patientId: alerta.paciente.id))),
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        children: [
+          Expanded(
+            child: RichText(
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              text: TextSpan(style: T.bodyText, children: [
+                TextSpan(
+                    text: alerta.paciente.codigo,
+                    style: T.bodyText.copyWith(fontWeight: FontWeight.w600)),
+                const TextSpan(text: '  ·  '),
+                TextSpan(text: alerta.tipo.etiqueta),
+                TextSpan(text: '  ·  ${alerta.detalle}', style: T.small),
+              ]),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Cuántos días lleva esperando, que es lo que decide por dónde
+          // empezar cuando hay varios.
+          Text(dias <= 0 ? 'hoy' : 'hace ${dias}d', style: T.small),
+        ],
+      ),
+    );
+  }
 }

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sivap/app.dart';
 import 'package:sivap/core/app_state.dart';
+import 'package:sivap/core/widgets/controls.dart';
 import 'package:sivap/data/local/seed_data.dart';
 import 'package:sivap/domain/models/evento_clinico.dart';
+import 'package:sivap/domain/models/patient.dart';
 import 'package:sivap/features/admin/admin_dashboard_screen.dart';
 import 'package:sivap/features/auth/login_screen.dart';
 import 'package:sivap/domain/models/role.dart';
@@ -11,6 +13,7 @@ import 'package:sivap/features/enrollment/enrollment_screen.dart';
 import 'package:sivap/features/eventos/evento_form_screen.dart';
 import 'package:sivap/features/eventos/paciente_timeline_screen.dart';
 import 'package:sivap/features/patients/patient_list_screen.dart';
+import 'package:sivap/features/sync/sincronizacion_screen.dart';
 
 /// Pruebas de pantalla: que cada una levante y muestre lo que promete.
 void main() {
@@ -50,11 +53,18 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  /// Resuelve la puerta de exclusión declarando que ningún criterio aplica.
+  Future<void> declararElegible(WidgetTester tester) async {
+    await tester.tap(find.text('Ninguno está presente'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('el enrolamiento pide centro y solo la ficha mínima',
       (tester) async {
     lienzo(tester, alto: 2600);
     final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
     await tester.pumpWidget(montar(const EnrollmentScreen(), estado: state));
+    await declararElegible(tester);
 
     expect(find.text('CENTRO'), findsOneWidget);
     expect(find.text('Hospital clínico-quirúrgico docente'), findsOneWidget);
@@ -62,6 +72,124 @@ void main() {
     // Retirados por minimización de datos personales (CLAUDE.md §9).
     expect(find.textContaining('CARNÉ'), findsNothing);
     expect(find.textContaining('DIRECCIÓN'), findsNothing);
+  });
+
+  testWidgets('la elegibilidad se resuelve antes de pedir nada del paciente',
+      (tester) async {
+    lienzo(tester, alto: 2600);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    await tester.pumpWidget(montar(const EnrollmentScreen(), estado: state));
+
+    // Los criterios se ven; la ficha todavía no.
+    expect(find.text('CRITERIOS DE EXCLUSIÓN'), findsOneWidget);
+    expect(find.text('Glasgow igual o menor de 8 puntos'), findsOneWidget);
+    expect(find.text('NOMBRE Y APELLIDOS'), findsNothing);
+    expect(find.text('CENTRO'), findsNothing);
+
+    await declararElegible(tester);
+
+    expect(find.text('NOMBRE Y APELLIDOS'), findsOneWidget);
+  });
+
+  testWidgets('un criterio presente detiene el enrolamiento ahí',
+      (tester) async {
+    lienzo(tester, alto: 2600);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    final antes = state.repo.pacientes().length;
+    await tester.pumpWidget(montar(const EnrollmentScreen(), estado: state));
+
+    // «Presente» en el primer criterio: trastorno neuromuscular grave.
+    await tester.tap(find.text('Presente').first);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('no elegible'), findsOneWidget);
+    // Ni ficha, ni paciente creado, ni posición de secuencia consumida.
+    expect(find.text('NOMBRE Y APELLIDOS'), findsNothing);
+    expect(state.repo.pacientes().length, antes);
+  });
+
+  testWidgets('sin resolver la elegibilidad no se puede guardar',
+      (tester) async {
+    lienzo(tester, alto: 2600);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    await tester.pumpWidget(montar(const EnrollmentScreen(), estado: state));
+
+    // Quedan los cinco por contestar, y se dice cuántos.
+    expect(find.text('QUEDAN 5'), findsOneWidget);
+
+    await tester.tap(find.text('No').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('QUEDAN 4'), findsOneWidget);
+    expect(find.text('NOMBRE Y APELLIDOS'), findsNothing);
+  });
+
+  testWidgets('lo pendiente se ve arriba, y solo lo que uno puede atender',
+      (tester) async {
+    lienzo(tester, alto: 2400);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.evaluador);
+    await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
+
+    // Hay un paciente extubado sin desenlaces: es trabajo suyo.
+    expect(find.text('PENDIENTE'), findsOneWidget);
+    // `findRichText`: la fila compone código, tipo y detalle en un solo
+    // párrafo, y sin esto el buscador no entra a mirarlo.
+    expect(
+      find.textContaining('Listo para evaluar desenlaces',
+          findRichText: true),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('quien no puede atender una alerta no la ve', (tester) async {
+    lienzo(tester, alto: 2400);
+    // El reclutador no captura desenlaces ni seguimiento. Una lista con avisos
+    // que uno no puede resolver se aprende a ignorar.
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutadorCardiologia);
+    await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
+
+    expect(find.text('PENDIENTE'), findsNothing);
+  });
+
+  testWidgets('desde la cola se llega a la pantalla de sincronización',
+      (tester) async {
+    lienzo(tester, alto: 2400);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
+
+    await tester.tap(find.text('SINCRONIZAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sincronización'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('la pantalla de sincronización dice que no bloquea la captura',
+      (tester) async {
+    lienzo(tester, alto: 2400);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    // Un paciente de verdad, para que haya algo esperando: los de
+    // demostración no se envían nunca.
+    state.repo.enrolar(
+      autor: Seed.reclutador,
+      institucion: Seed.coordinador,
+      nombre: 'Nombre Inventado',
+      numeroHistoriaClinica: 'HC-9',
+      telefonoPrincipal: '55512345',
+      edad: 62,
+      sexo: Sexo.masculino,
+    );
+    await tester.pumpWidget(
+        montar(const SincronizacionScreen(), estado: state));
+
+    // Que no se pueda enviar no impide trabajar, y tiene que decirlo
+    // (CLAUDE.md §12).
+    expect(find.textContaining('seguir capturando sin conexión'),
+        findsOneWidget);
+    // Sin sesión con el servidor no se puede enviar, y el botón lo refleja.
+    final boton = tester.widget<AppButton>(
+        find.widgetWithText(AppButton, 'Enviar lo pendiente'));
+    expect(boton.enabled, isFalse);
   });
 
   testWidgets('el usuario se puede escribir y selecciona su función',
@@ -117,7 +245,7 @@ void main() {
     expect(find.text('Aplicador'), findsOneWidget);
     expect(find.text('Evaluador de desenlaces'), findsOneWidget);
     expect(find.text('Investigador principal'), findsOneWidget);
-    expect(find.text('Observador'), findsOneWidget);
+    expect(find.text('Analista'), findsOneWidget);
     // El CEI no ha aprobado: la advertencia tiene que estar a la vista.
     expect(find.textContaining('Modo demostración'), findsOneWidget);
   });
@@ -134,9 +262,9 @@ void main() {
     expect(find.textContaining('IC-001'), findsNothing);
   });
 
-  testWidgets('el observador ve la cohorte y no puede enrolar', (tester) async {
+  testWidgets('el analista ve la cohorte y no puede enrolar', (tester) async {
     lienzo(tester);
-    final state = AppState.enMemoria()..iniciarSesion(Seed.observador);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.analista);
     await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
 
     expect(find.text('Cohorte completa'), findsOneWidget);
@@ -156,7 +284,7 @@ void main() {
         const PacienteTimelineScreen(patientId: 'p-demo-01'),
         estado: state));
 
-    expect(find.text('FASE 2 · CRIBADO'), findsOneWidget);
+    expect(find.text('MÓDULO 2 · CRIBADO'), findsOneWidget);
     expect(find.text('Prueba de ventilación espontánea'), findsWidgets);
     // Hito repetible: se anuncia como tal.
     expect(find.text('REPETIBLE'), findsWidgets);
@@ -191,10 +319,13 @@ void main() {
       estado: state,
     ));
 
-    expect(find.text('MONITORIZACIÓN AL INICIO DE LA PVE'), findsOneWidget);
-    expect(find.text('MONITORIZACIÓN AL FINAL DE LA PVE'), findsOneWidget);
+    expect(find.text('LA PRUEBA'), findsOneWidget);
     expect(find.text('Tubo en T'), findsOneWidget);
     expect(find.text('FECHA EN QUE OCURRIÓ'), findsOneWidget);
+
+    // La causa del fallo solo aparece cuando la prueba falló: es un campo
+    // condicional, y en blanco el formulario no lo enseña.
+    expect(find.text('SI LA PRUEBA FALLÓ'), findsNothing);
   });
 
   testWidgets('un evento registrado no ofrece captura al recolector',
@@ -225,10 +356,10 @@ void main() {
     await tester.pumpWidget(montar(const AdminDashboardScreen(), estado: state));
 
     expect(find.text('Pacientes del ensayo'), findsOneWidget);
-    expect(find.text('AVANCE POR FASES'), findsOneWidget);
+    expect(find.text('AVANCE POR MÓDULOS'), findsOneWidget);
     expect(find.text('Historial de auditoría — últimas correcciones'),
         findsOneWidget);
-    expect(find.textContaining('cifras transpuestas'), findsOneWidget);
+    expect(find.textContaining('hoja de enfermería'), findsOneWidget);
     // El recuento por rama no dice cuál es cuál.
     expect(find.textContaining('A: '), findsOneWidget);
   });

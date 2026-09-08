@@ -93,9 +93,12 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
     }
   }
 
-  void _registrar(List<FieldDefinition> campos) {
-    final faltan = campos
-        .where((c) => c.obligatorio && _vacio(_valores[c.key]))
+  void _registrar(EventoDefinicion definicion) {
+    // Solo se exige lo que está a la vista. Un campo oculto obligatorio
+    // bloquearía el formulario por algo que la pantalla ni enseña.
+    final faltan = definicion
+        .obligatoriosVisibles(_valores)
+        .where((c) => _vacio(_valores[c.key]))
         .map((c) => c.label)
         .toList();
     if (faltan.isNotEmpty) {
@@ -120,6 +123,27 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
 
   static bool _vacio(Object? v) =>
       v == null || (v is String && v.trim().isEmpty) || (v is List && v.isEmpty);
+
+  /// Rehace lo que depende de otros campos, después de cada cambio.
+  ///
+  /// Dos cosas, y el orden importa. Primero se borra lo que ha dejado de
+  /// verse: quien contesta «Fallo», elige una causa y luego rectifica a
+  /// «Éxito» no debe dejar la causa guardada por detrás. Después se recalculan
+  /// el IMC y los suyos, que pueden depender de lo que se acaba de escribir.
+  void _recalcular(EventoDefinicion definicion) {
+    for (final campo in definicion.campos) {
+      if (!campo.visibleCon(_valores)) _valores.remove(campo.key);
+    }
+    for (final campo in definicion.campos) {
+      if (!campo.esCalculado) continue;
+      final valor = Calculos.resolver(campo, _valores);
+      if (valor == null) {
+        _valores.remove(campo.key);
+      } else {
+        _valores[campo.key] = valor;
+      }
+    }
+  }
 
   Future<void> _corregir(FieldDefinition campo) async {
     final state = AppScope.read(context);
@@ -187,7 +211,6 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
       );
     }
 
-    final campos = definicion.campos.toList();
 
     return Scaffold(
       backgroundColor: T.surface,
@@ -251,19 +274,32 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
             // Aquí ocurre lo importante: el formulario es un recorrido sobre la
             // definición, no una lista de widgets a mano.
             for (final seccion in definicion.secciones) ...[
-              SectionLabel(seccion.titulo),
-              const SizedBox(height: 9),
-              _Seccion(
-                campos: seccion.campos,
-                valores: _valores,
-                soloLectura: soloLectura,
-                onChanged: (key, valor) => setState(() {
-                  _valores[key] = valor;
-                  _sucio = true;
-                }),
-                onCorregir: puedeCorregir ? _corregir : null,
-              ),
-              const SizedBox(height: 20),
+              // La puerta de exclusión no se repite aquí: se contestó en el
+              // enrolamiento, antes de que el paciente existiera. Volver a
+              // preguntarla sería pedir dos veces lo mismo, y todo paciente
+              // enrolado la contestó igual — por eso no se guarda.
+              //
+              // Y una sección cuyos campos están todos ocultos no se pinta: un
+              // título suelto sin nada debajo hace pensar que falta algo.
+              if (!seccion.esPuertaDeExclusion &&
+                  seccion.campos.any((c) => c.visibleCon(_valores))) ...[
+                SectionLabel(seccion.titulo),
+                const SizedBox(height: 9),
+                _Seccion(
+                  campos: seccion.campos
+                      .where((c) => c.visibleCon(_valores))
+                      .toList(),
+                  valores: _valores,
+                  soloLectura: soloLectura,
+                  onChanged: (key, valor) => setState(() {
+                    _valores[key] = valor;
+                    _recalcular(definicion);
+                    _sucio = true;
+                  }),
+                  onCorregir: puedeCorregir ? _corregir : null,
+                ),
+                const SizedBox(height: 20),
+              ],
             ],
           ],
         ),
@@ -279,7 +315,8 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
               const SizedBox(width: 10),
               Expanded(
                 flex: 15,
-                child: AppButton('Registrar', onTap: () => _registrar(campos)),
+                child: AppButton('Registrar',
+                    onTap: () => _registrar(definicion)),
               ),
             ]),
     );
@@ -384,10 +421,12 @@ class _Seccion extends StatelessWidget {
     );
   }
 
+  // Un campo calculado se muestra pero no se edita: si el IMC no cuadra, lo
+  // que hay que corregir es el peso o la talla.
   Widget _input(FieldDefinition campo) => FieldInput(
         campo: campo,
         valor: valores[campo.key],
-        soloLectura: soloLectura,
+        soloLectura: soloLectura || campo.esCalculado,
         onChanged: (v) => onChanged(campo.key, v),
         onCorregir: onCorregir == null ? null : () => onCorregir!(campo),
       );

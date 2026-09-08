@@ -1,12 +1,13 @@
 # Qué falta
 
-Inventario verificado contra el código el 21 ago 2026. Se actualiza al cerrar
+Inventario verificado contra el código el 8 sep 2026. Se actualiza al cerrar
 cada hito.
 
-> **El riesgo mayor hoy no es que falte una funcionalidad: es que la app no
-> sincroniza.** Lo que se capture ahora vive en un solo teléfono. Si ese
-> teléfono se rompe o se pierde, se pierde con él — y la clave de cifrado va en
-> su Keystore, así que no hay forma de recuperarlo desde otro sitio.
+> **El riesgo mayor sigue siendo que lo capturado vive en un solo teléfono.**
+> El servidor ya sabe recibirlo; la app todavía no sabe enviarlo. Hasta que las
+> dos mitades se junten, un teléfono roto o perdido se lleva sus datos consigo
+> — la clave de cifrado va en su Keystore, así que no hay de dónde
+> recuperarlos.
 
 ---
 
@@ -15,7 +16,7 @@ cada hito.
 | | |
 |---|---|
 | Captura por eventos clínicos | Línea de tiempo por fases, hitos repetibles, trayectorias incompletas |
-| Campos del Anexo 4 | Los cuatro módulos con sus categorías reales |
+| Campos del Anexo 4 | Los cinco módulos de la revisión, con condicionales y cálculos |
 | Cegamiento | Solo Protocolo A y B; el evaluador de desenlaces no ve la rama |
 | Separación de funciones | Seis funciones; la captura va por tipo de hito |
 | Multicéntrico | Centro en ficha, evento e investigador |
@@ -25,6 +26,10 @@ cada hito.
 | Esquema central | PostgreSQL, 14 garantías comprobadas en cada push |
 | Api: sesiones, dispositivos, tramos | 30 pruebas contra Postgres real |
 | Reparto de la secuencia | Tramos disjuntos; la colisión pasa de silenciosa a error |
+| Api: recepción de lotes | Idempotente, rechazo por registro con su motivo escrito |
+| Cola de envío | Acuse por registro; los datos de demostración quedan fuera |
+| Sincronización en la app | Pantalla propia: servidor, sesión, envío y motivos de rechazo |
+| Alertas | Seguimiento a los 7, 14 y 28 días, y paciente listo para evaluar |
 | Distribución | APK firmado, con icono, publicado y descargable sin cuenta |
 | Integración continua | App, esquema y api en cada push; aviso por Telegram al publicar |
 
@@ -34,18 +39,36 @@ cada hito.
 
 Ordenado por cuánto riesgo quita.
 
-### 1. Sincronización
+### 1. Sincronización — falta la mitad del cliente
 
-Hoy la app **no hace una sola llamada de red**: el «en cola» es un interruptor
-de demostración.
+El servidor ya recibe: `POST /api/sincronizacion` acepta pacientes, identidad,
+asignación, consentimientos, eventos, valores y auditoría; reenviar un lote no
+duplica nada, y lo que se rechaza queda escrito con su motivo en el diario de
+lotes.
 
-- **En la app**: cliente HTTP, cola de envío, `Ids.nuevo` a UUIDv4 (el esquema
-  usa `uuid` y la app genera `p-3f9a…`), pedir el tramo al servidor en vez de
-  llevar la secuencia entera, y **dejar de enrolar** cuando se quede sin tramo
-  y sin conexión. Improvisar una asignación es lo que la aleatorización
-  pre-generada existe para evitar.
-- **En la api**: recepción idempotente de eventos y auditoría, y el diario de
-  lotes que el esquema ya prevé.
+Del lado del cliente ya están el cliente HTTP y la cola: reúne lo pendiente, lo
+manda en un lote y marca solo lo que el servidor aceptó. Los datos de
+demostración quedan fuera y los borradores tampoco viajan.
+
+La app ya la usa: hay pantalla de sincronización con la dirección del servidor,
+el acceso, el envío y —lo que más importa— el motivo por el que el servidor no
+admitió algo. El identificador del aparato se guarda entre arranques, que era
+necesario: si se regenerara, el servidor le daría un tramo nuevo de la
+secuencia cada vez.
+
+El envío es **manual, a propósito**. Un reintento automático en bucle sobre una
+conexión que va y viene gasta batería y no añade nada que un botón no dé; y la
+captura no depende de él en ningún caso.
+
+Falta la parte de la aleatorización:
+
+- pedir el tramo de secuencia al servidor en vez de llevar la secuencia entera;
+- **dejar de enrolar** cuando se quede sin tramo y sin conexión. Improvisar una
+  asignación es lo que la aleatorización pre-generada existe para evitar.
+
+Y dos cosas menores: que el detalle de los rechazos sobreviva a cerrar la app
+—hoy vive en memoria, aunque el dato rechazado no se pierde— y poner etiqueta
+al aparato para distinguirlo en el panel.
 
 ### 2. Exportación `.xlsx`
 
@@ -102,11 +125,12 @@ Ninguna la puede resolver quien programa, y todas bloquean pacientes reales.
    corto obliga a pedir otro más a menudo, y hace falta conexión para pedirlo;
    tramo largo quema más posiciones si se pierde un teléfono.
 5. **Rangos clínicos** de cada campo numérico → `docs/RANGOS_PENDIENTES.md`.
-6. **RSBI: número o categoría.** Hoy categoría, como dice el Anexo 4. Un 92 y
-   un 104 caen en la misma y el dataset deja de distinguirlos. Al revés no
-   tiene vuelta.
-7. **Unidades** de la detención de sedación y del tiempo entre PVE y
-   extubación. Hoy horas con un decimal.
+6. **RSBI**: la revisión del Anexo 4 lo retiró junto con el resto de la
+   monitorización de la PVE. Decidir si vuelve como número al final de la
+   prueba → `docs/ANEXO4_CAMBIOS.md`.
+7. **Acceso del evaluador al Módulo 1** y **qué significa retirar a un
+   paciente**. Las dos salen de la revisión del Anexo 4, y las dos afectan a la
+   validez del estudio → `docs/ANEXO4_CAMBIOS.md`.
 8. **Umbral de VMI para incluir**: el protocolo dice >24 h, el proyecto >48 h.
 9. **Acumulación de funciones**: si un médico puede cumplir varias. Está como
    configuración; la combinación peligrosa está identificada.
@@ -123,11 +147,14 @@ Queda lo que ninguna prueba automática puede hacer:
 
 1. Que el archivo `.db` **no contenga el nombre del paciente en claro**.
 2. Que reabrir con otra clave falle.
-3. Que el disparador de auditoría aborte un `UPDATE`.
-4. Que dos borradores del mismo hito no puedan coexistir.
-5. **Enrolar → cerrar la app → reabrir → enrolar.** El segundo paciente debe
+3. **Enrolar → cerrar la app → reabrir → enrolar.** El segundo paciente debe
    recibir la posición siguiente de la secuencia, no la primera. Es el fallo
    que más daño haría y sigue sin comprobarse.
+
+Dos que estaban en esta lista ya no lo están: que dos borradores del mismo hito
+no puedan coexistir y que una corrección sin motivo no entre. Las comprueba
+`test/esquema_local_test.dart` contra un SQLite de verdad, sin cifrar — la
+forma del esquema se puede probar sin teléfono; el cifrado no.
 
 Y la que más vale de todas: **que un intensivista capture una PVE completa**.
 Mientras no haya sincronización ni exportación, todavía se pueden cambiar los

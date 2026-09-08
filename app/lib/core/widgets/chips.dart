@@ -42,7 +42,7 @@ class ProtocolChip extends StatelessWidget {
   }
 }
 
-/// Indicador compacto del avance por fases del proceso de liberación.
+/// Indicador compacto del avance por módulos del proceso de liberación.
 ///
 /// Sustituye a las píldoras de día del modelo anterior. No dice si una fase
 /// «falta»: en un ensayo dirigido por eventos no hay forma de saber qué tenía

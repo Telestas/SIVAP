@@ -5,16 +5,34 @@ import '../../core/format.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
 import '../../core/widgets/controls.dart';
+import '../../domain/models/estudio_form_definition.dart';
+import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/institucion.dart';
 import '../../domain/models/patient.dart';
 import '../consent/consent_screen.dart';
 
 /// Enrolamiento de paciente.
 ///
-/// Captura **solo la ficha**. Ni un dato clínico entra aquí: eso son eventos,
-/// que son otra entidad (CLAUDE.md §1). Y solo lo imprescindible: el carné de
-/// identidad y la dirección se retiraron porque el Anexo 4 no los pide, y cada
-/// dato personal almacenado hay que justificarlo ante el CEI (§9).
+/// Dos pasos, y el orden importa.
+///
+/// **Primero la elegibilidad.** Los criterios de exclusión se resuelven antes
+/// de pedir un solo dato del paciente. Si alguno está presente, el enrolamiento
+/// se detiene ahí: no se crea ficha, no se guarda nada y no se consume posición
+/// de la secuencia de aleatorización. Un paciente que no entró en el estudio no
+/// debe dejar rastro en él — que es distinto de uno que entró y hubo que
+/// retirar, y ese sí lo deja.
+///
+/// **Después la ficha**, y **solo la ficha**. Ni un dato clínico entra aquí:
+/// eso son eventos, que son otra entidad (CLAUDE.md §1). Y solo lo
+/// imprescindible: el carné de identidad y la dirección se retiraron porque el
+/// Anexo 4 no los pide, y cada dato personal almacenado hay que justificarlo
+/// ante el CEI (§9).
+///
+/// Los criterios se leen de la definición del formulario, no están escritos
+/// aquí (§5). Sus respuestas no se guardan: todo paciente enrolado los contestó
+/// igual —ninguno presente—, así que cinco columnas idénticas no dirían nada.
+/// Lo que sí tendría valor es un registro de cribado de los **excluidos**, y
+/// eso es una decisión del CEI que está pendiente.
 class EnrollmentScreen extends StatefulWidget {
   const EnrollmentScreen({super.key});
 
@@ -30,6 +48,10 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   final _telefonoAlt = TextEditingController();
   Sexo _sexo = Sexo.femenino;
   Institucion? _institucion;
+
+  /// Respuestas a los criterios de exclusión. Viven mientras dura la pantalla
+  /// y no se guardan en ninguna parte.
+  final Map<String, Object?> _criterios = {};
 
   /// Se rellena al guardar. Hasta entonces no hay asignación: consumir una
   /// entrada de la secuencia por un formulario que quizá se abandone dejaría
@@ -59,6 +81,17 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
     }
     super.dispose();
   }
+
+  /// La puerta sale de la definición del formulario, no de esta pantalla.
+  FormSection? _puerta(BuildContext context) => AppScope.of(context)
+      .repo
+      .config
+      .definicionFormulario
+      .para(TipoEvento.enrolamiento)
+      ?.puertaDeExclusion;
+
+  bool _elegibilidadResuelta(FormSection puerta) =>
+      puerta.campos.every((c) => _criterios[c.key] is bool);
 
   bool get _completo =>
       _nombre.text.trim().isNotEmpty &&
@@ -106,6 +139,10 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
     final state = AppScope.of(context);
     final config = state.repo.config;
 
+    final puerta = _puerta(context);
+    final resuelta = puerta == null || _elegibilidadResuelta(puerta);
+    final excluido = puerta != null && puerta.excluye(_criterios);
+
     return Scaffold(
       backgroundColor: T.surface,
       appBar: AppTopBar(
@@ -118,7 +155,46 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(T.gutter, 16, T.gutter, 16),
           children: [
-            // Restricción CLAUDE.md §13. El flag lo controla la configuración
+            if (puerta != null) ...[
+              _Elegibilidad(
+                puerta: puerta,
+                respuestas: _criterios,
+                // Una vez guardada la ficha ya no se puede cambiar de idea:
+                // la posición de la secuencia está consumida.
+                bloqueada: _guardado != null,
+                onChanged: (key, valor) =>
+                    setState(() => _criterios[key] = valor),
+                onNinguno: () => setState(() {
+                  for (final c in puerta.campos) {
+                    _criterios[c.key] = false;
+                  }
+                }),
+              ),
+              const SizedBox(height: 18),
+            ],
+
+            // Con un criterio presente el enrolamiento se acaba aquí. No se
+            // pide nada más porque no hay nada que registrar.
+            if (excluido) ...[
+              StatusBanner(
+                texto: puerta.mensajeAlExcluir ??
+                    'Paciente no elegible para el estudio.',
+                alineaArriba: true,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'No se guarda ningún dato de este paciente ni se consume '
+                'posición de la secuencia de aleatorización.',
+                style: T.small,
+              ),
+            ],
+
+            // Los datos del paciente aparecen cuando la elegibilidad está
+            // resuelta y ningún criterio está presente. Es lo que pide el
+            // Anexo 4 —«si no marca ninguno, desplegar los campos»— y evita el
+            // botón apagado que nadie sabe por qué está apagado.
+            if (!excluido && resuelta) ...[
+              // Restricción CLAUDE.md §13. El flag lo controla la configuración
             // del estudio, no el código ni el investigador.
             if (!config.consentimientoAprobadoPorCei) ...[
               const StatusBanner(
@@ -202,6 +278,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
                 onAccion: _irAConsentimiento,
               ),
             ],
+            ],
           ],
         ),
       ),
@@ -210,14 +287,15 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
           flex: 10,
           child: AppButton('Guardar',
               primary: false,
-              enabled: _completo && _guardado == null,
+              enabled: !excluido && resuelta && _completo && _guardado == null,
               onTap: _guardar),
         ),
         const SizedBox(width: 10),
         Expanded(
           flex: 14,
           child: AppButton('Ir a consentimiento',
-              enabled: _completo, onTap: _irAConsentimiento),
+              enabled: !excluido && resuelta && _completo,
+              onTap: _irAConsentimiento),
         ),
       ]),
     );
@@ -335,5 +413,107 @@ class _PanelAsignacion extends StatelessWidget {
                 style: TextStyle(fontSize: 12, color: T.secondary, height: 1.5)),
           ],
         ),
+      );
+}
+
+/// Los criterios de exclusión, antes de pedir nada del paciente.
+///
+/// Se responden uno a uno, y no por casillas que se dejan sin marcar. La
+/// diferencia importa: una casilla vacía no distingue «lo comprobé y no está»
+/// de «no lo miré», y en un ensayo esas dos cosas no son la misma. El atajo
+/// «ninguno está presente» resuelve de un toque el caso habitual, que es el de
+/// casi todos los pacientes.
+class _Elegibilidad extends StatelessWidget {
+  const _Elegibilidad({
+    required this.puerta,
+    required this.respuestas,
+    required this.bloqueada,
+    required this.onChanged,
+    required this.onNinguno,
+  });
+
+  final FormSection puerta;
+  final Map<String, Object?> respuestas;
+  final bool bloqueada;
+  final void Function(String key, bool valor) onChanged;
+  final VoidCallback onNinguno;
+
+  @override
+  Widget build(BuildContext context) {
+    final marcados = puerta.criteriosMarcados(respuestas);
+    final sinContestar =
+        puerta.campos.where((c) => respuestas[c.key] is! bool).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            SectionLabel(puerta.titulo),
+            if (sinContestar > 0 && !bloqueada)
+              MetaChip('QUEDAN $sinContestar', tono: MetaTone.aviso)
+            else if (marcados.isEmpty)
+              const MetaChip('ELEGIBLE', tono: MetaTone.ok),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Se comprueban antes de pedir los datos del paciente.',
+          style: T.small,
+        ),
+        const SizedBox(height: 12),
+        for (final campo in puerta.campos) ...[
+          _Criterio(
+            campo: campo,
+            valor: respuestas[campo.key] as bool?,
+            bloqueado: bloqueada,
+            onChanged: (v) => onChanged(campo.key, v),
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (!bloqueada && sinContestar > 0)
+          AppButton('Ninguno está presente', primary: false, onTap: onNinguno),
+      ],
+    );
+  }
+}
+
+class _Criterio extends StatelessWidget {
+  const _Criterio({
+    required this.campo,
+    required this.valor,
+    required this.bloqueado,
+    required this.onChanged,
+  });
+
+  final FieldDefinition campo;
+  final bool? valor;
+  final bool bloqueado;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Text(campo.label,
+                style: valor == true
+                    ? T.bodyText.copyWith(color: T.warnFg)
+                    : T.bodyText),
+          ),
+          const SizedBox(width: 10),
+          SelectablePill(
+            texto: 'Presente',
+            seleccionado: valor == true,
+            onTap: bloqueado ? null : () => onChanged(true),
+          ),
+          const SizedBox(width: 6),
+          SelectablePill(
+            texto: 'No',
+            seleccionado: valor == false,
+            onTap: bloqueado ? null : () => onChanged(false),
+          ),
+        ],
       );
 }

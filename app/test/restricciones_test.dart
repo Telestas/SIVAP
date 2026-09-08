@@ -159,10 +159,12 @@ void main() {
 
     test('un hito no repetible no se duplica: se corrige', () {
       final p = conConsentimiento();
-      registrar(p, TipoEvento.egresoUci, const {'estancia_uci': 10});
+      registrar(p, TipoEvento.desenlaces,
+          const {'estancia_uci': '5 días o menos'});
 
       expect(
-        () => registrar(p, TipoEvento.egresoUci, const {'estancia_uci': 11}),
+        () => registrar(p, TipoEvento.desenlaces,
+            const {'estancia_uci': 'De 6 a 14 días'}),
         throwsA(isA<EventoNoRepetible>()),
       );
     });
@@ -172,7 +174,7 @@ void main() {
       final p = conConsentimiento();
       for (var i = 0; i < 4; i++) {
         registrar(p, TipoEvento.pruebaVentilacionEspontanea,
-            {'metodo_pve': 'Tubo en T', 'rsbi_inicio': 90 + i});
+            {'metodo_pve': 'Tubo en T', 'resultado_pve': 'Fallo'});
       }
 
       final intentos = repo
@@ -184,17 +186,19 @@ void main() {
     });
 
     test('una trayectoria incompleta no es un error', () {
-      // Traqueostomía: el paciente sale del proceso y nunca llega a extubarse.
-      // No hay nada que marcar como perdido — esos eventos simplemente no
-      // existen.
+      // El paciente sale del proceso por traqueostomía y nunca se extuba, y
+      // tampoco llega a desenlaces. No hay nada que marcar como perdido: esos
+      // eventos simplemente no existen.
       final p = conConsentimiento();
       registrar(p, TipoEvento.cribado, const {'cumple_criterios': false});
-      registrar(p, TipoEvento.traqueostomia,
-          const {'fecha_traqueostomia': '2026-08-18'});
+      registrar(p, TipoEvento.extubacion, const {
+        'traqueostomia': true,
+        'fecha_traqueostomia': '2026-08-18',
+      });
 
       final tipos = repo.eventosDe(p.id).map((e) => e.tipo).toSet();
-      expect(tipos, contains(TipoEvento.traqueostomia));
-      expect(tipos, isNot(contains(TipoEvento.extubacion)));
+      expect(tipos, contains(TipoEvento.extubacion));
+      expect(tipos, isNot(contains(TipoEvento.desenlaces)));
     });
 
     test('no existe un estado de evento «perdido»', () {
@@ -208,9 +212,9 @@ void main() {
       final e = repo.registrarEvento(
         autor: Seed.reclutador,
         patientId: p.id,
-        tipo: TipoEvento.traqueostomia,
+        tipo: TipoEvento.extubacion,
         fechaOcurrencia: ocurrio,
-        valores: const {'fecha_traqueostomia': '2026-08-11'},
+        valores: const {'traqueostomia': false},
       );
 
       expect(e.fechaOcurrencia, ocurrio);
@@ -221,7 +225,7 @@ void main() {
 
   group('§5 · formularios configurables', () {
     test('los hitos con formulario salen de la definición, no del código', () {
-      const def = Seed.formulario;
+      final def = Seed.formulario;
 
       expect(def.tieneFormulario(TipoEvento.pruebaVentilacionEspontanea), isTrue);
       expect(def.para(TipoEvento.cribado)!.campos, isNotEmpty);
@@ -256,34 +260,54 @@ void main() {
       }
     });
 
-    test('los cuatro módulos del Anexo 4 están representados', () {
+    test('los cinco módulos del Anexo 4 están representados', () {
       final claves = {
         for (final e in Seed.formulario.eventos)
           for (final c in e.campos) c.key
       };
 
-      // Módulo 1
-      expect(claves, containsAll(['fecha_ingreso_uci', 'causa_intubacion',
-          'comorbilidades', 'imc']));
-      // Módulo 2
-      expect(claves, containsAll(['fecha_inicio_vmi', 'fio2', 'peep',
-          'metodo_pve', 'rsbi_inicio', 'rsbi_final', 'resultado_pve']));
-      // Módulo 3
-      expect(claves, containsAll(['test_fuga', 'resultado_test_fuga',
-          'duracion_total_vmi']));
-      // Módulo 4
+      // Módulo 1 · enrolamiento
+      expect(claves, containsAll(['exclusion_glasgow', 'fecha_ingreso_uci',
+          'fecha_inicio_vmi', 'causa_intubacion', 'peso', 'talla', 'imc',
+          'categoria_imc', 'estratificacion_riesgo', 'comorbilidades']));
+      // Módulo 2 · cribado
+      expect(claves, contains('cumple_criterios'));
+      // Módulo 3 · destete
+      expect(claves, containsAll(['modo_ventilatorio_previo', 'metodo_pve',
+          'duracion_pve', 'resultado_pve', 'causa_fallo_pve']));
+      // Módulo 4 · extubación y post-extubación
+      expect(claves, containsAll(['traqueostomia', 'test_fuga',
+          'resultado_test_fuga', 'esteroides_iv_previos',
+          'tiempo_pve_extubacion', 'tipo_soporte', 'duracion_total_vmi']));
+      // Módulo 5 · desenlaces y seguimiento
       expect(claves, containsAll(['reintubacion_72h', 'causa_reintubacion',
           'eventos_adversos', 'estancia_uci', 'estado_egreso',
-          'fallecimiento_post_egreso']));
+          'ventana_contacto', 'fallecido']));
     });
 
-    test('el RSBI usa las categorías del Anexo 4', () {
-      final rsbi = Seed.formulario
-          .para(TipoEvento.pruebaVentilacionEspontanea)!
-          .campos
-          .firstWhere((c) => c.key == 'rsbi_inicio');
+    test('la monitorización de la PVE ya no se pide', () {
+      // La revisión del Anexo 4 retiró RSBI, frecuencia respiratoria, Vt,
+      // volumen minuto, Pplateau y driving pressure. Queda anotado aquí para
+      // que su vuelta sea una decisión y no un descuido: sin RSBI el dataset
+      // no se puede comparar con la literatura de destete, y del número a la
+      // categoría se puede ir, al revés no. Ver docs/ANEXO4_CAMBIOS.md.
+      final claves = {
+        for (final c in Seed.formulario
+            .para(TipoEvento.pruebaVentilacionEspontanea)!
+            .campos)
+          c.key
+      };
 
-      expect(rsbi.opciones, ['> 105', '≤ 105', '≤ 58']);
+      expect(
+        claves.where((k) =>
+            k.startsWith('rsbi') ||
+            k.startsWith('fr_') ||
+            k.startsWith('vt_') ||
+            k.startsWith('vm_') ||
+            k.startsWith('pplateau') ||
+            k.startsWith('driving_pressure')),
+        isEmpty,
+      );
     });
 
     test('«total de PVE intentadas» no se pide: se cuenta', () {
@@ -393,10 +417,10 @@ void main() {
   });
 
   group('§11 · roles y permisos', () {
-    test('el observador no enrola ni captura', () {
+    test('el analista no enrola ni captura', () {
       expect(
         () => repo.enrolar(
-            autor: Seed.observador,
+            autor: Seed.analista,
             institucion: Seed.coordinador,
             nombre: 'X',
             numeroHistoriaClinica: '1',
@@ -505,7 +529,7 @@ void main() {
         () => repo.registrarEvento(
             autor: Seed.aplicador,
             patientId: p.id,
-            tipo: TipoEvento.reintubacion,
+            tipo: TipoEvento.desenlaces,
             fechaOcurrencia: DateTime(2026, 8, 20),
             valores: const {'reintubacion_72h': false}),
         throwsA(isA<FueraDeSuFuncion>()),

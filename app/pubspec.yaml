@@ -36,6 +36,10 @@ dependencies:
   path_provider: ^2.1.4
   path: ^1.9.0
 
+  # Cliente HTTP. `dart:io` no sirve: la app también compila para navegador y
+  # allí no existe. `package:http` da la misma interfaz en las dos.
+  http: ^1.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

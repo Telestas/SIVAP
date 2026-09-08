@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from .. import bd
 from ..ajustes import ajustes
-from ..dependencias import Autenticado, exigir_rol
+from ..dependencias import Autenticado, dispositivo_propio, exigir_rol
 from ..modelos import Dispositivo, PeticionDispositivo, Tramo
 
 router = APIRouter(prefix='/dispositivos', tags=['dispositivos'])
@@ -65,7 +65,7 @@ def tramo(dispositivo_id: str, quien: Autenticado) -> Tramo:
     dispositivos que no la están usando.
     """
     with bd.conexion() as con:
-        _comprobar_propiedad(con, dispositivo_id, quien)
+        dispositivo_propio(con, dispositivo_id, quien)
 
         secuencia = bd.uno(
             con,
@@ -101,18 +101,6 @@ def tramo(dispositivo_id: str, quien: Autenticado) -> Tramo:
         # ensayo entero.
         codigo_binario=secuencia['codigo_binario'][desde - 1:hasta - 1],
     )
-
-
-def _comprobar_propiedad(con, dispositivo_id, quien) -> None:
-    fila = bd.uno(con, 'SELECT investigador_id FROM dispositivo WHERE id = %s',
-                  (dispositivo_id,))
-    if fila is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail='Dispositivo no registrado.')
-    if fila['investigador_id'] != quien['investigador_id']:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail='Ese dispositivo no es suyo.')
 
 
 def _tramo_con_posiciones_libres(con, dispositivo_id, etiqueta):

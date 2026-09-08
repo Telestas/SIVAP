@@ -121,6 +121,33 @@ void main() {
     expect(find.text('NOMBRE Y APELLIDOS'), findsNothing);
   });
 
+  testWidgets('lo pendiente se ve arriba, y solo lo que uno puede atender',
+      (tester) async {
+    lienzo(tester, alto: 2400);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.evaluador);
+    await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
+
+    // Hay un paciente extubado sin desenlaces: es trabajo suyo.
+    expect(find.text('PENDIENTE'), findsOneWidget);
+    // `findRichText`: la fila compone código, tipo y detalle en un solo
+    // párrafo, y sin esto el buscador no entra a mirarlo.
+    expect(
+      find.textContaining('Listo para evaluar desenlaces',
+          findRichText: true),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('quien no puede atender una alerta no la ve', (tester) async {
+    lienzo(tester, alto: 2400);
+    // El reclutador no captura desenlaces ni seguimiento. Una lista con avisos
+    // que uno no puede resolver se aprende a ignorar.
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutadorCardiologia);
+    await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
+
+    expect(find.text('PENDIENTE'), findsNothing);
+  });
+
   testWidgets('el usuario se puede escribir y selecciona su función',
       (tester) async {
     lienzo(tester);

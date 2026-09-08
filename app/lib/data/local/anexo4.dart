@@ -52,6 +52,20 @@ import '../../domain/models/evento_clinico.dart';
 class Anexo4 {
   const Anexo4._();
 
+  /// Cuándo se contacta al paciente tras el egreso de UCI.
+  ///
+  /// Los días y las etiquetas viven aquí y en ningún otro sitio. Las opciones
+  /// del campo salen de esta lista, y las alertas de seguimiento cuentan con
+  /// los mismos números: si estuvieran escritos dos veces, el día que cambien
+  /// cambiarán en uno solo.
+  static const ventanasSeguimiento = <int>[7, 14, 28];
+
+  static String ventana(int dias) => 'Día $dias tras el egreso';
+
+  static final etiquetasSeguimiento = [
+    for (final dias in ventanasSeguimiento) ventana(dias),
+  ];
+
   /// Modos ventilatorios. La misma lista antes de la PVE y antes de extubar:
   /// si divergieran, el dataset tendría dos vocabularios para lo mismo.
   static const modosVentilatorios = [
@@ -70,7 +84,7 @@ class Anexo4 {
     'Otro modo',
   ];
 
-  static const definicion = EstudioFormDefinition(
+  static final definicion = EstudioFormDefinition(
     version: 'anexo4-v2',
     eventos: [
       _enrolamiento,
@@ -658,7 +672,7 @@ class Anexo4 {
   // Seguimiento post-egreso — un registro por contacto
   // ══════════════════════════════════════════════════════════════
 
-  static const _seguimientoPostEgreso = EventoDefinicion(
+  static final _seguimientoPostEgreso = EventoDefinicion(
     tipo: TipoEvento.seguimientoPostEgreso,
     secciones: [
       FormSection(
@@ -670,20 +684,16 @@ class Anexo4 {
             tipo: FieldType.seleccionUnica,
             obligatorio: true,
             ancho: 2,
-            opciones: [
-              'Día 7 tras el egreso',
-              'Día 14 tras el egreso',
-              'Día 28 tras el egreso',
-            ],
+            opciones: etiquetasSeguimiento,
           ),
-          FieldDefinition(
+          const FieldDefinition(
             key: 'fallecido',
             label: '¿Ha fallecido el paciente?',
             tipo: FieldType.siNo,
             obligatorio: true,
             ancho: 2,
           ),
-          FieldDefinition(
+          const FieldDefinition(
             key: 'causa_fallecimiento',
             label: 'Causa del fallecimiento',
             tipo: FieldType.texto,

@@ -7,6 +7,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
 import '../../core/widgets/controls.dart';
 import '../../data/local/seed_data.dart';
+import '../../domain/alertas.dart';
 import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/protocolo.dart';
@@ -58,6 +59,10 @@ class _PatientListScreenState extends State<PatientListScreen> {
               filtro: _filtro,
               onFiltro: (f) => setState(() => _filtro = f),
               onBuscar: (v) => setState(() => _busqueda = v),
+            ),
+            _Pendientes(
+              alertas: Alertas.pendientes(state.repo,
+                  hoy: Seed.hoy, para: usuario),
             ),
             Expanded(
               child: soloLectura
@@ -547,4 +552,86 @@ class _Vacio extends StatelessWidget {
               style: const TextStyle(fontSize: 13.5, color: T.faint)),
         ),
       );
+}
+
+/// Lo que el estudio espera de quien está mirando la pantalla.
+///
+/// Solo lo suyo: una lista con avisos que uno no puede atender se aprende a
+/// ignorar, y entonces deja de servir también para los que sí.
+///
+/// No es un calendario guardado. Cada aviso se deduce de los eventos que hay,
+/// así que desaparece solo en cuanto se registra el hito que lo cierra — nadie
+/// tiene que acordarse de tacharlo.
+class _Pendientes extends StatelessWidget {
+  const _Pendientes({required this.alertas});
+
+  final List<Alerta> alertas;
+
+  @override
+  Widget build(BuildContext context) {
+    if (alertas.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      color: T.warnBg,
+      padding: const EdgeInsets.fromLTRB(T.gutter, 12, T.gutter, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const SectionLabel('Pendiente'),
+              const SizedBox(width: 8),
+              MetaChip('${alertas.length}', tono: MetaTone.aviso),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final a in alertas.take(4)) ...[
+            _FilaAlerta(alerta: a),
+            const SizedBox(height: 6),
+          ],
+          if (alertas.length > 4)
+            Text('y ${alertas.length - 4} más', style: T.small),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilaAlerta extends StatelessWidget {
+  const _FilaAlerta({required this.alerta});
+
+  final Alerta alerta;
+
+  @override
+  Widget build(BuildContext context) {
+    final dias = alerta.diasEsperando(Seed.hoy);
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => PacienteTimelineScreen(patientId: alerta.paciente.id))),
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        children: [
+          Expanded(
+            child: RichText(
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              text: TextSpan(style: T.bodyText, children: [
+                TextSpan(
+                    text: alerta.paciente.codigo,
+                    style: T.bodyText.copyWith(fontWeight: FontWeight.w600)),
+                const TextSpan(text: '  ·  '),
+                TextSpan(text: alerta.tipo.etiqueta),
+                TextSpan(text: '  ·  ${alerta.detalle}', style: T.small),
+              ]),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Cuántos días lleva esperando, que es lo que decide por dónde
+          // empezar cuando hay varios.
+          Text(dias <= 0 ? 'hoy' : 'hace ${dias}d', style: T.small),
+        ],
+      ),
+    );
+  }
 }

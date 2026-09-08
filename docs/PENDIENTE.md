@@ -27,6 +27,8 @@ cada hito.
 | Api: sesiones, dispositivos, tramos | 30 pruebas contra Postgres real |
 | Reparto de la secuencia | Tramos disjuntos; la colisión pasa de silenciosa a error |
 | Api: recepción de lotes | Idempotente, rechazo por registro con su motivo escrito |
+| Cola de envío | Acuse por registro; los datos de demostración quedan fuera |
+| Alertas | Seguimiento a los 7, 14 y 28 días, y paciente listo para evaluar |
 | Distribución | APK firmado, con icono, publicado y descargable sin cuenta |
 | Integración continua | App, esquema y api en cada push; aviso por Telegram al publicar |
 
@@ -43,12 +45,16 @@ asignación, consentimientos, eventos, valores y auditoría; reenviar un lote no
 duplica nada, y lo que se rechaza queda escrito con su motivo en el diario de
 lotes.
 
-La app **sigue sin hacer una sola llamada de red**: el «en cola» es un
-interruptor de demostración. Falta:
+Del lado del cliente ya están el cliente HTTP y la cola: reúne lo pendiente, lo
+manda en un lote y marca solo lo que el servidor aceptó. Los datos de
+demostración quedan fuera y los borradores tampoco viajan.
 
-- cliente HTTP y cola de envío, con reintento;
-- que la cola deje fuera los datos de demostración, cuyos identificadores no son
-  UUID a propósito y el servidor rechazaría;
+Falta lo que ata la cola a la app:
+
+- **llamarla**: hoy nadie la invoca. Hace falta decidir cuándo —al abrir, al
+  registrar, a mano— y una pantalla donde se vea qué está esperando y por qué
+  se rechazó lo que se rechazó;
+- guardar la sesión y el identificador del dispositivo entre arranques;
 - pedir el tramo de secuencia al servidor en vez de llevar la secuencia entera;
 - **dejar de enrolar** cuando se quede sin tramo y sin conexión. Improvisar una
   asignación es lo que la aleatorización pre-generada existe para evitar.

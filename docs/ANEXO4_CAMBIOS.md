@@ -187,7 +187,28 @@ investigador principal, como pide.
 teléfono del evaluador no tiene conexión, el aviso le llega cuando la tenga. Eso
 no hay forma de evitarlo.
 
-Ninguna de las dos está implementada todavía.
+**Las dos están implementadas.** Con una decisión de fondo que conviene
+explicar: **no hay calendario guardado en ninguna parte**. Un aviso no es una
+fila que se crea al enrolar y alguien tacha; se deduce cada vez, mirando qué
+eventos existen y cuáles espera el protocolo a continuación.
+
+La consecuencia práctica es que un aviso se apaga solo en cuanto se registra el
+hito que lo cierra, sin que nadie tenga que acordarse de cancelarlo. Y que un
+paciente que fallece deja de generar contactos de seguimiento sin ninguna
+cancelación: los siguientes simplemente ya no proceden.
+
+Cada persona ve solo los avisos que puede resolver. Una lista con cosas que uno
+no puede atender se aprende a ignorar, y entonces deja de servir también para
+las que sí.
+
+**Y aquí hay una pregunta.** El documento pide que la alerta de seguimiento
+llegue al reclutador-aplicador y al investigador principal, pero sitúa el
+seguimiento post-egreso en el Módulo 5, que es del evaluador de desenlaces. Tal
+como está implementado, el aviso lo ve quien puede registrar el contacto: el
+evaluador y el investigador principal. Si quien debe llamar al paciente es el
+reclutador-aplicador, entonces o él también registra ese contacto —y hay que
+darle acceso a esa parte del Módulo 5— o llama él y registra otro. Conviene
+decidirlo, porque son dos permisos distintos.
 
 ---
 

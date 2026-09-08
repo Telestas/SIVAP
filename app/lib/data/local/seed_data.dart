@@ -105,7 +105,7 @@ class Seed {
   // El Anexo 4 vive en `anexo4.dart`: son quinientas líneas de datos y aquí
   // dentro tapaban todo lo demás. Este alias existe para no tocar a quien ya
   // lo usaba.
-  static const formulario = Anexo4.definicion;
+  static final formulario = Anexo4.definicion;
 
   // ── Consentimiento informado ───────────────────────────────────
   //
@@ -134,7 +134,7 @@ class Seed {
     ],
   );
 
-  static StudyConfig get config => const StudyConfig(
+  static StudyConfig get config => StudyConfig(
         nombreEstudio: 'Liberación de la ventilación mecánica invasiva',
         acronimo: 'LIVERE',
         instituciones: instituciones,

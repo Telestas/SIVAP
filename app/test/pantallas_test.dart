@@ -50,11 +50,18 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  /// Resuelve la puerta de exclusión declarando que ningún criterio aplica.
+  Future<void> declararElegible(WidgetTester tester) async {
+    await tester.tap(find.text('Ninguno está presente'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('el enrolamiento pide centro y solo la ficha mínima',
       (tester) async {
     lienzo(tester, alto: 2600);
     final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
     await tester.pumpWidget(montar(const EnrollmentScreen(), estado: state));
+    await declararElegible(tester);
 
     expect(find.text('CENTRO'), findsOneWidget);
     expect(find.text('Hospital clínico-quirúrgico docente'), findsOneWidget);
@@ -62,6 +69,56 @@ void main() {
     // Retirados por minimización de datos personales (CLAUDE.md §9).
     expect(find.textContaining('CARNÉ'), findsNothing);
     expect(find.textContaining('DIRECCIÓN'), findsNothing);
+  });
+
+  testWidgets('la elegibilidad se resuelve antes de pedir nada del paciente',
+      (tester) async {
+    lienzo(tester, alto: 2600);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    await tester.pumpWidget(montar(const EnrollmentScreen(), estado: state));
+
+    // Los criterios se ven; la ficha todavía no.
+    expect(find.text('CRITERIOS DE EXCLUSIÓN'), findsOneWidget);
+    expect(find.text('Glasgow igual o menor de 8 puntos'), findsOneWidget);
+    expect(find.text('NOMBRE Y APELLIDOS'), findsNothing);
+    expect(find.text('CENTRO'), findsNothing);
+
+    await declararElegible(tester);
+
+    expect(find.text('NOMBRE Y APELLIDOS'), findsOneWidget);
+  });
+
+  testWidgets('un criterio presente detiene el enrolamiento ahí',
+      (tester) async {
+    lienzo(tester, alto: 2600);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    final antes = state.repo.pacientes().length;
+    await tester.pumpWidget(montar(const EnrollmentScreen(), estado: state));
+
+    // «Presente» en el primer criterio: trastorno neuromuscular grave.
+    await tester.tap(find.text('Presente').first);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('no elegible'), findsOneWidget);
+    // Ni ficha, ni paciente creado, ni posición de secuencia consumida.
+    expect(find.text('NOMBRE Y APELLIDOS'), findsNothing);
+    expect(state.repo.pacientes().length, antes);
+  });
+
+  testWidgets('sin resolver la elegibilidad no se puede guardar',
+      (tester) async {
+    lienzo(tester, alto: 2600);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    await tester.pumpWidget(montar(const EnrollmentScreen(), estado: state));
+
+    // Quedan los cinco por contestar, y se dice cuántos.
+    expect(find.text('QUEDAN 5'), findsOneWidget);
+
+    await tester.tap(find.text('No').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('QUEDAN 4'), findsOneWidget);
+    expect(find.text('NOMBRE Y APELLIDOS'), findsNothing);
   });
 
   testWidgets('el usuario se puede escribir y selecciona su función',

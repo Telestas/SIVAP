@@ -274,9 +274,15 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
             // Aquí ocurre lo importante: el formulario es un recorrido sobre la
             // definición, no una lista de widgets a mano.
             for (final seccion in definicion.secciones) ...[
-              // Una sección cuyos campos están todos ocultos no se pinta: un
+              // La puerta de exclusión no se repite aquí: se contestó en el
+              // enrolamiento, antes de que el paciente existiera. Volver a
+              // preguntarla sería pedir dos veces lo mismo, y todo paciente
+              // enrolado la contestó igual — por eso no se guarda.
+              //
+              // Y una sección cuyos campos están todos ocultos no se pinta: un
               // título suelto sin nada debajo hace pensar que falta algo.
-              if (seccion.campos.any((c) => c.visibleCon(_valores))) ...[
+              if (!seccion.esPuertaDeExclusion &&
+                  seccion.campos.any((c) => c.visibleCon(_valores))) ...[
                 SectionLabel(seccion.titulo),
                 const SizedBox(height: 9),
                 _Seccion(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'app.dart';
 import 'core/app_state.dart';
@@ -8,6 +9,7 @@ import 'core/theme/tokens.dart';
 import 'core/widgets/controls.dart';
 import 'data/local/abrir_almacen.dart';
 import 'data/local/almacen_local.dart';
+import 'firebase_options.dart';
 
 /// Modo de almacén con el que arranca esta compilación.
 ///
@@ -18,7 +20,15 @@ const ModoAlmacen modoAlmacen = ModoAlmacen.demostracion;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _inicializarFirebase();
   runApp(const SivapApp());
+}
+
+/// Android y web son los clientes Firebase registrados. Escritorio conserva
+/// el modo local para desarrollo hasta que se registre su aplicación propia.
+Future<void> _inicializarFirebase() async {
+  if (!kIsWeb && defaultTargetPlatform != TargetPlatform.android) return;
+  await Firebase.initializeApp(options: FirebaseSivapOptions.actual);
 }
 
 class SivapApp extends StatefulWidget {

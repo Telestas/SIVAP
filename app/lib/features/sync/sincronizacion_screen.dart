@@ -87,10 +87,15 @@ class _SincronizacionScreenState extends State<SincronizacionScreen> {
             ),
 
             const SizedBox(height: 20),
-            const SectionLabel('Servidor'),
-            const SizedBox(height: 8),
-            LabeledField(
-                label: 'Dirección', controller: _servidor, mono: true),
+            if (!sync.usaFirebase) ...[
+              const SectionLabel('Servidor'),
+              const SizedBox(height: 8),
+              LabeledField(
+                  label: 'Dirección', controller: _servidor, mono: true),
+            ] else const StatusBanner(
+              texto: 'Sincronización protegida por Firebase.',
+              alineaArriba: true,
+            ),
             const SizedBox(height: 8),
             Text(
               'Este aparato se identifica como ${sync.dispositivoId}. '
@@ -125,7 +130,8 @@ class _SincronizacionScreenState extends State<SincronizacionScreen> {
               const SizedBox(height: 12),
               AppButton('Entrar',
                   primary: false,
-                  enabled: !sync.enCurso && _servidor.text.trim().isNotEmpty,
+                  enabled: !sync.enCurso &&
+                      (sync.usaFirebase || _servidor.text.trim().isNotEmpty),
                   onTap: _entrar),
             ],
 

@@ -1,0 +1,167 @@
+rules_version = '2';
+
+// La base Firebase consolida la cola local; no es un almacén abierto al cliente.
+// Los perfiles se aprovisionan desde una herramienta administrativa confiable,
+// nunca desde la app. Cada documento clínico conserva su institución y autor.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function perfilExiste() {
+      return autenticado() &&
+          exists(/databases/$(database)/documents/investigadores/$(request.auth.uid));
+    }
+
+    function perfil() {
+      return get(/databases/$(database)/documents/investigadores/$(request.auth.uid)).data;
+    }
+
+    function tieneRol(rol) {
+      return perfilExiste() && rol in perfil().roles;
+    }
+
+    function esPrincipal() {
+      return tieneRol('investigadorPrincipal');
+    }
+
+    function mismaInstitucionNueva() {
+      return perfilExiste() &&
+          request.resource.data.institucion_codigo == perfil().institucion_codigo;
+    }
+
+    function mismaInstitucionExistente() {
+      return perfilExiste() &&
+          resource.data.institucion_codigo == perfil().institucion_codigo;
+    }
+
+    function creadoPorUsuarioActual() {
+      return request.resource.data.autor_uid == request.auth.uid;
+    }
+
+    function veCohorteCompleta() {
+      return tieneRol('evaluadorDesenlaces') || tieneRol('analista') ||
+          esPrincipal();
+    }
+
+    function puedeLeerRegistroClinico() {
+      return mismaInstitucionExistente() &&
+          (veCohorteCompleta() || resource.data.autor_uid == request.auth.uid);
+    }
+
+    function puedeCrearTipoDeEvento() {
+      return esPrincipal() ||
+          (tieneRol('reclutador') &&
+              request.resource.data.tipo == 'enrolamiento') ||
+          (tieneRol('aplicador') &&
+              request.resource.data.tipo in [
+                'cribado',
+                'prueba_ventilacion_espontanea',
+                'extubacion'
+              ]) ||
+          (tieneRol('evaluadorDesenlaces') &&
+              request.resource.data.tipo in [
+                'desenlaces',
+                'seguimiento_post_egreso'
+              ]);
+    }
+
+    // Perfiles y configuración no se administran desde clientes clínicos.
+    match /investigadores/{uid} {
+      allow get: if autenticado() && (uid == request.auth.uid || esPrincipal());
+      allow list, create, update, delete: if false;
+    }
+
+    match /estudios/{estudioId} {
+      allow get: if perfilExiste();
+      allow list, create, update, delete: if false;
+
+      match /configuracion/{documento} {
+        allow get, list: if perfilExiste();
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /dispositivos/{id} {
+      allow create: if perfilExiste() && creadoPorUsuarioActual() &&
+          mismaInstitucionNueva();
+      allow get: if perfilExiste() && resource.data.autor_uid == request.auth.uid;
+      allow update: if perfilExiste() &&
+          resource.data.autor_uid == request.auth.uid &&
+          request.resource.data.autor_uid == resource.data.autor_uid &&
+          request.resource.data.institucion_codigo ==
+              resource.data.institucion_codigo;
+      allow delete, list: if false;
+    }
+
+    // La ficha identificable no comparte colección con los datos clínicos.
+    match /identidades/{id} {
+      allow create: if (tieneRol('reclutador') || esPrincipal()) &&
+          mismaInstitucionNueva() && creadoPorUsuarioActual();
+      allow get: if (tieneRol('reclutador') || esPrincipal()) &&
+          mismaInstitucionExistente();
+      allow list, update, delete: if false;
+    }
+
+    match /pacientes/{id} {
+      allow create: if (tieneRol('reclutador') || esPrincipal()) &&
+          mismaInstitucionNueva() && creadoPorUsuarioActual();
+      allow get, list: if puedeLeerRegistroClinico();
+      allow update, delete: if false;
+    }
+
+    // Separada del paciente para que el evaluador de desenlaces pueda leer la
+    // cohorte sin recibir la rama asignada.
+    match /asignaciones/{id} {
+      allow create: if (tieneRol('reclutador') || esPrincipal()) &&
+          mismaInstitucionNueva() && creadoPorUsuarioActual() &&
+          request.resource.data.protocolo in ['a', 'b'];
+      allow get, list: if mismaInstitucionExistente() &&
+          !tieneRol('evaluadorDesenlaces') &&
+          (tieneRol('reclutador') || tieneRol('aplicador') ||
+              tieneRol('analista') || esPrincipal());
+      allow update, delete: if false;
+    }
+
+    match /consentimientos/{id} {
+      allow create: if (tieneRol('reclutador') || esPrincipal()) &&
+          mismaInstitucionNueva() && creadoPorUsuarioActual();
+      allow get, list: if (tieneRol('reclutador') || esPrincipal()) &&
+          mismaInstitucionExistente();
+      allow update, delete: if false;
+    }
+
+    match /eventos/{id} {
+      allow create: if puedeCrearTipoDeEvento() && mismaInstitucionNueva() &&
+          creadoPorUsuarioActual();
+      allow get, list: if puedeLeerRegistroClinico();
+      allow update, delete: if false;
+    }
+
+    // La auditoría es solo de inserción. Una corrección llega como un evento
+    // nuevo y una entrada que conserva valor anterior, nuevo y motivo.
+    match /auditoria/{id} {
+      allow create: if perfilExiste() && mismaInstitucionNueva() &&
+          creadoPorUsuarioActual();
+      allow get, list: if mismaInstitucionExistente();
+      allow update, delete: if false;
+    }
+
+    // Acuse idempotente: el mismo lote puede volver a enviarse sin duplicar
+    // registros. Solo el dueño del dispositivo puede leer su acuse.
+    match /lotes/{id} {
+      allow create: if perfilExiste() && creadoPorUsuarioActual() &&
+          mismaInstitucionNueva();
+      allow get: if autenticado() && resource.data.autor_uid == request.auth.uid;
+      allow list, update, delete: if false;
+    }
+
+    // La aleatorización no se implementa con acceso directo del cliente.
+    // Ninguna regla habilita secuencias ni tramos hasta disponer de una
+    // operación privilegiada, auditable y aprobada por el equipo.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

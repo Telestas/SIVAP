@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'lote.dart';
+import 'cliente_remoto.dart';
 
 /// Lo que la app le dice al servidor central.
 ///
@@ -20,7 +21,7 @@ import 'lote.dart';
 ///    repetiría el mismo error: alguien tiene que mirarlo.
 ///
 /// Confundirlas es lo que produce colas que se reintentan para siempre.
-class ClienteApi {
+class ClienteApi implements ClienteRemoto {
   ClienteApi({required this.base, http.Client? cliente, this.tiempoLimite})
       : _http = cliente ?? http.Client();
 

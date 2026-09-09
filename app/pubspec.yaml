@@ -40,6 +40,12 @@ dependencies:
   # allí no existe. `package:http` da la misma interfaz en las dos.
   http: ^1.2.0
 
+  # Consolidación remota: Auth identifica al investigador y Firestore recibe
+  # la cola local. La captura continúa usando SQLite cifrado sin conexión.
+  firebase_core: ^4.14.0
+  firebase_auth: ^6.6.1
+  cloud_firestore: ^6.9.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -2,6 +2,7 @@ import '../../domain/models/estudio_form_definition.dart';
 import '../../domain/models/evento_clinico.dart';
 import '../../domain/repositories/study_repository.dart';
 import 'cliente_api.dart';
+import 'cliente_remoto.dart';
 import 'lote.dart';
 
 /// Lo que el dispositivo tiene guardado, camino del servidor.
@@ -33,7 +34,7 @@ class ColaDeEnvio {
   });
 
   final StudyRepository repo;
-  final ClienteApi api;
+  final ClienteRemoto api;
   final String dispositivoId;
 
   /// Cuántos registros esperan a ser enviados.

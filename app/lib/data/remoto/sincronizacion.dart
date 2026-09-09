@@ -1,8 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import '../../core/ids.dart';
 import '../../domain/repositories/study_repository.dart';
 import 'cliente_api.dart';
+import 'cliente_firebase.dart';
+import 'cliente_remoto.dart';
+import 'autenticacion_firebase.dart';
 import 'cola_de_envio.dart';
 import 'lote.dart';
 
@@ -31,6 +39,7 @@ class Sincronizacion extends ChangeNotifier {
   final ClienteApi Function(Uri) _construirCliente;
 
   ClienteApi? _api;
+  ClienteFirebase? _firebase;
   Uri? _servidor;
   late String _dispositivoId;
 
@@ -41,9 +50,12 @@ class Sincronizacion extends ChangeNotifier {
   Uri? get servidor => _servidor;
   String get dispositivoId => _dispositivoId;
   bool get enCurso => _enCurso;
-  bool get configurado => _servidor != null;
-  bool get haySesion => _api?.haySesion ?? false;
+  bool get configurado => usaFirebase || _servidor != null;
+  bool get usaFirebase => Firebase.apps.isNotEmpty;
+  bool get haySesion => _clienteActivo?.haySesion ?? false;
   Sesion? get sesion => _sesion;
+
+  ClienteRemoto? get _clienteActivo => usaFirebase ? _firebase : _api;
 
   /// Cómo fue el último envío. Vive en memoria: al reabrir la app se pierde el
   /// detalle, pero no el dato — lo que no entró sigue en la cola y el motivo
@@ -99,6 +111,7 @@ class Sincronizacion extends ChangeNotifier {
   /// el envío, y el token se queda en memoria — una base que se pueda copiar no
   /// debe llevar dentro con qué entrar.
   Future<String?> entrar(String usuario, String contrasena) async {
+    if (usaFirebase) return _entrarFirebase(usuario, contrasena);
     final api = _api;
     if (api == null) return 'Falta configurar la dirección del servidor.';
 
@@ -128,8 +141,53 @@ class Sincronizacion extends ChangeNotifier {
     }
   }
 
+  Future<String?> _entrarFirebase(String correo, String contrasena) async {
+    _enCurso = true;
+    notifyListeners();
+    try {
+      final investigador =
+          await AutenticacionFirebase().entrar(correo, contrasena);
+      await FirebaseFirestore.instance
+          .collection('dispositivos')
+          .doc(_dispositivoId)
+          .set({
+        'autor_uid': investigador.id,
+        'institucion_codigo': investigador.institucion.codigo,
+        'etiqueta': _repo.ajuste(claveEtiqueta) ?? 'Aparato de campo',
+        'registrado_en': FieldValue.serverTimestamp(),
+      });
+      _sesion = Sesion(
+        token: 'firebase',
+        expiraEn: DateTime.now().toUtc().add(const Duration(hours: 1)),
+        investigadorId: investigador.id,
+        usuario: investigador.usuario,
+        nombre: investigador.nombre,
+        institucion: investigador.institucion.codigo,
+        roles: investigador.roles.map((rol) => rol.name).toList(),
+      );
+      _firebase = ClienteFirebase(
+        investigadorId: investigador.id,
+        institucionCodigo: investigador.institucion.codigo,
+        roles: investigador.roles,
+      );
+      return null;
+    } on AccesoFirebaseRechazado catch (e) {
+      return e.mensaje;
+    } on PerfilNoAprovisionado catch (e) {
+      return e.toString();
+    } on FirebaseException catch (e) {
+      return e.message ?? 'No se pudo registrar el dispositivo.';
+    } finally {
+      _enCurso = false;
+      notifyListeners();
+    }
+  }
+
   void salir() {
     _api?.olvidarSesion();
+    _firebase?.olvidarSesion();
+    _firebase = null;
+    if (usaFirebase) unawaited(FirebaseAuth.instance.signOut());
     _sesion = null;
     notifyListeners();
   }
@@ -140,10 +198,10 @@ class Sincronizacion extends ChangeNotifier {
   /// la mitad y hay que repetir entero es peor que varios pequeños. Si quedan
   /// pendientes, se vuelve a pulsar.
   Future<EnvioRealizado> sincronizar() async {
-    final api = _api;
+    final api = _clienteActivo;
     if (api == null) {
       return _anotar(const EnvioRealizado.sinConexion(
-          SinConexion('Falta configurar la dirección del servidor.')));
+          SinConexion('Falta abrir una sesión remota.')));
     }
     if (_enCurso) return _ultimo ?? const EnvioRealizado.nadaQueEnviar();
 
@@ -168,6 +226,7 @@ class Sincronizacion extends ChangeNotifier {
   @override
   void dispose() {
     _api?.cerrar();
+    _firebase?.cerrar();
     super.dispose();
   }
 }

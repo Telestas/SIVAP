@@ -38,10 +38,13 @@ class ClienteApi implements ClienteRemoto {
 
   String? _token;
 
+  @override
   bool get haySesion => _token != null;
 
+  @override
   void olvidarSesion() => _token = null;
 
+  @override
   void cerrar() => _http.close();
 
   // ── Sesión ──────────────────────────────────────────────────────
@@ -107,6 +110,7 @@ class ClienteApi implements ClienteRemoto {
   /// identificador y devuelve el resultado que ya había guardado. Eso es lo que
   /// hace recuperable el caso que va a ocurrir de verdad — que el servidor
   /// guarde y la respuesta no llegue.
+  @override
   Future<ResultadoLote> enviar(Lote lote) async {
     final cuerpo = await _pedir('POST', 'sincronizacion', json: lote.aJson());
     try {

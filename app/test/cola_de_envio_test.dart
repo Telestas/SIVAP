@@ -57,7 +57,7 @@ void main() {
   }
 
   Future<void> abrirSesion(ColaDeEnvio c) =>
-      c.api.abrirSesion(usuario: 'dra.uno', contrasena: 'x');
+      (c.api as ClienteApi).abrirSesion(usuario: 'dra.uno', contrasena: 'x');
 
   /// Acepta el lote entero.
   http.Response todoBien(Map<String, dynamic> lote) => http.Response(

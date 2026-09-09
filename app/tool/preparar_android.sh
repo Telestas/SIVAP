@@ -44,6 +44,7 @@ if [[ "$PLATAFORMAS" == *web* ]]; then
   # La plantilla de Flutter trae su propio favicon e iconos PWA. Se reemplazan
   # en cada build porque web/ se regenera y no se versiona.
   cp assets/icono/sivap_icon_rounded_512.png web/favicon.png
+  cp assets/icono/sivap_icon_rounded_512.png web/favicon-sivap.png
   cp android_res/mipmap-xxxhdpi/ic_launcher.png web/icons/Icon-192.png
   cp assets/icono/sivap_icon_rounded_512.png web/icons/Icon-512.png
   cp android_res/mipmap-xxxhdpi/ic_launcher.png \
@@ -53,6 +54,7 @@ if [[ "$PLATAFORMAS" == *web* ]]; then
   sed -i \
     -e 's/A new Flutter project\./SIVAP · captura clínica offline-first./' \
     -e 's/apple-mobile-web-app-title" content="sivap"/apple-mobile-web-app-title" content="SIVAP"/' \
+    -e 's/href="favicon.png"/href="favicon-sivap.png"/' \
     -e 's/<title>sivap<\/title>/<title>SIVAP<\/title>/' \
     web/index.html
   sed -i \
@@ -64,8 +66,9 @@ if [[ "$PLATAFORMAS" == *web* ]]; then
     web/manifest.json
 
   grep -q '<title>SIVAP</title>' web/index.html
+  grep -q 'href="favicon-sivap.png"' web/index.html
   grep -q '"name": "SIVAP"' web/manifest.json
-  test -f web/favicon.png
+  test -f web/favicon-sivap.png
   test -f web/icons/Icon-512.png
 
   echo 'Andamiaje web preparado: iconos, nombre y colores aplicados.'

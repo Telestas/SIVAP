@@ -39,3 +39,34 @@ if [[ "$PLATAFORMAS" == *android* ]]; then
 
   echo 'Andamiaje de Android preparado: iconos y nombre aplicados.'
 fi
+
+if [[ "$PLATAFORMAS" == *web* ]]; then
+  # La plantilla de Flutter trae su propio favicon e iconos PWA. Se reemplazan
+  # en cada build porque web/ se regenera y no se versiona.
+  cp assets/icono/sivap_icon_rounded_512.png web/favicon.png
+  cp android_res/mipmap-xxxhdpi/ic_launcher.png web/icons/Icon-192.png
+  cp assets/icono/sivap_icon_rounded_512.png web/icons/Icon-512.png
+  cp android_res/mipmap-xxxhdpi/ic_launcher.png \
+    web/icons/Icon-maskable-192.png
+  cp assets/icono/sivap_icon_rounded_512.png web/icons/Icon-maskable-512.png
+
+  sed -i \
+    -e 's/A new Flutter project\./SIVAP · captura clínica offline-first./' \
+    -e 's/apple-mobile-web-app-title" content="sivap"/apple-mobile-web-app-title" content="SIVAP"/' \
+    -e 's/<title>sivap<\/title>/<title>SIVAP<\/title>/' \
+    web/index.html
+  sed -i \
+    -e 's/"name": "sivap"/"name": "SIVAP"/' \
+    -e 's/"short_name": "sivap"/"short_name": "SIVAP"/' \
+    -e 's/"background_color": "#0175C2"/"background_color": "#16181A"/' \
+    -e 's/"theme_color": "#0175C2"/"theme_color": "#16181A"/' \
+    -e 's/"description": "A new Flutter project\."/"description": "SIVAP · captura clínica offline-first."/' \
+    web/manifest.json
+
+  grep -q '<title>SIVAP</title>' web/index.html
+  grep -q '"name": "SIVAP"' web/manifest.json
+  test -f web/favicon.png
+  test -f web/icons/Icon-512.png
+
+  echo 'Andamiaje web preparado: iconos, nombre y colores aplicados.'
+fi

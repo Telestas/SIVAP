@@ -28,6 +28,7 @@ htmlcov/
 .pub-cache/
 .pub/
 build/
+.firebase/
 *.iml
 .flutter-plugins
 .flutter-plugins-dependencies

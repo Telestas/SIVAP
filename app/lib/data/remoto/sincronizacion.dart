@@ -17,6 +17,20 @@ import 'autenticacion_firebase.dart';
 import 'cola_de_envio.dart';
 import 'lote.dart';
 
+/// Una página HTML de Firebase o de la red nunca es un tramo de aleatorización.
+String? mensajeRespuestaTramo(http.Response respuesta) {
+  if (respuesta.statusCode == 404) {
+    return 'El servicio de tramos aún no está publicado. '
+        'El enrolamiento permanece bloqueado.';
+  }
+  final tipo = respuesta.headers['content-type']?.toLowerCase() ?? '';
+  if (!tipo.contains('json')) {
+    return 'El servicio de tramos no está disponible '
+        '(HTTP ${respuesta.statusCode}). El enrolamiento permanece bloqueado.';
+  }
+  return null;
+}
+
 /// La sincronización, vista desde la app.
 ///
 /// Junta las tres cosas que hasta ahora estaban sueltas: a qué servidor se
@@ -88,6 +102,10 @@ class Sincronizacion extends ChangeNotifier {
     final repo = _repo;
     if (!repo.requiereTramos) return 'La demostración no usa tramos reales.';
     if (repo.asignacionesRestantes > 0) return null;
+    if (!repo.config.consentimientoAprobadoPorCei) {
+      return 'El enrolamiento sigue bloqueado: falta el consentimiento '
+          'aprobado del estudio para este centro.';
+    }
     final usuario = FirebaseAuth.instance.currentUser;
     if (usuario == null || _sesion == null) {
       return 'Abra sesión para solicitar un tramo.';
@@ -122,7 +140,18 @@ class Sincronizacion extends ChangeNotifier {
             }),
           )
           .timeout(const Duration(seconds: 30));
-      final cuerpo = jsonDecode(respuesta.body) as Map<String, dynamic>;
+      final problema = mensajeRespuestaTramo(respuesta);
+      if (problema != null) return problema;
+      final Map<String, dynamic> cuerpo;
+      try {
+        cuerpo = jsonDecode(respuesta.body) as Map<String, dynamic>;
+      } on FormatException {
+        return 'El servicio de tramos devolvió una respuesta inválida. '
+            'No se puede enrolar hasta que esté disponible.';
+      } on TypeError {
+        return 'El servicio de tramos devolvió una respuesta inválida. '
+            'No se puede enrolar hasta que esté disponible.';
+      }
       if (respuesta.statusCode != 200 || cuerpo.containsKey('error')) {
         return (cuerpo['error'] as Map?)?['message']?.toString() ??
             'No se pudo reservar un tramo.';

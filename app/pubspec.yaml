@@ -3,7 +3,7 @@ description: >-
   SIVAP — captura de datos de un estudio de cohorte clínico.
   App Flutter offline-first para investigadores de campo.
 publish_to: none
-version: 0.2.2
+version: 0.2.3
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -55,6 +55,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icono/sivap_icon_rounded_512.png
   fonts:
     # IBM Plex Sans se distribuye como fuente variable: Flutter la carga y
     # sintetiza los pesos intermedios. Si el equipo quiere los cortes exactos

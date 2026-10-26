@@ -9,6 +9,7 @@ import '../../domain/models/estudio_form_definition.dart';
 import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/institucion.dart';
 import '../../domain/models/patient.dart';
+import '../../domain/models/validacion_ficha.dart';
 import '../consent/consent_screen.dart';
 
 /// Enrolamiento de paciente.
@@ -59,6 +60,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   Patient? _guardado;
   String? _error;
   bool _solicitandoTramo = false;
+  bool _mostrarErroresFicha = false;
 
   Future<void> _pedirTramo() async {
     setState(() => _solicitandoTramo = true);
@@ -73,7 +75,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   @override
   void initState() {
     super.initState();
-    for (final c in [_nombre, _hc, _edad, _telefono]) {
+    for (final c in [_nombre, _hc, _edad, _telefono, _telefonoAlt]) {
       c.addListener(() => setState(() {}));
     }
   }
@@ -104,15 +106,41 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   bool _elegibilidadResuelta(FormSection puerta) =>
       puerta.campos.every((c) => _criterios[c.key] is bool);
 
-  bool get _completo =>
-      _nombre.text.trim().isNotEmpty &&
-      _hc.text.trim().isNotEmpty &&
-      int.tryParse(_edad.text.trim()) != null &&
-      _telefono.text.trim().isNotEmpty &&
-      _institucion != null;
+  Map<String, String> get _erroresFicha => {
+        if (ValidacionFicha.nombre(_nombre.text) case final String error)
+          'nombre': error,
+        if (ValidacionFicha.historia(_hc.text) case final String error)
+          'historia': error,
+        if (ValidacionFicha.edad(_edad.text) case final String error)
+          'edad': error,
+        if (ValidacionFicha.telefono(_telefono.text) case final String error)
+          'telefono': error,
+        if (ValidacionFicha.telefono(_telefonoAlt.text, opcional: true)
+            case final String error)
+          'telefonoAlt': error,
+      };
+
+  String? _errorCampo(String clave, TextEditingController control) =>
+      _mostrarErroresFicha || control.text.trim().isNotEmpty
+          ? _erroresFicha[clave]
+          : null;
+
+  String? get _ayudaEdad {
+    final edad = int.tryParse(_edad.text.trim());
+    return edad != null && edad >= 110 && edad <= 130
+        ? 'Edad poco frecuente: confirme el dato.'
+        : null;
+  }
 
   Patient? _guardar() {
     if (_guardado != null) return _guardado;
+    if (_erroresFicha.isNotEmpty || _institucion == null) {
+      setState(() {
+        _mostrarErroresFicha = true;
+        _error = _institucion == null ? 'Seleccione el centro.' : null;
+      });
+      return null;
+    }
     final state = AppScope.read(context);
     try {
       final paciente = state.repo.enrolar(
@@ -151,6 +179,9 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
     final config = state.repo.config;
     final bloqueadoPorConfiguracion =
         state.repo.requiereTramos && !config.consentimientoAprobadoPorCei;
+    final sinTramo =
+        state.repo.requiereTramos && state.repo.asignacionesRestantes == 0;
+    final accionesBloqueadas = bloqueadoPorConfiguracion || sinTramo;
 
     final puerta = _puerta(context);
     final resuelta = puerta == null || _elegibilidadResuelta(puerta);
@@ -244,7 +275,11 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
               ),
 
               const SizedBox(height: 18),
-              LabeledField(label: 'Nombre y apellidos', controller: _nombre),
+              LabeledField(
+                label: 'Nombre y apellidos',
+                controller: _nombre,
+                errorText: _errorCampo('nombre', _nombre),
+              ),
               const SizedBox(height: 16),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,7 +289,8 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
                     child: LabeledField(
                         label: 'Núm. de historia clínica',
                         controller: _hc,
-                        mono: true),
+                        mono: true,
+                        errorText: _errorCampo('historia', _hc)),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -262,7 +298,9 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
                     child: LabeledField(
                         label: 'Edad',
                         controller: _edad,
-                        keyboardType: TextInputType.number),
+                        keyboardType: TextInputType.number,
+                        errorText: _errorCampo('edad', _edad),
+                        helperText: _ayudaEdad),
                   ),
                 ],
               ),
@@ -283,15 +321,31 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
               LabeledField(
                   label: 'Teléfono de contacto',
                   controller: _telefono,
-                  keyboardType: TextInputType.phone),
+                  keyboardType: TextInputType.phone,
+                  errorText: _errorCampo('telefono', _telefono)),
               const SizedBox(height: 12),
               LabeledField(
                   label: 'Segundo teléfono (opcional)',
                   controller: _telefonoAlt,
-                  keyboardType: TextInputType.phone),
+                  keyboardType: TextInputType.phone,
+                  errorText: _errorCampo('telefonoAlt', _telefonoAlt)),
 
               const SizedBox(height: 20),
               _PanelAsignacion(paciente: _guardado),
+
+              if (accionesBloqueadas) ...[
+                const SizedBox(height: 14),
+                StatusBanner(
+                  texto: bloqueadoPorConfiguracion
+                      ? 'Guardar e ir a consentimiento están desactivados: '
+                          'falta el consentimiento aprobado del centro en la '
+                          'configuración del estudio.'
+                      : 'Guardar e ir a consentimiento están desactivados: '
+                          'este aparato no tiene un tramo de aleatorización '
+                          'reservado.',
+                  alineaArriba: true,
+                ),
+              ],
 
               if (_error != null) ...[
                 const SizedBox(height: 14),
@@ -315,10 +369,9 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
           flex: 10,
           child: AppButton('Guardar',
               primary: false,
-              enabled: !bloqueadoPorConfiguracion &&
+              enabled: !accionesBloqueadas &&
                   !excluido &&
                   resuelta &&
-                  _completo &&
                   _guardado == null,
               onTap: _guardar),
         ),
@@ -326,10 +379,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
         Expanded(
           flex: 14,
           child: AppButton('Ir a consentimiento',
-              enabled: !bloqueadoPorConfiguracion &&
-                  !excluido &&
-                  resuelta &&
-                  _completo,
+              enabled: !accionesBloqueadas && !excluido && resuelta,
               onTap: _irAConsentimiento),
         ),
       ]),

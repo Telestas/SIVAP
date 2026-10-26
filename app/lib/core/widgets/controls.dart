@@ -72,7 +72,8 @@ enum BannerTone { aviso, ok }
 
 /// Encabezado monoespaciado de sección o etiqueta de campo.
 class SectionLabel extends StatelessWidget {
-  const SectionLabel(this.texto, {super.key, this.color = T.muted, this.size = 10.5});
+  const SectionLabel(this.texto,
+      {super.key, this.color = T.muted, this.size = 10.5});
 
   final String texto;
   final Color color;
@@ -138,6 +139,8 @@ class LabeledField extends StatefulWidget {
     this.readOnly = false,
     this.oculto = false,
     this.onSubmitted,
+    this.errorText,
+    this.helperText,
   });
 
   final String label;
@@ -155,6 +158,8 @@ class LabeledField extends StatefulWidget {
   final bool oculto;
 
   final ValueChanged<String>? onSubmitted;
+  final String? errorText;
+  final String? helperText;
 
   @override
   State<LabeledField> createState() => _LabeledFieldState();
@@ -184,6 +189,8 @@ class _LabeledFieldState extends State<LabeledField> {
             decoration: InputDecoration(
               isDense: true,
               hintText: widget.hint,
+              errorText: widget.errorText,
+              helperText: widget.helperText,
               hintStyle: const TextStyle(fontSize: 15, color: T.faint),
               filled: true,
               fillColor: T.card,
@@ -192,6 +199,8 @@ class _LabeledFieldState extends State<LabeledField> {
               border: fieldBorder(T.line),
               enabledBorder: fieldBorder(T.line),
               focusedBorder: fieldBorder(T.accent, ancho: 1.5),
+              errorBorder: fieldBorder(T.dangerFg),
+              focusedErrorBorder: fieldBorder(T.dangerFg, ancho: 1.5),
               suffixIcon: widget.oculto
                   ? IconButton(
                       icon: Icon(
@@ -213,7 +222,8 @@ class _LabeledFieldState extends State<LabeledField> {
 }
 
 /// Borde de los campos de texto, compartido por todas las pantallas.
-OutlineInputBorder fieldBorder(Color color, {double ancho = 1}) => OutlineInputBorder(
+OutlineInputBorder fieldBorder(Color color, {double ancho = 1}) =>
+    OutlineInputBorder(
       borderRadius: BorderRadius.circular(T.radiusField),
       borderSide: BorderSide(color: color, width: ancho),
     );
@@ -324,7 +334,8 @@ class SelectablePill extends StatelessWidget {
 /// Barra superior de las pantallas de detalle: flecha atrás, título y un
 /// distintivo opcional a la derecha.
 class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
-  const AppTopBar({super.key, required this.titulo, this.trailing, this.subtitulo});
+  const AppTopBar(
+      {super.key, required this.titulo, this.trailing, this.subtitulo});
 
   final String titulo;
   final Widget? trailing;
@@ -358,7 +369,8 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                 preferredSize: const Size.fromHeight(32),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(T.gutter, 0, T.gutter, 10),
-                  child: Align(alignment: Alignment.centerLeft, child: subtitulo),
+                  child:
+                      Align(alignment: Alignment.centerLeft, child: subtitulo),
                 ),
               ),
       );

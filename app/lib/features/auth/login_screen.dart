@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../sync/sincronizacion_screen.dart';
 import 'solicitar_acceso_screen.dart';
 import '../../core/app_state.dart';
 import '../../core/theme/tokens.dart';
@@ -159,33 +158,32 @@ class _LoginScreenState extends State<LoginScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
           children: [
-            const Text('SIVAP',
-                style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                    color: T.ink)),
-            const SizedBox(height: 6),
-            Text('Ensayo ${config.acronimo}\n${config.nombreEstudio}',
+            Row(children: [
+              Image.asset('assets/icono/sivap_icon_rounded_512.png',
+                  width: 58, height: 58, semanticLabel: 'Logo de SIVAP'),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('SIVAP',
+                        style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: T.ink)),
+                    Text('Ensayo ${config.acronimo}',
+                        style:
+                            const TextStyle(fontSize: 13, color: T.secondary)),
+                  ],
+                ),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            Text(config.nombreEstudio,
                 style: const TextStyle(
                     fontSize: 13, color: T.secondary, height: 1.5)),
             const SizedBox(height: 22),
-
-            // Entrar aquí no habla con el servidor, y conviene decirlo: la
-            // app trabaja sin conexión y el envío es otra cosa (CLAUDE.md §12).
-            StatusBanner(
-              texto: remoto
-                  ? 'La cuenta y las funciones las valida Firebase. La captura '
-                      'móvil sigue disponible sin conexión tras iniciar sesión.'
-                  : 'El acceso a la app no necesita conexión. El envío al '
-                      'servidor se hace aparte, cuando la haya.',
-              alineaArriba: true,
-              accion: state.hayCola ? state.textoSyncCorto : null,
-              onAccion: state.hayCola
-                  ? () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const SincronizacionScreen()))
-                  : null,
-            ),
 
             // Qué garantiza el almacén de esta compilación. Si no cifra o no
             // persiste, se dice aquí y no en letra pequeña.
@@ -270,7 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            Text('v0.2.2 · ${config.definicionFormulario.version}',
+            Text('v0.2.3 · ${config.definicionFormulario.version}',
                 textAlign: TextAlign.center,
                 style: T.label(size: 10.5, color: T.faint, tracking: 0.05)),
           ],

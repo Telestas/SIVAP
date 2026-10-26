@@ -269,7 +269,8 @@ void main() {
 
     expect(find.text('Función en el ensayo'), findsNothing);
     expect(find.text('Aplicador'), findsNothing);
-    expect(find.textContaining('valida Firebase'), findsOneWidget);
+    expect(find.textContaining('valida Firebase'), findsNothing);
+    expect(find.bySemanticsLabel('Logo de SIVAP'), findsOneWidget);
     expect(find.widgetWithText(TextField, 'correo@institucion.cu'),
         findsOneWidget);
   });
@@ -350,6 +351,72 @@ void main() {
     expect(find.textContaining('HC-001'), findsOneWidget);
     // Paciente de otro centro y otro recolector: no debe aparecer.
     expect(find.textContaining('IC-001'), findsNothing);
+  });
+
+  testWidgets('el avatar abre opciones y solo cierra al elegir salir',
+      (tester) async {
+    lienzo(tester);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    await tester.pumpWidget(raizDeLaApp(state));
+
+    await tester.tap(find.byTooltip('Opciones de la cuenta'));
+    await tester.pumpAndSettle();
+    expect(state.usuario, isNotNull);
+    expect(find.text('Mi perfil'), findsOneWidget);
+    expect(find.text('Cerrar sesión'), findsOneWidget);
+
+    await tester.tap(find.text('Cerrar sesión'));
+    await tester.pumpAndSettle();
+    expect(state.usuario, isNull);
+    expect(find.text('Entrar'), findsOneWidget);
+  });
+
+  testWidgets('la ficha avisa de datos inválidos antes de guardar',
+      (tester) async {
+    lienzo(tester, alto: 2800);
+    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutador);
+    final antes = state.repo.pacientes().length;
+    await tester.pumpWidget(montar(const EnrollmentScreen(), estado: state));
+    await declararElegible(tester);
+
+    await tester.enterText(find.byType(TextField).at(0), 'Paciente 123');
+    await tester.enterText(find.byType(TextField).at(1), 'HC-001');
+    await tester.enterText(find.byType(TextField).at(2), '999');
+    await tester.enterText(find.byType(TextField).at(3), 'abc123');
+    await tester.tap(find.text('Guardar'));
+    await tester.pumpAndSettle();
+
+    expect(state.repo.pacientes().length, antes);
+    expect(find.textContaining('supera 130 años'), findsOneWidget);
+    expect(find.textContaining('Use letras y separadores'), findsOneWidget);
+    expect(find.textContaining('Use solo cifras'), findsOneWidget);
+  });
+
+  testWidgets('sin configuración y tramo explica por qué no puede guardar',
+      (tester) async {
+    lienzo(tester, alto: 2800);
+    final repo = _RepositorioSinActivar();
+    final state = AppState(AlmacenLocal(
+      repo: repo,
+      persistente: false,
+      cifrado: false,
+      descripcion: 'Prueba sin activar',
+    ))
+      ..iniciarSesion(Seed.reclutador);
+    await tester.pumpWidget(montar(const EnrollmentScreen(), estado: state));
+    await declararElegible(tester);
+
+    expect(
+      tester
+          .widget<AppButton>(find.widgetWithText(AppButton, 'Guardar'))
+          .enabled,
+      isFalse,
+    );
+    expect(find.textContaining('están desactivados'), findsOneWidget);
+    await tester.tap(find.text('Solicitar tramo'));
+    await tester.pumpAndSettle();
+    expect(
+        find.textContaining('El enrolamiento sigue bloqueado'), findsOneWidget);
   });
 
   testWidgets('el analista ve la cohorte y no puede enrolar', (tester) async {
@@ -454,4 +521,9 @@ void main() {
     // El recuento por rama no dice cuál es cuál.
     expect(find.textContaining('A: '), findsOneWidget);
   });
+}
+
+class _RepositorioSinActivar extends InMemoryStudyRepository {
+  @override
+  bool get requiereTramos => true;
 }

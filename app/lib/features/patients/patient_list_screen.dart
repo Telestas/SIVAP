@@ -33,6 +33,8 @@ class PatientListScreen extends StatefulWidget {
 /// no hay nada registrado hoy, que es lo que de verdad necesita el equipo.
 enum _Filtro { todos, conBorrador, sinRegistroHoy }
 
+enum _AccionCuenta { perfil, sincronizacion, salir }
+
 class _PatientListScreenState extends State<PatientListScreen> {
   _Filtro _filtro = _Filtro.todos;
   String _busqueda = '';
@@ -148,24 +150,80 @@ class _Encabezado extends StatelessWidget {
                   ],
                 ),
               ),
-              if (soloLectura)
-                const MetaChip('SOLO LECTURA')
-              else
-                GestureDetector(
-                  onTap: state.cerrarSesion,
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                        color: Color(0xFFE6E8EA), shape: BoxShape.circle),
-                    child: Text(usuario.iniciales,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: T.body)),
+              if (soloLectura) ...[
+                const MetaChip('SOLO LECTURA'),
+                const SizedBox(width: 10),
+              ],
+              PopupMenuButton<_AccionCuenta>(
+                tooltip: 'Opciones de la cuenta',
+                onSelected: (accion) {
+                  switch (accion) {
+                    case _AccionCuenta.perfil:
+                      showDialog<void>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Mi perfil'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(usuario.nombre),
+                              const SizedBox(height: 6),
+                              Text(usuario.usuario),
+                              const SizedBox(height: 6),
+                              Text(usuario.etiquetaRoles),
+                              const SizedBox(height: 6),
+                              Text(usuario.institucion.nombre),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cerrar'),
+                            ),
+                          ],
+                        ),
+                      );
+                    case _AccionCuenta.sincronizacion:
+                      Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const SincronizacionScreen()));
+                    case _AccionCuenta.salir:
+                      state.cerrarSesion();
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem<_AccionCuenta>(
+                    enabled: false,
+                    child: Text(usuario.nombre,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
                   ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: _AccionCuenta.perfil,
+                    child: Text('Mi perfil'),
+                  ),
+                  const PopupMenuItem(
+                    value: _AccionCuenta.sincronizacion,
+                    child: Text('Sincronización'),
+                  ),
+                  const PopupMenuItem(
+                    value: _AccionCuenta.salir,
+                    child: Text('Cerrar sesión'),
+                  ),
+                ],
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                      color: Color(0xFFE6E8EA), shape: BoxShape.circle),
+                  child: Text(usuario.iniciales,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: T.body)),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 12),

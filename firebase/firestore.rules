@@ -40,6 +40,28 @@ service cloud.firestore {
       return request.resource.data.autor_uid == request.auth.uid;
     }
 
+    function centroAprobado() {
+      return perfilExiste() &&
+          get(/databases/$(database)/documents/instituciones/$(perfil().institucion_codigo))
+              .data.cei_aprobado == true;
+    }
+
+    function consentimientoAprobado() {
+      return get(/databases/$(database)/documents/estudios/livere/configuracion/consentimiento)
+          .data.aprobado == true;
+    }
+
+    function asignacionReservada() {
+      let tramo = get(/databases/$(database)/documents/tramos/$(request.resource.data.dispositivo_id)).data;
+      let posicion = request.resource.data.posicion;
+      return tramo.autor_uid == request.auth.uid &&
+          tramo.institucion_codigo == request.resource.data.institucion_codigo &&
+          tramo.etiqueta == request.resource.data.secuencia_etiqueta &&
+          posicion is int && posicion >= tramo.desde && posicion < tramo.hasta &&
+          tramo.codigo_binario[posicion - tramo.desde] ==
+              (request.resource.data.protocolo == 'b' ? '1' : '0');
+    }
+
     function veCohorteCompleta() {
       return tieneRol('evaluadorDesenlaces') || tieneRol('analista') ||
           esPrincipal();
@@ -69,8 +91,10 @@ service cloud.firestore {
 
     // Perfiles y configuración no se administran desde clientes clínicos.
     match /investigadores/{uid} {
-      allow get: if autenticado() && (uid == request.auth.uid || esPrincipal());
-      allow list, create, update, delete: if false;
+      allow get: if autenticado() && (uid == request.auth.uid ||
+          (esPrincipal() && mismaInstitucionExistente()));
+      allow list: if esPrincipal() && mismaInstitucionExistente();
+      allow create, update, delete: if false;
     }
 
     match /estudios/{estudioId} {
@@ -81,6 +105,18 @@ service cloud.firestore {
         allow get, list: if perfilExiste();
         allow create, update, delete: if false;
       }
+    }
+
+    // Solo una función del servidor puede activar el estudio y repartir tramos.
+    match /instituciones/{codigo} {
+      allow get: if perfilExiste() && codigo == perfil().institucion_codigo;
+      allow list, write: if false;
+    }
+    match /aleatorizacion/{id} {
+      allow read, write: if false;
+    }
+    match /tramos/{id} {
+      allow read, write: if false;
     }
 
     match /dispositivos/{id} {
@@ -98,7 +134,10 @@ service cloud.firestore {
     // La ficha identificable no comparte colección con los datos clínicos.
     match /identidades/{id} {
       allow create: if (tieneRol('reclutador') || esPrincipal()) &&
-          mismaInstitucionNueva() && creadoPorUsuarioActual();
+          mismaInstitucionNueva() && creadoPorUsuarioActual() &&
+          centroAprobado() && consentimientoAprobado() &&
+          getAfter(/databases/$(database)/documents/pacientes/$(id))
+              .data.institucion_codigo == request.resource.data.institucion_codigo;
       allow get: if (tieneRol('reclutador') || esPrincipal()) &&
           mismaInstitucionExistente();
       allow list, update, delete: if false;
@@ -106,7 +145,8 @@ service cloud.firestore {
 
     match /pacientes/{id} {
       allow create: if (tieneRol('reclutador') || esPrincipal()) &&
-          mismaInstitucionNueva() && creadoPorUsuarioActual();
+          mismaInstitucionNueva() && creadoPorUsuarioActual() &&
+          centroAprobado() && consentimientoAprobado();
       allow get, list: if puedeLeerRegistroClinico();
       allow update, delete: if false;
     }
@@ -116,7 +156,11 @@ service cloud.firestore {
     match /asignaciones/{id} {
       allow create: if (tieneRol('reclutador') || esPrincipal()) &&
           mismaInstitucionNueva() && creadoPorUsuarioActual() &&
-          request.resource.data.protocolo in ['a', 'b'];
+          centroAprobado() &&
+          request.resource.data.protocolo in ['a', 'b'] &&
+          asignacionReservada() &&
+          getAfter(/databases/$(database)/documents/posiciones/$(string(request.resource.data.posicion)))
+              .data.paciente_id == id;
       allow get, list: if mismaInstitucionExistente() &&
           !tieneRol('evaluadorDesenlaces') &&
           (tieneRol('reclutador') || tieneRol('aplicador') ||
@@ -124,9 +168,43 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Un documento por posición, creado en la misma transacción que la
+    // asignación. La exclusividad del id impide duplicarla entre pacientes.
+    match /posiciones/{posicion} {
+      allow create: if (tieneRol('reclutador') || esPrincipal()) &&
+          mismaInstitucionNueva() && creadoPorUsuarioActual() &&
+          request.resource.data.posicion is int &&
+          posicion == string(request.resource.data.posicion) &&
+          getAfter(/databases/$(database)/documents/asignaciones/$(request.resource.data.paciente_id))
+              .data.posicion == request.resource.data.posicion;
+      allow get, list, update, delete: if false;
+    }
+
     match /consentimientos/{id} {
       allow create: if (tieneRol('reclutador') || esPrincipal()) &&
-          mismaInstitucionNueva() && creadoPorUsuarioActual();
+          mismaInstitucionNueva() && creadoPorUsuarioActual() &&
+          centroAprobado() &&
+          consentimientoAprobado() &&
+          request.resource.data.version_documento ==
+              get(/databases/$(database)/documents/estudios/livere/configuracion/consentimiento)
+                  .data.version &&
+          request.resource.data.codigo_cei ==
+              get(/databases/$(database)/documents/estudios/livere/configuracion/consentimiento)
+                  .data.codigo_cei &&
+          request.resource.data.documento_firmado.version ==
+              request.resource.data.version_documento &&
+          request.resource.data.documento_firmado.codigo_cei ==
+              request.resource.data.codigo_cei &&
+          request.resource.data.documento_firmado.parrafos is list &&
+          request.resource.data.documento_firmado.parrafos.size() > 0 &&
+          request.resource.data.documento_firmado.declaraciones is list &&
+          request.resource.data.documento_firmado.declaraciones.size() > 0 &&
+          request.resource.data.firma.trazos is list &&
+          request.resource.data.firma.trazos.size() > 0 &&
+          request.resource.data.firma.trazos[0].puntos is list &&
+          request.resource.data.firma.trazos[0].puntos.size() > 0 &&
+          getAfter(/databases/$(database)/documents/pacientes/$(request.resource.data.paciente_id))
+              .data.institucion_codigo == request.resource.data.institucion_codigo;
       allow get, list: if (tieneRol('reclutador') || esPrincipal()) &&
           mismaInstitucionExistente();
       allow update, delete: if false;
@@ -134,7 +212,11 @@ service cloud.firestore {
 
     match /eventos/{id} {
       allow create: if puedeCrearTipoDeEvento() && mismaInstitucionNueva() &&
-          creadoPorUsuarioActual();
+          creadoPorUsuarioActual() && centroAprobado() &&
+          getAfter(/databases/$(database)/documents/pacientes/$(request.resource.data.paciente_id))
+              .data.institucion_codigo == request.resource.data.institucion_codigo &&
+          getAfter(/databases/$(database)/documents/consentimientos/$(request.resource.data.consentimiento_id))
+              .data.paciente_id == request.resource.data.paciente_id;
       allow get, list: if puedeLeerRegistroClinico();
       allow update, delete: if false;
     }
@@ -143,7 +225,13 @@ service cloud.firestore {
     // nuevo y una entrada que conserva valor anterior, nuevo y motivo.
     match /auditoria/{id} {
       allow create: if perfilExiste() && mismaInstitucionNueva() &&
-          creadoPorUsuarioActual();
+          creadoPorUsuarioActual() &&
+          (request.resource.data.entidad != 'exportacion' ||
+              ((tieneRol('analista') || esPrincipal()) &&
+                  request.resource.data.campo == 'archivo')) &&
+          (request.resource.data.entidad != 'consentimiento' ||
+              request.resource.data.campo != 'archivo' ||
+              tieneRol('reclutador') || esPrincipal());
       allow get, list: if mismaInstitucionExistente();
       allow update, delete: if false;
     }

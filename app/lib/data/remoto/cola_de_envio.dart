@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import '../../domain/models/audit_entry.dart';
+import '../../domain/models/consent.dart';
 import '../../domain/models/estudio_form_definition.dart';
 import '../../domain/models/evento_clinico.dart';
 import '../../domain/repositories/study_repository.dart';
@@ -27,15 +31,18 @@ import 'lote.dart';
 /// recuperable el caso que va a ocurrir de verdad: que el servidor guarde y la
 /// respuesta se pierda por el camino.
 class ColaDeEnvio {
+  static const claveLoteEnVuelo = 'lote_en_vuelo';
   ColaDeEnvio({
     required this.repo,
     required this.api,
     required this.dispositivoId,
+    this.maxPacientesPorLote,
   });
 
   final StudyRepository repo;
   final ClienteRemoto api;
   final String dispositivoId;
+  final int? maxPacientesPorLote;
 
   /// Cuántos registros esperan a ser enviados.
   int get pendientes => repo.pendienteDeEnvio().registros;
@@ -47,12 +54,20 @@ class ColaDeEnvio {
   /// pequeños; quien llame puede repetir mientras queden pendientes.
   Future<EnvioRealizado> sincronizar() async {
     final pendiente = repo.pendienteDeEnvio();
-    if (pendiente.vacio) return const EnvioRealizado.nadaQueEnviar();
+    if (pendiente.vacio) {
+      repo.guardarAjuste(claveLoteEnVuelo, '');
+      return const EnvioRealizado.nadaQueEnviar();
+    }
 
-    final lote = _armar(pendiente);
     try {
+      final lote = _lotePersistente(pendiente);
       final resultado = await api.enviar(lote);
+      if (resultado.loteId != lote.id) {
+        throw const ErrorDelServidor(
+            200, 'El servidor acusó un lote distinto del enviado.');
+      }
       _anotar(lote, resultado);
+      repo.guardarAjuste(claveLoteEnVuelo, '');
       return EnvioRealizado.hecho(resultado);
     } on SinConexion catch (error) {
       // No se llegó: la cola se queda intacta y se reintenta más tarde.
@@ -64,24 +79,98 @@ class ColaDeEnvio {
       // envió algo con una forma que el servidor no sabe leer. Eso no se
       // arregla reintentando.
       return EnvioRealizado.rechazado(error);
+    } on StateError catch (error) {
+      return EnvioRealizado.rechazado(ErrorDelServidor(409, error.message));
     }
   }
 
-  Lote _armar(Pendiente pendiente) => Lote(
-        dispositivoId: dispositivoId,
-        pacientes: [
-          for (final p in pendiente.pacientes) PacienteEnviable(p),
-        ],
-        consentimientos: [
-          for (final c in pendiente.consentimientos) ConsentimientoEnviable(c),
-        ],
-        eventos: [
-          for (final e in pendiente.eventos) EventoEnviable(e, _tipos(e)),
-        ],
-        auditoria: [
-          for (final a in pendiente.auditoria) AuditoriaEnviable(a),
-        ],
+  Lote _lotePersistente(Pendiente pendiente) {
+    final guardado = repo.ajuste(claveLoteEnVuelo);
+    if (guardado != null && guardado.isNotEmpty) {
+      final datos = jsonDecode(guardado) as Map<String, dynamic>;
+      final ids = (datos['ids'] as List).cast<String>().toSet();
+      final seleccion = Pendiente(
+        pacientes:
+            pendiente.pacientes.where((p) => ids.contains(p.id)).toList(),
+        consentimientos:
+            pendiente.consentimientos.where((c) => ids.contains(c.id)).toList(),
+        eventos: pendiente.eventos.where((e) => ids.contains(e.id)).toList(),
+        auditoria:
+            pendiente.auditoria.where((a) => ids.contains(a.id)).toList(),
       );
+      if (seleccion.registros != ids.length) {
+        throw StateError('El lote pendiente cambió antes de recibir su acuse.');
+      }
+      final lote =
+          _armar(seleccion, id: datos['id'] as String, limitado: false);
+      if (jsonEncode(lote.aJson()) != datos['contenido']) {
+        throw StateError(
+            'Un registro del lote cambió antes de recibir su acuse. '
+            'Requiere revisión para no perder la corrección.');
+      }
+      return lote;
+    }
+    final lote = _armar(pendiente);
+    repo.guardarAjuste(
+        claveLoteEnVuelo,
+        jsonEncode({
+          'id': lote.id,
+          'contenido': jsonEncode(lote.aJson()),
+          'ids': [
+            for (final p in lote.pacientes) p.paciente.id,
+            for (final c in lote.consentimientos) c.consentimiento.id,
+            for (final e in lote.eventos) e.evento.id,
+            for (final a in lote.auditoria) a.entrada.id,
+          ],
+        }));
+    return lote;
+  }
+
+  Lote _armar(Pendiente pendiente, {String? id, bool limitado = true}) {
+    limitado = limitado && maxPacientesPorLote != null;
+    final soloPacientes = limitado && pendiente.pacientes.isNotEmpty;
+    final pacientes = limitado
+        ? pendiente.pacientes.take(maxPacientesPorLote!)
+        : pendiente.pacientes;
+    // Cada evento consulta paciente y consentimiento en las reglas. Ocho
+    // dejan margen bajo el límite de 20 accesos por transacción de Firestore.
+    var cupo = 8;
+    final consentimientos = soloPacientes
+        ? const <Consent>[]
+        : pendiente.consentimientos
+            .take(limitado ? cupo : pendiente.consentimientos.length)
+            .toList();
+    cupo -= consentimientos.length;
+    final eventos = soloPacientes
+        ? const <EventoClinico>[]
+        : pendiente.eventos
+            .take(limitado ? cupo : pendiente.eventos.length)
+            .toList();
+    cupo -= eventos.length;
+    final auditoria = soloPacientes
+        ? const <AuditEntry>[]
+        : pendiente.auditoria
+            .take(limitado ? cupo : pendiente.auditoria.length)
+            .toList();
+    return Lote(
+      id: id,
+      dispositivoId: dispositivoId,
+      pacientes: [
+        for (final p in pacientes) PacienteEnviable(p),
+      ],
+      consentimientos: [
+        for (final c in consentimientos) ConsentimientoEnviable(c),
+      ],
+      eventos: [
+        for (final e in eventos)
+          EventoEnviable(e, _tipos(e),
+              consentimientoId: repo.paciente(e.patientId)?.consentimientoId),
+      ],
+      auditoria: [
+        for (final a in auditoria) AuditoriaEnviable(a),
+      ],
+    );
+  }
 
   /// El tipo de dato de cada campo, sacado de la definición del formulario.
   ///
@@ -118,9 +207,7 @@ class ColaDeEnvio {
         FieldType.numero => 'numero',
         FieldType.fecha => 'fecha',
         FieldType.siNo => 'booleano',
-        FieldType.seleccionUnica ||
-        FieldType.seleccionMultiple =>
-          'lista',
+        FieldType.seleccionUnica || FieldType.seleccionMultiple => 'lista',
         FieldType.texto || FieldType.textoLargo => 'texto',
       };
 }

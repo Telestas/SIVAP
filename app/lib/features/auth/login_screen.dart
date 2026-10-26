@@ -27,11 +27,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final _clave = TextEditingController();
   Investigador _seleccionado = Seed.investigadores.first;
   String? _error;
+  bool _entrando = false;
+  bool _recuperando = false;
 
   @override
   void initState() {
     super.initState();
-    _usuario.text = _seleccionado.usuario;
     // Teclear un usuario selecciona su función, y elegir función rellena el
     // usuario. Los dos controles miran lo mismo y tienen que ir a la par.
     _usuario.addListener(_sincronizarDesdeUsuario);
@@ -68,26 +69,88 @@ class _LoginScreenState extends State<LoginScreen> {
         if (_usuario.text != i.usuario) _usuario.text = i.usuario;
       });
 
-  void _entrar() {
+  Future<void> _entrar() async {
+    final state = AppScope.read(context);
+    if (state.requiereAutenticacionRemota) {
+      if (_usuario.text.trim().isEmpty || _clave.text.isEmpty) {
+        setState(() => _error = 'Escriba el correo y la contraseña.');
+        return;
+      }
+      setState(() {
+        _entrando = true;
+        _error = null;
+      });
+      try {
+        await state.iniciarSesionRemota(
+          _usuario.text.trim(),
+          _clave.text,
+        );
+      } on Object catch (error) {
+        if (!mounted) return;
+        setState(() => _error = _mensajeDe(error));
+      } finally {
+        if (mounted) setState(() => _entrando = false);
+      }
+      return;
+    }
+
     final encontrado = _buscar(_usuario.text);
     if (encontrado == null) {
       setState(() => _error =
           'No hay ningún investigador con el usuario «${_usuario.text.trim()}». '
-          'Elija una función de la lista o escriba uno de los usuarios que '
-          'aparecen en ella.');
+              'Elija una función de la lista o escriba uno de los usuarios que '
+              'aparecen en ella.');
       return;
     }
     if (_clave.text.isEmpty) {
       setState(() => _error = 'Escriba la contraseña.');
       return;
     }
-    AppScope.read(context).iniciarSesion(encontrado);
+    state.iniciarSesion(encontrado);
+  }
+
+  Future<void> _recuperarAcceso() async {
+    final correo = _usuario.text.trim();
+    if (correo.isEmpty) {
+      setState(() => _error = 'Escriba primero su correo.');
+      return;
+    }
+    setState(() {
+      _recuperando = true;
+      _error = null;
+    });
+    try {
+      await AppScope.read(context).recuperarAcceso(correo);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+          'Solicitud enviada. Revise Recibidos, Spam y Promociones. El remitente puede aparecer como SIVAP o Firebase.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = _mensajeDe(error));
+    } finally {
+      if (mounted) setState(() => _recuperando = false);
+    }
+  }
+
+  static String _mensajeDe(Object error) {
+    final mensaje = error.toString();
+    if (mensaje.startsWith('Exception: ')) {
+      return mensaje.substring('Exception: '.length);
+    }
+    if (mensaje.contains('permission-denied')) {
+      return 'La cuenta no tiene permiso para leer los datos del estudio.';
+    }
+    return mensaje;
   }
 
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final config = state.repo.config;
+    final remoto = state.requiereAutenticacionRemota;
 
     return Scaffold(
       backgroundColor: T.surface,
@@ -110,8 +173,11 @@ class _LoginScreenState extends State<LoginScreen> {
             // Entrar aquí no habla con el servidor, y conviene decirlo: la
             // app trabaja sin conexión y el envío es otra cosa (CLAUDE.md §12).
             StatusBanner(
-              texto: 'El acceso a la app no necesita conexión. El envío al '
-                  'servidor se hace aparte, cuando la haya.',
+              texto: remoto
+                  ? 'La cuenta y las funciones las valida Firebase. La captura '
+                      'móvil sigue disponible sin conexión tras iniciar sesión.'
+                  : 'El acceso a la app no necesita conexión. El envío al '
+                      'servidor se hace aparte, cuando la haya.',
               alineaArriba: true,
               accion: state.hayCola ? state.textoSyncCorto : null,
               onAccion: state.hayCola
@@ -124,17 +190,18 @@ class _LoginScreenState extends State<LoginScreen> {
             // persiste, se dice aquí y no en letra pequeña.
             if (state.almacen.advertencia != null) ...[
               const SizedBox(height: 12),
-              StatusBanner(texto: state.almacen.advertencia!, alineaArriba: true),
+              StatusBanner(
+                  texto: state.almacen.advertencia!, alineaArriba: true),
             ],
 
             // El CEI aún no ha aprobado: la app funciona, pero no con pacientes
             // reales. Decirlo aquí y no en letra pequeña es deliberado.
-            if (!config.consentimientoAprobadoPorCei) ...[
+            if (!remoto && !config.consentimientoAprobadoPorCei) ...[
               const SizedBox(height: 12),
               const StatusBanner(
-                texto: 'Modo demostración. El CEI no ha aprobado aún protocolo '
-                    'y consentimiento: no se admite el enrolamiento de '
-                    'pacientes reales.',
+                texto: 'La aprobación del centro o el consentimiento vigente '
+                    'aún no están disponibles en este aparato. No se admite '
+                    'el enrolamiento.',
                 alineaArriba: true,
               ),
             ],
@@ -143,13 +210,16 @@ class _LoginScreenState extends State<LoginScreen> {
             LabeledField(
                 label: 'Usuario',
                 controller: _usuario,
-                hint: 'Ej.: investigador.uno'),
+                hint:
+                    remoto ? 'correo@institucion.cu' : 'Ej.: investigador.uno'),
             const SizedBox(height: 14),
             LabeledField(
               label: 'Contraseña',
               controller: _clave,
               oculto: true,
-              onSubmitted: (_) => _entrar(),
+              onSubmitted: (_) {
+                if (!_entrando) _entrar();
+              },
             ),
 
             if (_error != null) ...[
@@ -157,27 +227,40 @@ class _LoginScreenState extends State<LoginScreen> {
               StatusBanner(texto: _error!, alineaArriba: true),
             ],
 
-            const SizedBox(height: 22),
-            const SectionLabel('Función en el ensayo'),
-            const SizedBox(height: 6),
-            const Text(
-                'El diseño del ensayo separa funciones por razones '
-                'metodológicas: quien selecciona pacientes está cegado a la '
-                'secuencia, y quien evalúa desenlaces, a la rama asignada. '
-                'Elegir una rellena el usuario, y al revés.',
-                style: TextStyle(fontSize: 12, color: T.secondary, height: 1.45)),
-            const SizedBox(height: 12),
-            for (final i in Seed.investigadores) ...[
-              _OpcionFuncion(
-                investigador: i,
-                seleccionado: _seleccionado.id == i.id,
-                onTap: () => _elegir(i),
-              ),
-              const SizedBox(height: 8),
+            if (!remoto) ...[
+              const SizedBox(height: 22),
+              const SectionLabel('Función en el ensayo'),
+              const SizedBox(height: 6),
+              const Text(
+                  'El diseño del ensayo separa funciones por razones '
+                  'metodológicas: quien selecciona pacientes está cegado a la '
+                  'secuencia, y quien evalúa desenlaces, a la rama asignada. '
+                  'Elegir una rellena el usuario, y al revés.',
+                  style: TextStyle(
+                      fontSize: 12, color: T.secondary, height: 1.45)),
+              const SizedBox(height: 12),
+              for (final i in Seed.investigadores) ...[
+                _OpcionFuncion(
+                  investigador: i,
+                  seleccionado: _seleccionado.id == i.id,
+                  onTap: () => _elegir(i),
+                ),
+                const SizedBox(height: 8),
+              ],
             ],
 
             const SizedBox(height: 20),
-            AppButton('Entrar', onTap: _entrar),
+            AppButton(_entrando ? 'Entrando…' : 'Entrar',
+                enabled: !_entrando, onTap: _entrar),
+            if (remoto) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _entrando || _recuperando ? null : _recuperarAcceso,
+                child: Text(_recuperando
+                    ? 'Solicitando…'
+                    : '¿No recibió el correo? Enviar recuperación'),
+              ),
+            ],
             const SizedBox(height: 12),
             Text('v0.2 · ${config.definicionFormulario.version}',
                 textAlign: TextAlign.center,

@@ -12,6 +12,7 @@ import '../../domain/models/protocolo.dart';
 import '../../domain/models/role.dart';
 import '../../domain/repositories/study_repository.dart';
 import '../allocation/allocation_strategy.dart';
+import '../remoto/lote.dart';
 import 'db/sivap_database.dart';
 import 'demo_dataset.dart';
 import 'seed_data.dart';
@@ -20,16 +21,114 @@ import 'seed_data.dart';
 ///
 /// Las operaciones son síncronas porque `package:sqlite3` lo es: la apertura de
 /// la base es lo único asíncrono, y ocurre una vez al arrancar.
-class SqliteStudyRepository implements StudyRepository {
-  SqliteStudyRepository(this._base, {required AllocationSequence secuencia}) {
-    _asegurarSecuencia(secuencia);
+class SqliteStudyRepository extends StudyRepository {
+  SqliteStudyRepository(this._base, {AllocationSequence? secuencia})
+      : _usaTramos = secuencia == null {
+    if (secuencia != null) _asegurarSecuencia(secuencia);
   }
 
   final SivapDatabase _base;
+  final bool _usaTramos;
+  @override
+  bool get requiereTramos => _usaTramos;
   Database get _db => _base.db;
 
   @override
-  StudyConfig get config => Seed.config;
+  StudyConfig get config {
+    if (!_usaTramos) return Seed.config;
+    final crudo = ajuste('configuracion_aprobada');
+    if (crudo == null) return _configuracionPendiente();
+    try {
+      final datos = jsonDecode(crudo) as Map<String, dynamic>;
+      final codigo = datos['institucion_codigo'] as String;
+      final institucion = Institucion(
+        codigo: codigo,
+        nombre: datos['institucion_nombre'] as String,
+      );
+      final consentimiento = datos['consentimiento'] as Map<String, dynamic>;
+      final documento = ConsentDocument(
+        version: consentimiento['version'] as String,
+        codigoCei: consentimiento['codigo_cei'] as String,
+        vigenteDesde: consentimiento['vigente_desde'] as String,
+        parrafos: List<String>.from(consentimiento['parrafos'] as List),
+        declaraciones:
+            List<String>.from(consentimiento['declaraciones'] as List),
+      );
+      return StudyConfig(
+        nombreEstudio: Seed.config.nombreEstudio,
+        acronimo: Seed.config.acronimo,
+        instituciones: [institucion],
+        consentimientoAprobadoPorCei:
+            datos['cei_aprobado'] == true && consentimiento['aprobado'] == true,
+        permiteAcumularRoles: Seed.config.permiteAcumularRoles,
+        documentoConsentimiento: documento,
+        definicionFormulario: Seed.config.definicionFormulario,
+      );
+    } on Object {
+      return _configuracionPendiente();
+    }
+  }
+
+  StudyConfig _configuracionPendiente() => StudyConfig(
+        nombreEstudio: Seed.config.nombreEstudio,
+        acronimo: Seed.config.acronimo,
+        instituciones: const [],
+        consentimientoAprobadoPorCei: false,
+        permiteAcumularRoles: Seed.config.permiteAcumularRoles,
+        documentoConsentimiento: const ConsentDocument(
+          version: 'sin-configurar',
+          codigoCei: '',
+          vigenteDesde: '',
+          parrafos: [],
+          declaraciones: [],
+        ),
+        definicionFormulario: Seed.config.definicionFormulario,
+      );
+
+  /// Actualiza la aprobación y el texto del consentimiento desde Firestore.
+  /// Solo se guarda en la base cifrada del aparato, nunca en el repositorio.
+  void guardarConfiguracionAprobada({
+    required Institucion institucion,
+    required bool ceiAprobado,
+    required Map<String, dynamic> consentimiento,
+  }) {
+    if (!_usaTramos) return;
+    final version = consentimiento['version'];
+    final codigo = consentimiento['codigo_cei'];
+    final vigente = consentimiento['vigente_desde'];
+    final parrafos = consentimiento['parrafos'];
+    final declaraciones = consentimiento['declaraciones'];
+    if (version is! String ||
+        version.trim().isEmpty ||
+        version.toLowerCase().contains('demo') ||
+        codigo is! String ||
+        codigo.trim().isEmpty ||
+        codigo.toLowerCase().contains('pendiente') ||
+        parrafos is! List ||
+        parrafos.isEmpty ||
+        !parrafos.every((p) => p is String && p.trim().isNotEmpty) ||
+        declaraciones is! List ||
+        declaraciones.isEmpty ||
+        !declaraciones.every((d) => d is String && d.trim().isNotEmpty) ||
+        vigente is! String ||
+        !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(vigente)) {
+      throw StateError('El consentimiento aprobado está incompleto.');
+    }
+    guardarAjuste(
+        'configuracion_aprobada',
+        jsonEncode({
+          'institucion_codigo': institucion.codigo,
+          'institucion_nombre': institucion.nombre,
+          'cei_aprobado': ceiAprobado,
+          'consentimiento': consentimiento,
+        }));
+  }
+
+  @override
+  bool get admiteEscritura => true;
+
+  @override
+  List<Investigador> investigadores() => List.unmodifiable(Seed.investigadores);
 
   // ── Secuencia de aleatorización ────────────────────────────────
 
@@ -64,8 +163,7 @@ class SqliteStudyRepository implements StudyRepository {
     return (
       secuencia: AllocationSequence(
         valores: [
-          for (final c in codigo.split(''))
-            c == '1' ? Protocolo.b : Protocolo.a
+          for (final c in codigo.split('')) c == '1' ? Protocolo.b : Protocolo.a
         ],
         etiqueta: fila['etiqueta'] as String,
         origen: OrigenSecuencia.values
@@ -78,9 +176,76 @@ class SqliteStudyRepository implements StudyRepository {
   }
 
   /// Cuántas asignaciones quedan en la secuencia activa.
+  @override
   int get asignacionesRestantes {
+    if (_usaTramos) {
+      final filas =
+          _db.select('SELECT COALESCE(SUM(hasta - desde - consumidas), 0) '
+              'AS libres FROM tramos_aleatorizacion;');
+      return filas.first['libres'] as int;
+    }
     final s = _secuenciaActiva();
     return s.secuencia.longitud - s.consumidas;
+  }
+
+  /// Guarda únicamente un tramo emitido para este aparato. Una respuesta
+  /// repetida no rebobina el contador local.
+  @override
+  void incorporarTramo(Tramo tramo, String etiqueta, String dispositivoId) {
+    if (!_usaTramos) {
+      throw StateError('La demostración no recibe tramos reales.');
+    }
+    if (tramo.desde < 1 ||
+        tramo.hasta <= tramo.desde ||
+        tramo.consumidas < 0 ||
+        tramo.consumidas > tramo.total ||
+        tramo.codigoBinario.length != tramo.total ||
+        !RegExp(r'^[01]+$').hasMatch(tramo.codigoBinario)) {
+      throw StateError('El servidor entregó un tramo inválido.');
+    }
+    _enTransaccion(() {
+      final repetido = _db.select(
+          'SELECT * FROM tramos_aleatorizacion WHERE desde = ?;',
+          [tramo.desde]);
+      if (repetido.isNotEmpty) {
+        final fila = repetido.first;
+        if (fila['hasta'] != tramo.hasta ||
+            fila['codigo_binario'] != tramo.codigoBinario ||
+            fila['etiqueta'] != etiqueta ||
+            fila['dispositivo_id'] != dispositivoId) {
+          throw StateError('El tramo recibido contradice el ya guardado.');
+        }
+        if (tramo.consumidas > (fila['consumidas'] as int)) {
+          _db.execute(
+              'UPDATE tramos_aleatorizacion SET consumidas = ? '
+              'WHERE desde = ?;',
+              [tramo.consumidas, tramo.desde]);
+        }
+        return;
+      }
+      if (_db.select(
+          'SELECT 1 FROM tramos_aleatorizacion '
+          'WHERE etiqueta != ? OR dispositivo_id != ? OR '
+          '(desde < ? AND hasta > ?) LIMIT 1;',
+          [etiqueta, dispositivoId, tramo.hasta, tramo.desde]).isNotEmpty) {
+        throw StateError('El tramo recibido se solapa o cambia de estudio.');
+      }
+      if (asignacionesRestantes != 0) {
+        throw StateError('Primero se debe consumir el tramo actual.');
+      }
+      _db.execute(
+          'INSERT INTO tramos_aleatorizacion '
+          '(desde, hasta, etiqueta, codigo_binario, dispositivo_id, consumidas) '
+          'VALUES (?, ?, ?, ?, ?, ?);',
+          [
+            tramo.desde,
+            tramo.hasta,
+            etiqueta,
+            tramo.codigoBinario,
+            dispositivoId,
+            tramo.consumidas,
+          ]);
+    });
   }
 
   // ── Lectura ────────────────────────────────────────────────────
@@ -96,7 +261,8 @@ class SqliteStudyRepository implements StudyRepository {
   List<Patient> pacientes({String? recolectorId}) {
     final filas = recolectorId == null
         ? _db.select(_sqlPaciente)
-        : _db.select('$_sqlPaciente WHERE p.recolector_id = ?;', [recolectorId]);
+        : _db
+            .select('$_sqlPaciente WHERE p.recolector_id = ?;', [recolectorId]);
     final lista = filas.map(_leerPaciente).toList()
       ..sort((a, b) => a.codigo.compareTo(b.codigo));
     return lista;
@@ -167,12 +333,14 @@ class SqliteStudyRepository implements StudyRepository {
   EventoClinico _leerEvento(Row f) => EventoClinico(
         id: f['id'] as String,
         patientId: f['paciente_id'] as String,
-        tipo: TipoEvento.values.firstWhere((t) => t.name == f['tipo'] as String),
+        tipo:
+            TipoEvento.values.firstWhere((t) => t.name == f['tipo'] as String),
         ocurrencia: f['ocurrencia'] as int,
         fechaOcurrencia: DateTime.parse(f['fecha_ocurrencia'] as String),
         estado: EstadoEvento.values
             .firstWhere((e) => e.name == f['estado'] as String),
-        sync: SyncStatus.values.firstWhere((s) => s.name == f['sync'] as String),
+        sync:
+            SyncStatus.values.firstWhere((s) => s.name == f['sync'] as String),
         valores: _leerValores(f['id'] as String),
         recolectorId: f['recolector_id'] as String,
         institucion: _institucion(f['institucion'] as String),
@@ -256,19 +424,53 @@ class SqliteStudyRepository implements StudyRepository {
       throw PermissionDenied(autor, 'enrolar pacientes');
     }
 
+    if (_usaTramos && autor.institucion.codigo != institucion.codigo) {
+      throw StateError('Solo se puede enrolar en el centro de su perfil.');
+    }
+    if (_usaTramos &&
+        (!config.consentimientoAprobadoPorCei ||
+            !config.instituciones.any((c) => c.codigo == institucion.codigo))) {
+      throw StateError('Falta la aprobación del centro o el consentimiento '
+          'aprobado en la configuración del estudio.');
+    }
+
     // Asignación y alta van en la misma transacción. Si se guardara el paciente
     // sin avanzar el contador —o al revés— la secuencia dejaría de
     // corresponderse con los pacientes, que es un daño irreparable.
     return _enTransaccion(() {
-      final estado = _secuenciaActiva();
-      final estrategia = SequentialAllocation(
-          secuencia: estado.secuencia, consumidas: estado.consumidas);
-      final asignacion = estrategia.asignar(ahora: DateTime.now());
-
-      _db.execute(
-        'UPDATE secuencia_aleatorizacion SET consumidas = ? WHERE etiqueta = ?;',
-        [estrategia.consumidas, estado.secuencia.etiqueta],
-      );
+      late final Allocation asignacion;
+      if (_usaTramos) {
+        final filas = _db.select('SELECT * FROM tramos_aleatorizacion '
+            'WHERE consumidas < hasta - desde ORDER BY desde LIMIT 1;');
+        if (filas.isEmpty) {
+          throw StateError(
+              'Sin tramo disponible. Conéctese para solicitar otro; '
+              'no se puede enrolar sin una posición reservada.');
+        }
+        final tramo = filas.first;
+        final consumidas = tramo['consumidas'] as int;
+        final posicion = (tramo['desde'] as int) + consumidas;
+        final bit = (tramo['codigo_binario'] as String)[consumidas];
+        asignacion = Allocation(
+          protocolo: bit == '1' ? Protocolo.b : Protocolo.a,
+          etiquetaSecuencia: tramo['etiqueta'] as String,
+          asignadoEn: DateTime.now(),
+          posicion: posicion,
+        );
+        _db.execute(
+            'UPDATE tramos_aleatorizacion SET consumidas = ? '
+            'WHERE desde = ?;',
+            [consumidas + 1, tramo['desde']]);
+      } else {
+        final estado = _secuenciaActiva();
+        final estrategia = SequentialAllocation(
+            secuencia: estado.secuencia, consumidas: estado.consumidas);
+        asignacion = estrategia.asignar(ahora: DateTime.now());
+        _db.execute(
+          'UPDATE secuencia_aleatorizacion SET consumidas = ? WHERE etiqueta = ?;',
+          [estrategia.consumidas, estado.secuencia.etiqueta],
+        );
+      }
 
       final ahora = DateTime.now();
       final id = Ids.nuevo();
@@ -294,7 +496,23 @@ class SqliteStudyRepository implements StudyRepository {
       _db.execute(
         'INSERT INTO identidad (paciente_id, nombre, numero_historia_clinica, '
         'telefono_principal, telefono_secundario) VALUES (?, ?, ?, ?, ?);',
-        [id, nombre, numeroHistoriaClinica, telefonoPrincipal, telefonoSecundario],
+        [
+          id,
+          nombre,
+          numeroHistoriaClinica,
+          telefonoPrincipal,
+          telefonoSecundario
+        ],
+      );
+
+      _auditarAlta(
+        autor: autor,
+        entidad: AuditEntity.ficha,
+        entidadId: id,
+        objetivo: paciente(id)!.codigo,
+        campo: 'ficha',
+        valorNuevo: 'creada',
+        motivo: 'Enrolamiento',
       );
 
       // Sin calendario que pre-crear: los eventos aparecen cuando ocurren
@@ -324,6 +542,15 @@ class SqliteStudyRepository implements StudyRepository {
     if (!autor.puedeEnrolar) {
       throw PermissionDenied(autor, 'registrar consentimientos');
     }
+    if (paciente(patientId)?.tieneConsentimiento != false) {
+      throw StateError('El paciente ya tiene consentimiento o no existe.');
+    }
+    if (_usaTramos &&
+        (!config.consentimientoAprobadoPorCei ||
+            !config.instituciones
+                .any((c) => c.codigo == autor.institucion.codigo))) {
+      throw StateError('El consentimiento aprobado no está disponible.');
+    }
     final doc = config.documentoConsentimiento;
     final consent = Consent(
       id: Ids.nuevo(),
@@ -333,13 +560,14 @@ class SqliteStudyRepository implements StudyRepository {
       firmadoEn: DateTime.now(),
       testigoId: autor.id,
       firmaTrazos: firmaTrazos,
+      documentoFirmado: doc,
     );
 
     return _enTransaccion(() {
       _db.execute(
         'INSERT INTO consentimientos (id, paciente_id, version_documento, '
-        'codigo_cei, firmado_en, testigo_id, firma_json) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?);',
+        'codigo_cei, firmado_en, testigo_id, firma_json, documento_json) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?);',
         [
           consent.id,
           patientId,
@@ -348,12 +576,51 @@ class SqliteStudyRepository implements StudyRepository {
           consent.firmadoEn.toIso8601String(),
           consent.testigoId,
           _codificarFirma(firmaTrazos),
+          jsonEncode(_documentoJson(doc)),
         ],
       );
       _db.execute('UPDATE pacientes SET consentimiento_id = ? WHERE id = ?;',
           [consent.id, patientId]);
+      _auditarAlta(
+        autor: autor,
+        entidad: AuditEntity.consentimiento,
+        entidadId: consent.id,
+        objetivo: paciente(patientId)!.codigo,
+        campo: 'version_documento',
+        valorNuevo: consent.versionDocumento,
+        motivo: 'Firma del consentimiento',
+      );
       return consent;
     });
+  }
+
+  void _auditarAlta({
+    required Investigador autor,
+    required AuditEntity entidad,
+    required String entidadId,
+    required String objetivo,
+    required String campo,
+    required String valorNuevo,
+    required String motivo,
+  }) {
+    _db.execute(
+      'INSERT INTO auditoria (id, ocurrido_en, autor_id, autor_nombre, '
+      'entidad, entidad_id, descripcion_objetivo, campo, valor_anterior, '
+      'valor_nuevo, motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+      [
+        Ids.nuevo(),
+        DateTime.now().toIso8601String(),
+        autor.id,
+        autor.nombre,
+        entidad.name,
+        entidadId,
+        objetivo,
+        campo,
+        null,
+        valorNuevo,
+        motivo,
+      ],
+    );
   }
 
   @override
@@ -469,15 +736,15 @@ class SqliteStudyRepository implements StudyRepository {
 
   bool _yaRegistrado(String patientId, TipoEvento tipo) =>
       (_db.select(
-              'SELECT count(*) c FROM eventos WHERE paciente_id = ? '
-              "AND tipo = ? AND estado = 'registrado';",
-              [patientId, tipo.name]).first['c'] as int) >
+          'SELECT count(*) c FROM eventos WHERE paciente_id = ? '
+          "AND tipo = ? AND estado = 'registrado';",
+          [patientId, tipo.name]).first['c'] as int) >
       0;
 
   int _siguienteOcurrencia(String patientId, TipoEvento tipo) =>
       (_db.select(
-              'SELECT count(*) c FROM eventos WHERE paciente_id = ? AND tipo = ?;',
-              [patientId, tipo.name]).first['c'] as int) +
+          'SELECT count(*) c FROM eventos WHERE paciente_id = ? AND tipo = ?;',
+          [patientId, tipo.name]).first['c'] as int) +
       1;
 
   @override
@@ -500,7 +767,8 @@ class SqliteStudyRepository implements StudyRepository {
     final anterior = actual.valores[campo];
 
     return _enTransaccion(() {
-      _db.execute('DELETE FROM evento_valores WHERE evento_id = ? AND campo = ?;',
+      _db.execute(
+          'DELETE FROM evento_valores WHERE evento_id = ? AND campo = ?;',
           [eventoId, campo]);
       if (valorNuevo != null) {
         final (tipoValor, texto) = _codificar(valorNuevo);
@@ -556,7 +824,8 @@ class SqliteStudyRepository implements StudyRepository {
 
   /// Los valores son heterogéneos porque los campos son configurables: no se
   /// puede fijar una columna por tipo de antemano.
-  static (String tipo, String texto) _codificar(Object valor) => switch (valor) {
+  static (String tipo, String texto) _codificar(Object valor) =>
+      switch (valor) {
         bool b => ('booleano', b ? '1' : '0'),
         num n => ('numero', n.toString()),
         List l => ('lista', jsonEncode(l.map((e) => e.toString()).toList())),
@@ -600,7 +869,8 @@ class SqliteStudyRepository implements StudyRepository {
   @override
   Pendiente pendienteDeEnvio() => Pendiente(
         pacientes: _db
-            .select('$_sqlPaciente WHERE p.id NOT IN (SELECT id FROM enviados);')
+            .select(
+                '$_sqlPaciente WHERE p.id NOT IN (SELECT id FROM enviados);')
             .map(_leerPaciente)
             .where(_sincronizable)
             .toList(),
@@ -673,7 +943,35 @@ class SqliteStudyRepository implements StudyRepository {
         firmadoEn: DateTime.parse(f['firmado_en'] as String),
         testigoId: f['testigo_id'] as String,
         firmaTrazos: _decodificarFirma(f['firma_json'] as String),
+        documentoFirmado: _leerDocumentoFirmado(f['documento_json'] as String?),
       );
+
+  @override
+  Consent? consentimiento(String id) {
+    final filas =
+        _db.select('SELECT * FROM consentimientos WHERE id = ?;', [id]);
+    return filas.isEmpty ? null : _leerConsentimiento(filas.first);
+  }
+
+  static Map<String, Object?> _documentoJson(ConsentDocument d) => {
+        'version': d.version,
+        'codigo_cei': d.codigoCei,
+        'vigente_desde': d.vigenteDesde,
+        'parrafos': d.parrafos,
+        'declaraciones': d.declaraciones,
+      };
+
+  static ConsentDocument? _leerDocumentoFirmado(String? json) {
+    if (json == null) return null;
+    final d = jsonDecode(json) as Map<String, dynamic>;
+    return ConsentDocument(
+      version: d['version'] as String,
+      codigoCei: d['codigo_cei'] as String,
+      vigenteDesde: d['vigente_desde'] as String,
+      parrafos: List<String>.from(d['parrafos'] as List),
+      declaraciones: List<String>.from(d['declaraciones'] as List),
+    );
+  }
 
   static List<List<({double x, double y})>> _decodificarFirma(String json) => [
         for (final trazo in jsonDecode(json) as List)
@@ -696,7 +994,8 @@ class SqliteStudyRepository implements StudyRepository {
   /// producción. Nunca hay un paciente inventado y uno real en la misma base:
   /// no es una cuestión de disciplina, es que son ficheros diferentes.
   void sembrarDemostracionSiVacia() {
-    final hay = _db.select('SELECT count(*) c FROM pacientes;').first['c'] as int;
+    final hay =
+        _db.select('SELECT count(*) c FROM pacientes;').first['c'] as int;
     if (hay > 0) return;
 
     _enTransaccion(() {

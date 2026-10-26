@@ -21,6 +21,8 @@ htmlcov/
 /app/linux/
 /app/macos/
 /app/windows/
+/firebase/node_modules/
+/firebase/functions/node_modules/
 
 # ── Flutter / Dart ────────────────────────────────
 .dart_tool/

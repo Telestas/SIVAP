@@ -27,8 +27,8 @@ void main() {
 
   /// Una cola contra un servidor de mentira que responde lo que se le diga.
   ColaDeEnvio cola(
-    Future<http.Response> Function(Map<String, dynamic> lote) responder,
-  ) {
+      Future<http.Response> Function(Map<String, dynamic> lote) responder,
+      {int? maxPacientesPorLote}) {
     final api = ClienteApi(
       base: Uri.parse('https://servidor.ejemplo/api'),
       cliente: MockClient((peticion) async {
@@ -53,7 +53,11 @@ void main() {
         return responder(lote);
       }),
     );
-    return ColaDeEnvio(repo: repo, api: api, dispositivoId: 'd-1');
+    return ColaDeEnvio(
+        repo: repo,
+        api: api,
+        dispositivoId: 'd-1',
+        maxPacientesPorLote: maxPacientesPorLote);
   }
 
   Future<void> abrirSesion(ColaDeEnvio c) =>
@@ -102,7 +106,9 @@ void main() {
     test('un borrador no se envía', () {
       final paciente = enrolar();
       repo.registrarConsentimiento(
-          autor: Seed.reclutador, patientId: paciente.id, firmaTrazos: const []);
+          autor: Seed.reclutador,
+          patientId: paciente.id,
+          firmaTrazos: const []);
       repo.guardarBorrador(
         autor: Seed.reclutador,
         patientId: paciente.id,
@@ -119,7 +125,9 @@ void main() {
     test('el mismo evento, ya registrado, sí entra', () {
       final paciente = enrolar();
       repo.registrarConsentimiento(
-          autor: Seed.reclutador, patientId: paciente.id, firmaTrazos: const []);
+          autor: Seed.reclutador,
+          patientId: paciente.id,
+          firmaTrazos: const []);
       final evento = repo.registrarEvento(
         autor: Seed.reclutador,
         patientId: paciente.id,
@@ -134,6 +142,72 @@ void main() {
   });
 
   group('qué se da por enviado', () {
+    test('la sincronización limitada reparte los pacientes en lotes', () async {
+      for (var i = 0; i < 6; i++) {
+        enrolar();
+      }
+      final c = cola((lote) async => todoBien(lote), maxPacientesPorLote: 5);
+      await abrirSesion(c);
+
+      await c.sincronizar();
+      expect(enviados.single['pacientes'], hasLength(5));
+      expect(repo.pendienteDeEnvio().pacientes, hasLength(1));
+      await c.sincronizar();
+      expect(enviados.last['pacientes'], hasLength(1));
+      expect(repo.pendienteDeEnvio().pacientes, isEmpty);
+    });
+
+    test('reintenta el mismo lote si se pierde el acuse', () async {
+      enrolar();
+      var intentos = 0;
+      final c = cola((lote) async {
+        intentos++;
+        if (intentos == 1) throw Exception('Se perdió la respuesta');
+        return todoBien(lote);
+      });
+      await abrirSesion(c);
+
+      expect(await c.sincronizar(), isA<SinRed>());
+      expect(repo.pendienteDeEnvio().pacientes, hasLength(1));
+      expect(repo.ajuste(ColaDeEnvio.claveLoteEnVuelo), isNotEmpty);
+
+      expect(await c.sincronizar(), isA<Hecho>());
+      expect(enviados, hasLength(2));
+      expect(enviados[1]['id'], enviados[0]['id']);
+      expect(repo.pendienteDeEnvio().pacientes, isEmpty);
+    });
+
+    test('no acusa como enviada una corrección hecha durante un lote incierto',
+        () async {
+      final paciente = enrolar();
+      repo.registrarConsentimiento(
+          autor: Seed.reclutador,
+          patientId: paciente.id,
+          firmaTrazos: const []);
+      final evento = repo.registrarEvento(
+        autor: Seed.reclutador,
+        patientId: paciente.id,
+        tipo: TipoEvento.enrolamiento,
+        fechaOcurrencia: DateTime(2026, 9, 2),
+        valores: const {'fecha_ingreso_uci': '2026-09-01'},
+      );
+      final c = cola((_) async => throw Exception('Se perdió la respuesta'));
+      await abrirSesion(c);
+      expect(await c.sincronizar(), isA<SinRed>());
+
+      repo.corregirEventoRegistrado(
+        autor: Seed.principal,
+        eventoId: evento.id,
+        campo: 'fecha_ingreso_uci',
+        valorNuevo: '2026-09-02',
+        motivo: 'Fecha comprobada en expediente',
+      );
+
+      final resultado = await c.sincronizar();
+      expect(resultado, isA<Rechazado>());
+      expect(repo.pendienteDeEnvio().eventos, isNotEmpty);
+      expect(enviados, hasLength(1));
+    });
     test('sin nada pendiente no se llama al servidor', () async {
       final c = cola((_) async => todoBien(const {}));
       await abrirSesion(c);
@@ -172,7 +246,8 @@ void main() {
               {
                 'tipo': 'paciente',
                 'id': paciente.id,
-                'motivo': 'El centro HC no tiene aprobación del Comité de Ética',
+                'motivo':
+                    'El centro HC no tiene aprobación del Comité de Ética',
               }
             ],
             'ya_recibido': false,
@@ -193,7 +268,9 @@ void main() {
     test('un lote con parte rechazada marca solo la parte que entró', () async {
       final paciente = enrolar();
       repo.registrarConsentimiento(
-          autor: Seed.reclutador, patientId: paciente.id, firmaTrazos: const []);
+          autor: Seed.reclutador,
+          patientId: paciente.id,
+          firmaTrazos: const []);
       final evento = repo.registrarEvento(
         autor: Seed.reclutador,
         patientId: paciente.id,
@@ -273,7 +350,9 @@ void main() {
         () async {
       final paciente = enrolar();
       repo.registrarConsentimiento(
-          autor: Seed.reclutador, patientId: paciente.id, firmaTrazos: const []);
+          autor: Seed.reclutador,
+          patientId: paciente.id,
+          firmaTrazos: const []);
       repo.registrarEvento(
         autor: Seed.reclutador,
         patientId: paciente.id,
@@ -308,7 +387,9 @@ void main() {
         () async {
       final paciente = enrolar();
       repo.registrarConsentimiento(
-          autor: Seed.reclutador, patientId: paciente.id, firmaTrazos: const []);
+          autor: Seed.reclutador,
+          patientId: paciente.id,
+          firmaTrazos: const []);
       final evento = repo.registrarEvento(
         autor: Seed.reclutador,
         patientId: paciente.id,
@@ -333,8 +414,8 @@ void main() {
       // corrección, que es lo que cuenta qué cambió y por qué.
       final pendiente = repo.pendienteDeEnvio();
       expect(pendiente.auditoria, hasLength(1));
-      expect(pendiente.auditoria.single.motivo,
-          'cifras transpuestas al teclear');
+      expect(
+          pendiente.auditoria.single.motivo, 'cifras transpuestas al teclear');
     });
   });
 }

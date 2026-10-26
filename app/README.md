@@ -1,16 +1,14 @@
 # app · SIVAP (Flutter)
 
 Cliente de captura del ensayo LIVERE. Captura por eventos clínicos, sin conexión,
-con la base local cifrada. Sin backend todavía.
+con la base local cifrada y sincronización con Firebase/Firestore.
 
 ## Correr
 
-Faltan las carpetas de plataforma (`android/`, `ios/`, `web/`): las genera el
-propio Flutter y no se pudieron crear aquí (ver la limitación al final de
-[`../docs/HITO_1.md`](../docs/HITO_1.md)). Una sola vez, dentro de `app/`:
+El andamiaje Android y web se regenera desde `tool/preparar_android.sh`:
 
 ```bash
-flutter create .    # añade android/ ios/ web/ sin tocar lib/, test/ ni pubspec
+tool/preparar_android.sh android
 ```
 
 Después, lo de siempre:
@@ -23,8 +21,8 @@ flutter test
 flutter analyze
 ```
 
-Sin dependencias de terceros: solo el SDK de Flutter y `flutter_lints`. Es
-deliberado — la app tiene que poder compilarse con conectividad intermitente.
+La compilación usa dependencias de Flutter, Firebase, SQLCipher y exportación
+XLSX; conserve la caché local para trabajar con conectividad intermitente.
 
 ## Cómo está organizado
 
@@ -88,7 +86,7 @@ Si una de esas pruebas falla, no es un test roto: es el ensayo dejando de ser v�
 | Plataforma | Almacén | Cifrado |
 |---|---|---|
 | Android / iOS / escritorio | SQLite + SQLCipher, archivo en el directorio de la app | Sí, AES-256 |
-| Navegador | En memoria | **No** — y la app lo avisa en pantalla |
+| Navegador | Firestore, solo lectura | Los datos permanecen en el servidor; no se captura localmente |
 
 La clave la genera el dispositivo la primera vez y vive en el Keystore de
 Android o el Keychain de iOS. **Nunca está en el código**: una clave dentro del
@@ -98,9 +96,11 @@ Al abrir, la app comprueba `PRAGMA cipher_version` y **se niega a arrancar** si
 lo que se cargó no es SQLCipher. Sin esa comprobación, un fallo de empaquetado
 dejaría la base en claro y nadie se enteraría.
 
-En el navegador no hay cifrado y no se finge que lo haya: no existe archivo que
-cifrar, y guardar la clave en el propio navegador no protege de nadie. La web es
-el panel de administración y su sitio es leer del servidor.
+En el navegador no hay cifrado local y no se finge que lo haya: no existe
+archivo que cifrar, y guardar la clave en el propio navegador no protege de
+nadie. La web autentica con Firebase y carga desde Firestore una vista de solo
+lectura limitada por institución y función. La captura permanece en la app
+móvil, que sí tiene SQLite cifrado.
 
 Demostración y producción son **archivos distintos** (`sivap_demo.db` y
 `sivap.db`), no un modo dentro del mismo archivo. Se elige con `modoAlmacen` en
@@ -115,14 +115,15 @@ del estudio.
 - **Los rangos clínicos van vacíos** a propósito, y hay una prueba que falla si
   alguien los rellena: los anteriores eran de paciente ambulatorio y en UCI
   producirían avisos falsos constantes. Ver `../docs/RANGOS_PENDIENTES.md`.
-- **La secuencia de aleatorización no está repartida por dispositivo.** Dos
-  dispositivos sin conexión asignarían la misma posición. Es bloqueante para
-  enrolar pacientes reales — ver `../docs/REENCAMINAMIENTO.md`.
-- **El acceso es de demostración**: se elige la función al entrar. En producción
-  viene del servidor con la credencial.
+- **La asignación real exige un tramo reservado por dispositivo.** La función
+  de Firebase reparte tramos exclusivos; sin tramo libre la app detiene el
+  enrolamiento. Falta desplegar y probar el ciclo en teléfonos reales.
+- **Android autentica con Firebase**: función y centro vienen del perfil
+  aprovisionado. La compilación actual sigue usando la base de demostración
+  hasta la aprobación clínica y la activación del estudio.
 - **La semilla de aleatorización es de demostración** (`Seed.semillaAleatorizacion`).
   La del estudio real la fija el investigador principal una sola vez, antes del
   primer paciente, y va al acta. Cambiarla con pacientes ya enrolados invalida
   la trazabilidad de todo lo asignado.
-- **El selector de rol en el acceso es de demostración.** En producción el rol
-  llega del servidor con la credencial: un investigador no elige sus permisos.
+- **El selector de rol permanece solo en entornos locales de prueba** sin
+  Firebase. Android y web toman función e institución del perfil Firebase.

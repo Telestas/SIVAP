@@ -29,7 +29,8 @@ class _SincronizacionScreenState extends State<SincronizacionScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_servidor.text.isEmpty) {
-      _servidor.text = AppScope.of(context).sincronizacion.servidor?.toString() ?? '';
+      _servidor.text =
+          AppScope.of(context).sincronizacion.servidor?.toString() ?? '';
     }
   }
 
@@ -92,10 +93,11 @@ class _SincronizacionScreenState extends State<SincronizacionScreen> {
               const SizedBox(height: 8),
               LabeledField(
                   label: 'Dirección', controller: _servidor, mono: true),
-            ] else const StatusBanner(
-              texto: 'Sincronización protegida por Firebase.',
-              alineaArriba: true,
-            ),
+            ] else
+              const StatusBanner(
+                texto: 'Sincronización protegida por Firebase.',
+                alineaArriba: true,
+              ),
             const SizedBox(height: 8),
             Text(
               'Este aparato se identifica como ${sync.dispositivoId}. '
@@ -108,8 +110,7 @@ class _SincronizacionScreenState extends State<SincronizacionScreen> {
             const SectionLabel('Acceso al servidor'),
             const SizedBox(height: 4),
             const Text(
-              'No es el acceso a la app: eso funciona sin conexión. Esto solo '
-              'autoriza el envío.',
+              'La cuenta de la app autoriza el envío cuando hay conexión.',
               style: T.small,
             ),
             const SizedBox(height: 10),
@@ -117,10 +118,12 @@ class _SincronizacionScreenState extends State<SincronizacionScreen> {
               _Sesion(
                 nombre: abierta.nombre,
                 roles: abierta.roles.join(' · '),
-                onSalir: () {
-                  sync.salir();
-                  setState(() => _aviso = null);
-                },
+                onSalir: sync.usaFirebase
+                    ? null
+                    : () {
+                        sync.salir();
+                        setState(() => _aviso = null);
+                      },
               )
             else ...[
               LabeledField(label: 'Usuario', controller: _usuario),
@@ -181,7 +184,7 @@ class _Sesion extends StatelessWidget {
 
   final String nombre;
   final String roles;
-  final VoidCallback onSalir;
+  final VoidCallback? onSalir;
 
   @override
   Widget build(BuildContext context) => AppCard(
@@ -197,11 +200,12 @@ class _Sesion extends StatelessWidget {
                 ],
               ),
             ),
-            GestureDetector(
-              onTap: onSalir,
-              behavior: HitTestBehavior.opaque,
-              child: const MetaChip('SALIR'),
-            ),
+            if (onSalir != null)
+              GestureDetector(
+                onTap: onSalir,
+                behavior: HitTestBehavior.opaque,
+                child: const MetaChip('SALIR'),
+              ),
           ],
         ),
       );

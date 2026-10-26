@@ -18,6 +18,13 @@ import 'package:sqlite3/sqlite3.dart';
 class SivapDatabase {
   SivapDatabase._(this.db);
 
+  /// Permite verificar las transacciones del repositorio contra SQLite real.
+  /// La prueba del cifrado continúa en un teléfono con SQLCipher.
+  factory SivapDatabase.paraPruebas(Database db) {
+    aplicarEsquema(db);
+    return SivapDatabase._(db);
+  }
+
   final Database db;
 
   /// Versión del esquema. Subirla obliga a añadir su migración en [_migrar].
@@ -27,7 +34,7 @@ class SivapDatabase {
   /// dispositivo: no hay base existente que migrar. En cuanto la app corra en
   /// un teléfono real, cualquier cambio de esquema exige subir el número y
   /// escribir su migración.
-  static const int versionEsquema = 3;
+  static const int versionEsquema = 5;
 
   /// Abre la base cifrada en [ruta] con [claveHex] (64 caracteres hex).
   ///
@@ -109,6 +116,8 @@ class SivapDatabase {
       if (actual < 1) _crearVersion1(db);
       if (actual < 2) _crearVersion2(db);
       if (actual < 3) _crearVersion3(db);
+      if (actual < 4) _crearVersion4(db);
+      if (actual < 5) _crearVersion5(db);
       db.execute('PRAGMA user_version = $versionEsquema;');
       db.execute('COMMIT;');
     } catch (_) {
@@ -154,6 +163,28 @@ class SivapDatabase {
         valor TEXT NOT NULL
       );
     ''');
+  }
+
+  /// Tramos exclusivos entregados por el servidor. El contador se actualiza en
+  /// la misma transacción que el alta del paciente.
+  static void _crearVersion4(Database db) {
+    db.execute('''
+      CREATE TABLE tramos_aleatorizacion (
+        desde           INTEGER PRIMARY KEY,
+        hasta           INTEGER NOT NULL,
+        etiqueta        TEXT NOT NULL,
+        codigo_binario  TEXT NOT NULL,
+        dispositivo_id  TEXT NOT NULL,
+        consumidas      INTEGER NOT NULL DEFAULT 0,
+        CHECK (hasta > desde),
+        CHECK (length(codigo_binario) = hasta - desde),
+        CHECK (consumidas >= 0 AND consumidas <= hasta - desde)
+      );
+    ''');
+  }
+
+  static void _crearVersion5(Database db) {
+    db.execute('ALTER TABLE consentimientos ADD COLUMN documento_json TEXT;');
   }
 
   static void _crearVersion1(Database db) {
@@ -314,7 +345,8 @@ class SivapDatabase {
     // Los análisis por centro son un requisito del diseño multicéntrico.
     db.execute('CREATE INDEX idx_pacientes_institucion '
         'ON pacientes (institucion);');
-    db.execute('CREATE INDEX idx_eventos_institucion ON eventos (institucion);');
+    db.execute(
+        'CREATE INDEX idx_eventos_institucion ON eventos (institucion);');
     db.execute(
         'CREATE INDEX idx_auditoria_entidad ON auditoria (entidad_id, ocurrido_en);');
   }

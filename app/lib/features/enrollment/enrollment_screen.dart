@@ -58,6 +58,17 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   /// huecos sin paciente en la secuencia.
   Patient? _guardado;
   String? _error;
+  bool _solicitandoTramo = false;
+
+  Future<void> _pedirTramo() async {
+    setState(() => _solicitandoTramo = true);
+    final error = await AppScope.read(context).sincronizacion.solicitarTramo();
+    if (!mounted) return;
+    setState(() {
+      _solicitandoTramo = false;
+      _error = error;
+    });
+  }
 
   @override
   void initState() {
@@ -130,14 +141,16 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   void _irAConsentimiento() {
     final paciente = _guardar();
     if (paciente == null || !mounted) return;
-    Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => ConsentScreen(patientId: paciente.id)));
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => ConsentScreen(patientId: paciente.id)));
   }
 
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final config = state.repo.config;
+    final bloqueadoPorConfiguracion =
+        state.repo.requiereTramos && !config.consentimientoAprobadoPorCei;
 
     final puerta = _puerta(context);
     final resuelta = puerta == null || _elegibilidadResuelta(puerta);
@@ -194,90 +207,105 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
             // Anexo 4 —«si no marca ninguno, desplegar los campos»— y evita el
             // botón apagado que nadie sabe por qué está apagado.
             if (!excluido && resuelta) ...[
+              if (state.repo.requiereTramos &&
+                  state.repo.asignacionesRestantes == 0) ...[
+                const StatusBanner(
+                  texto: 'Este aparato no tiene posiciones reservadas. '
+                      'Conéctese y solicite un tramo antes de enrolar.',
+                  alineaArriba: true,
+                ),
+                const SizedBox(height: 8),
+                AppButton(
+                    _solicitandoTramo ? 'Solicitando…' : 'Solicitar tramo',
+                    enabled: !_solicitandoTramo,
+                    onTap: _pedirTramo),
+                const SizedBox(height: 16),
+              ],
               // Restricción CLAUDE.md §13. El flag lo controla la configuración
-            // del estudio, no el código ni el investigador.
-            if (!config.consentimientoAprobadoPorCei) ...[
-              const StatusBanner(
-                texto: 'Modo demostración: el CEI aún no aprobó protocolo ni '
-                    'consentimiento. Lo que registre aquí no constituye un '
-                    'enrolamiento válido del ensayo.',
-                alineaArriba: true,
+              // del estudio, no el código ni el investigador.
+              if (!config.consentimientoAprobadoPorCei) ...[
+                const StatusBanner(
+                  texto: 'La aprobación del centro o el consentimiento vigente '
+                      'no están disponibles. El enrolamiento queda detenido.',
+                  alineaArriba: true,
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              const SectionLabel('Centro'),
+              const SizedBox(height: 8),
+              _SelectorInstitucion(
+                instituciones: state.repo.requiereTramos
+                    ? [state.usuarioActual.institucion]
+                    : config.instituciones,
+                valor: _institucion,
+                bloqueado: _guardado != null,
+                onChanged: (i) => setState(() => _institucion = i),
+              ),
+
+              const SizedBox(height: 18),
+              LabeledField(label: 'Nombre y apellidos', controller: _nombre),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 14,
+                    child: LabeledField(
+                        label: 'Núm. de historia clínica',
+                        controller: _hc,
+                        mono: true),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 10,
+                    child: LabeledField(
+                        label: 'Edad',
+                        controller: _edad,
+                        keyboardType: TextInputType.number),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
-            ],
+              const SectionLabel('Sexo'),
+              const SizedBox(height: 8),
+              Row(children: [
+                for (final s in Sexo.values) ...[
+                  SelectablePill(
+                    texto: s.etiqueta,
+                    seleccionado: _sexo == s,
+                    onTap: () => setState(() => _sexo = s),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ]),
+              const SizedBox(height: 16),
+              LabeledField(
+                  label: 'Teléfono de contacto',
+                  controller: _telefono,
+                  keyboardType: TextInputType.phone),
+              const SizedBox(height: 12),
+              LabeledField(
+                  label: 'Segundo teléfono (opcional)',
+                  controller: _telefonoAlt,
+                  keyboardType: TextInputType.phone),
 
-            const SectionLabel('Centro'),
-            const SizedBox(height: 8),
-            _SelectorInstitucion(
-              instituciones: config.instituciones,
-              valor: _institucion,
-              bloqueado: _guardado != null,
-              onChanged: (i) => setState(() => _institucion = i),
-            ),
+              const SizedBox(height: 20),
+              _PanelAsignacion(paciente: _guardado),
 
-            const SizedBox(height: 18),
-            LabeledField(label: 'Nombre y apellidos', controller: _nombre),
-            const SizedBox(height: 16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 14,
-                  child: LabeledField(
-                      label: 'Núm. de historia clínica',
-                      controller: _hc,
-                      mono: true),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 10,
-                  child: LabeledField(
-                      label: 'Edad',
-                      controller: _edad,
-                      keyboardType: TextInputType.number),
+              if (_error != null) ...[
+                const SizedBox(height: 14),
+                StatusBanner(texto: _error!, alineaArriba: true),
+              ],
+
+              if (_guardado != null && !_guardado!.tieneConsentimiento) ...[
+                const SizedBox(height: 14),
+                StatusBanner(
+                  texto: 'Falta el consentimiento informado',
+                  accion: 'FIRMAR',
+                  onAccion: _irAConsentimiento,
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            const SectionLabel('Sexo'),
-            const SizedBox(height: 8),
-            Row(children: [
-              for (final s in Sexo.values) ...[
-                SelectablePill(
-                  texto: s.etiqueta,
-                  seleccionado: _sexo == s,
-                  onTap: () => setState(() => _sexo = s),
-                ),
-                const SizedBox(width: 8),
-              ],
-            ]),
-            const SizedBox(height: 16),
-            LabeledField(
-                label: 'Teléfono de contacto',
-                controller: _telefono,
-                keyboardType: TextInputType.phone),
-            const SizedBox(height: 12),
-            LabeledField(
-                label: 'Segundo teléfono (opcional)',
-                controller: _telefonoAlt,
-                keyboardType: TextInputType.phone),
-
-            const SizedBox(height: 20),
-            _PanelAsignacion(paciente: _guardado),
-
-            if (_error != null) ...[
-              const SizedBox(height: 14),
-              StatusBanner(texto: _error!, alineaArriba: true),
-            ],
-
-            if (_guardado != null && !_guardado!.tieneConsentimiento) ...[
-              const SizedBox(height: 14),
-              StatusBanner(
-                texto: 'Falta el consentimiento informado',
-                accion: 'FIRMAR',
-                onAccion: _irAConsentimiento,
-              ),
-            ],
             ],
           ],
         ),
@@ -287,14 +315,21 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
           flex: 10,
           child: AppButton('Guardar',
               primary: false,
-              enabled: !excluido && resuelta && _completo && _guardado == null,
+              enabled: !bloqueadoPorConfiguracion &&
+                  !excluido &&
+                  resuelta &&
+                  _completo &&
+                  _guardado == null,
               onTap: _guardar),
         ),
         const SizedBox(width: 10),
         Expanded(
           flex: 14,
           child: AppButton('Ir a consentimiento',
-              enabled: !excluido && resuelta && _completo,
+              enabled: !bloqueadoPorConfiguracion &&
+                  !excluido &&
+                  resuelta &&
+                  _completo,
               onTap: _irAConsentimiento),
         ),
       ]),
@@ -343,7 +378,8 @@ class _SelectorInstitucion extends StatelessWidget {
                     ),
                     if (i.coordinador)
                       Text('coordinador',
-                          style: T.label(size: 10, color: T.faint, tracking: 0)),
+                          style:
+                              T.label(size: 10, color: T.faint, tracking: 0)),
                   ],
                 ),
               ),
@@ -377,10 +413,12 @@ class _PanelAsignacion extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const SectionLabel('Asignación por aleatorización', color: T.body),
+                const SectionLabel('Asignación por aleatorización',
+                    color: T.body),
                 if (paciente != null)
                   Text('posición ${paciente!.posicionSecuencia}',
-                      style: T.label(size: 10.5, color: T.secondary, tracking: 0)),
+                      style:
+                          T.label(size: 10.5, color: T.secondary, tracking: 0)),
               ],
             ),
             const SizedBox(height: 10),
@@ -389,7 +427,8 @@ class _PanelAsignacion extends StatelessWidget {
                   'La rama se asigna automáticamente al guardar la ficha, '
                   'tomando la siguiente entrada de la secuencia aleatoria del '
                   'ensayo.',
-                  style: TextStyle(fontSize: 12.5, color: T.secondary, height: 1.45))
+                  style: TextStyle(
+                      fontSize: 12.5, color: T.secondary, height: 1.45))
             else
               Row(
                 children: [
@@ -398,7 +437,8 @@ class _PanelAsignacion extends StatelessWidget {
                   // Solo la letra y la hora. Ninguna descripción de la rama: el
                   // sistema no sabe cuál es cuál (CLAUDE.md §2).
                   Expanded(
-                    child: Text('Asignado a las ${F.hora(paciente!.asignadoEn)}',
+                    child: Text(
+                        'Asignado a las ${F.hora(paciente!.asignadoEn)}',
                         style: const TextStyle(
                             fontSize: 12.5, color: T.secondary, height: 1.4)),
                   ),
@@ -410,7 +450,8 @@ class _PanelAsignacion extends StatelessWidget {
             const Text(
                 'La asignación es automática y no puede modificarse. El sistema '
                 'no registra a qué protocolo corresponde cada rama.',
-                style: TextStyle(fontSize: 12, color: T.secondary, height: 1.5)),
+                style:
+                    TextStyle(fontSize: 12, color: T.secondary, height: 1.5)),
           ],
         ),
       );

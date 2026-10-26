@@ -4,9 +4,9 @@
 # RubyGems, Gradle y contenedores. Un .apk no cabe ahí. Lo que corresponde
 # para un binario suelto son las releases.
 #
-#   gh workflow run apk.yml -f version=0.1.0
+#   gh workflow run apk.yml -f version=0.2.0
 #
-# O empujando una etiqueta:  git tag v0.1.0 && git push origin v0.1.0
+# O empujando una etiqueta:  git tag v0.2.0 && git push origin v0.2.0
 
 name: APK
 
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Versión (sin la v). Ej.: 0.1.0'
+        description: 'Versión (sin la v). Ej.: 0.2.0'
         required: true
         type: string
 
@@ -99,12 +99,8 @@ jobs:
 
       # ── Firma ────────────────────────────────────────────────────────
       #
-      # Si no hay llavero en los secretos, el APK sale firmado con la clave de
-      # depuración que genera Flutter. Se instala igual, pero NO sirve para
-      # repartir de verdad: el día que se pase a una clave propia, Android lo
-      # tratará como otra aplicación y cada usuario tendrá que desinstalar la
-      # anterior. Al desinstalar se borra la clave del Keystore, y con ella
-      # todo lo que hubiera capturado y no sincronizado.
+      # La versión de producción exige el llavero del estudio. Una clave de
+      # depuración haría perder datos locales al sustituirla en otra versión.
       #
       # Conclusión práctica: crear el llavero ANTES de que nadie capture un
       # solo dato real. Ver docs/DISTRIBUCION.md.
@@ -137,12 +133,8 @@ jobs:
           if [ -z "$faltan" ]; then
             echo 'hay=si' >> "$GITHUB_OUTPUT"
             echo 'Se firmará con el llavero del estudio.'
-          elif [ -z "$LLAVERO" ] && [ -z "$CLAVE_LLAVERO" ] \
-            && [ -z "$ALIAS" ] && [ -z "$CLAVE_ALIAS" ]; then
-            echo 'hay=no' >> "$GITHUB_OUTPUT"
-            echo "::warning::Sin llavero configurado: el APK saldrá firmado con la clave de depuración. Sirve para probar, no para repartir."
           else
-            echo "::error::Configuración de firma a medias. Faltan:$faltan"
+            echo "::error::La versión de producción exige el llavero del estudio. Faltan:$faltan"
             echo "Añádalos con: gh secret set <NOMBRE> --repo ${{ github.repository }}"
             exit 1
           fi
@@ -201,17 +193,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.numero }}
-          name: SIVAP ${{ steps.version.outputs.numero }}
+          name: SIVAP ${{ steps.version.outputs.numero }} · pruebas operativas
           files: app/build/entrega/*.apk
-          # Todo lo de esta fase es preliminar: sin aprobación del CEI no se
-          # enrolan pacientes reales.
           prerelease: true
           body: |
-            **Versión de prueba. No para pacientes reales.**
-
-            El estudio no tiene aprobación del CEI, así que la app arranca en
-            modo demostración: los pacientes que aparecen son inventados y la
-            base de datos que usa es un archivo aparte del de producción.
+            **Versión de pruebas operativas. No capture pacientes reales.**
+            La app usa el almacén cifrado de producción, pero el enrolamiento
+            permanece bloqueado mientras falten el consentimiento aprobado en
+            Firebase y la función que entrega tramos de aleatorización.
 
             ### Cuál descargar
 
@@ -224,9 +213,7 @@ jobs:
             procesador más común. Con una conexión lenta, la diferencia son
             veinte minutos por teléfono.
 
-            Firma: ${{ steps.llavero.outputs.hay == 'si' && 'llavero del estudio' || '⚠️ clave de depuración' }}
-
-            ${{ steps.llavero.outputs.hay == 'si' && ' ' || '> **Firmado con la clave de depuración.** Sirve para probar la app y validar los formularios. Antes de que nadie capture datos que quiera conservar, hay que crear el llavero del estudio: al cambiar de clave, Android trata la app como otra distinta, obliga a desinstalar, y al desinstalar se pierde la clave de cifrado del dispositivo con todo lo que no se hubiera sincronizado. Instrucciones en `docs/DISTRIBUCION.md`.' }}
+            Firma: llavero del estudio.
 
             ### Instalación
 
@@ -288,7 +275,7 @@ jobs:
             texto="$texto$(printf 'Descarga: https://telestas.github.io/SIVAP/\n')"
             texto="$texto$(printf 'Tamaño: %s · Firma: %s\n\n' "$ARM64" "$firma")"
             texto="$texto$(printf '<code>%s</code>\n' "$SHA")"
-            texto="$texto$(printf '<i>Versión de prueba. Sin aprobación del CEI no se enrolan pacientes reales.</i>')"
+            texto="$texto$(printf '<i>Pruebas operativas. La captura de pacientes reales permanece bloqueada.</i>')"
           else
             texto=$(printf '❌ <b>SIVAP %s</b> no se pudo publicar\n\n' "$VERSION")
             texto="$texto$(printf 'Registro: %s/%s/actions/runs/%s' \

@@ -15,13 +15,22 @@ cd "$(dirname "$0")/.."
 
 PLATAFORMAS="${1:-android}"
 
-flutter create --platforms="$PLATAFORMAS" --org cu.sivap .
+flutter create --no-pub --platforms="$PLATAFORMAS" --org cu.sivap .
 
 # `flutter create` añade su test de ejemplo, que referencia una clase MyApp que
 # este proyecto no tiene.
 rm -f test/widget_test.dart
 
 if [[ "$PLATAFORMAS" == *android* ]]; then
+  # `flutter create --org` no modifica el identificador de un proyecto Android
+  # ya existente. Fijarlo también aquí evita publicar otra app por accidente.
+  sed -i \
+    -e 's/namespace = "com.example.sivap"/namespace = "cu.sivap.sivap"/' \
+    -e 's/applicationId = "com.example.sivap"/applicationId = "cu.sivap.sivap"/' \
+    android/app/build.gradle.kts
+  grep -q 'namespace = "cu.sivap.sivap"' android/app/build.gradle.kts
+  grep -q 'applicationId = "cu.sivap.sivap"' android/app/build.gradle.kts
+
   # Iconos: clásico, capas del adaptativo, monocromo y color de fondo.
   cp -r android_res/. android/app/src/main/res/
 
@@ -51,12 +60,11 @@ if [[ "$PLATAFORMAS" == *web* ]]; then
     web/icons/Icon-maskable-192.png
   cp assets/icono/sivap_icon_rounded_512.png web/icons/Icon-maskable-512.png
 
-  sed -i \
-    -e 's/A new Flutter project\./SIVAP · captura clínica offline-first./' \
-    -e 's/apple-mobile-web-app-title" content="sivap"/apple-mobile-web-app-title" content="SIVAP"/' \
-    -e 's/href="favicon.png"/href="favicon-sivap.png"/' \
-    -e 's/<title>sivap<\/title>/<title>SIVAP<\/title>/' \
-    web/index.html
+  # Pantalla estática visible mientras se descargan Flutter y CanvasKit. Es
+  # especialmente importante en redes de poco ancho de banda: una página en
+  # blanco no permite distinguir una descarga lenta de un fallo.
+  cp web_assets/index.html web/index.html
+
   sed -i \
     -e 's/"name": "sivap"/"name": "SIVAP"/' \
     -e 's/"short_name": "sivap"/"short_name": "SIVAP"/' \
@@ -66,6 +74,7 @@ if [[ "$PLATAFORMAS" == *web* ]]; then
     web/manifest.json
 
   grep -q '<title>SIVAP</title>' web/index.html
+  grep -q 'flutter-first-frame' web/index.html
   grep -q 'href="favicon-sivap.png"' web/index.html
   grep -q '"name": "SIVAP"' web/manifest.json
   test -f web/favicon-sivap.png

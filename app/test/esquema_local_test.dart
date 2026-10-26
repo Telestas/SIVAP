@@ -47,6 +47,7 @@ void main() {
         'evento_valores',
         'identidad',
         'pacientes',
+        'tramos_aleatorizacion',
       ]),
     );
   });
@@ -64,13 +65,18 @@ void main() {
     // Cada versión nueva del esquema añade su tabla a esta lista. Es a
     // propósito: una migración merece que alguien piense en ella, no que la
     // prueba se adapte sola.
-    const anadidasDespuesDeLa1 = ['enviados', 'ajustes'];
+    const anadidasDespuesDeLa1 = [
+      'enviados',
+      'ajustes',
+      'tramos_aleatorizacion'
+    ];
 
     final vieja = sqlite3.openInMemory();
     SivapDatabase.aplicarEsquema(vieja);
     for (final tabla in anadidasDespuesDeLa1) {
       vieja.execute('DROP TABLE $tabla;');
     }
+    vieja.execute('ALTER TABLE consentimientos DROP COLUMN documento_json;');
     vieja.execute('PRAGMA user_version = 1;');
     vieja.execute(
         'INSERT INTO pacientes (id, codigo, institucion, edad, sexo, protocolo,'
@@ -115,11 +121,11 @@ void main() {
         ' secuencia_etiqueta, secuencia_posicion, asignado_en, recolector_id,'
         " enrolado_en) VALUES ('p1','HC-001','HC',60,'masculino','a','s',1,"
         "'2026-01-01','u1','2026-01-01');");
-    void borrador(String id) => db.execute(
-        'INSERT INTO eventos (id, paciente_id, tipo, ocurrencia,'
-        ' fecha_ocurrencia, estado, sync, recolector_id, institucion)'
-        " VALUES ('$id','p1','cribado',1,'2026-01-02','borrador','local',"
-        "'u1','HC');");
+    void borrador(String id) =>
+        db.execute('INSERT INTO eventos (id, paciente_id, tipo, ocurrencia,'
+            ' fecha_ocurrencia, estado, sync, recolector_id, institucion)'
+            " VALUES ('$id','p1','cribado',1,'2026-01-02','borrador','local',"
+            "'u1','HC');");
 
     borrador('e1');
 

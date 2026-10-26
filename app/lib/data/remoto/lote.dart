@@ -91,11 +91,35 @@ class ConsentimientoEnviable {
   const ConsentimientoEnviable(this.consentimiento);
   final Consent consentimiento;
 
+  /// Firestore no admite listas dentro de listas. Cada trazo se envuelve en
+  /// un mapa sin cambiar el contrato JSON de la API PostgreSQL.
+  Map<String, Object?> aJsonFirestore() => {
+        ...aJson(),
+        'firma': {
+          'trazos': [
+            for (final trazo in consentimiento.firmaTrazos)
+              {
+                'puntos': [
+                  for (final punto in trazo) {'x': punto.x, 'y': punto.y},
+                ],
+              },
+          ],
+        },
+      };
+
   Map<String, Object?> aJson() => {
         'id': consentimiento.id,
         'paciente_id': consentimiento.patientId,
         'version_documento': consentimiento.versionDocumento,
         'codigo_cei': consentimiento.codigoCei,
+        if (consentimiento.documentoFirmado case final documento?)
+          'documento_firmado': {
+            'version': documento.version,
+            'codigo_cei': documento.codigoCei,
+            'vigente_desde': documento.vigenteDesde,
+            'parrafos': documento.parrafos,
+            'declaraciones': documento.declaraciones,
+          },
         'firmado_en': consentimiento.firmadoEn.toUtc().toIso8601String(),
         'testigo_id': consentimiento.testigoId,
         // Trazos normalizados 0..1: independientes del tamaño de la pantalla
@@ -112,25 +136,28 @@ class ConsentimientoEnviable {
 }
 
 class EventoEnviable {
-  const EventoEnviable(this.evento, this.tipos);
+  const EventoEnviable(this.evento, this.tipos, {this.consentimientoId});
 
   final EventoClinico evento;
+  final String? consentimientoId;
 
   /// Tipo de dato de cada campo, para que el servidor no tenga que adivinarlo.
   final Map<String, String> tipos;
 
-  List<MapEntry<String, Object?>> get valores => evento.valores.entries.toList();
+  List<MapEntry<String, Object?>> get valores =>
+      evento.valores.entries.toList();
 
   Map<String, Object?> aJson() => {
         'id': evento.id,
         'paciente_id': evento.patientId,
+        if (consentimientoId != null) 'consentimiento_id': consentimientoId,
         'tipo': _nombreServidor(evento.tipo),
         'ocurrencia': evento.ocurrencia,
         'fecha_ocurrencia': _soloFecha(evento.fechaOcurrencia),
         'institucion_codigo': evento.institucion.codigo,
-        'fecha_captura':
-            (evento.fechaCaptura ?? evento.fechaOcurrencia).toUtc()
-                .toIso8601String(),
+        'fecha_captura': (evento.fechaCaptura ?? evento.fechaOcurrencia)
+            .toUtc()
+            .toIso8601String(),
         'valores': [
           for (final entrada in evento.valores.entries)
             {
@@ -166,8 +193,7 @@ class AuditoriaEnviable {
 String _nombreServidor(TipoEvento tipo) => tipo.name
     .replaceAllMapped(RegExp('[A-Z]'), (m) => '_${m[0]!.toLowerCase()}');
 
-String _soloFecha(DateTime fecha) =>
-    '${fecha.year.toString().padLeft(4, '0')}-'
+String _soloFecha(DateTime fecha) => '${fecha.year.toString().padLeft(4, '0')}-'
     '${fecha.month.toString().padLeft(2, '0')}-'
     '${fecha.day.toString().padLeft(2, '0')}';
 
@@ -256,8 +282,7 @@ class Tramo {
   /// Cuando devuelve `null` y no hay conexión para pedir otro tramo, **hay que
   /// dejar de enrolar**. Improvisar una asignación es exactamente lo que la
   /// aleatorización pre-generada existe para evitar.
-  int? get siguientePosicion =>
-      libres > 0 ? desde + consumidas : null;
+  int? get siguientePosicion => libres > 0 ? desde + consumidas : null;
 
   Protocolo? protocoloEn(int posicion) {
     final indice = posicion - desde;

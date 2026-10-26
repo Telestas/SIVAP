@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import '../data/local/almacen_local.dart';
@@ -6,10 +8,28 @@ import '../data/remoto/sincronizacion.dart';
 import '../domain/models/role.dart';
 import '../domain/repositories/study_repository.dart';
 
+typedef AutenticarUsuario = Future<Investigador> Function(
+    String usuario, String contrasena);
+typedef CargarRepositorioRemoto = Future<StudyRepository> Function(
+    Investigador investigador);
+typedef CerrarSesionRemota = Future<void> Function();
+typedef RecuperarAccesoRemoto = Future<void> Function(String correo);
+
 /// Estado de sesión de la app.
 class AppState extends ChangeNotifier {
-  AppState(this.almacen, {Sincronizacion? sincronizacion})
-      : sincronizacion = sincronizacion ?? Sincronizacion(almacen.repo) {
+  AppState(
+    this.almacen, {
+    Sincronizacion? sincronizacion,
+    AutenticarUsuario? autenticarUsuario,
+    CargarRepositorioRemoto? cargarRepositorioRemoto,
+    CerrarSesionRemota? cerrarSesionRemota,
+    RecuperarAccesoRemoto? recuperarAccesoRemoto,
+  })  : _repo = almacen.repo,
+        _autenticarUsuario = autenticarUsuario,
+        _cargarRepositorioRemoto = cargarRepositorioRemoto,
+        _cerrarSesionRemota = cerrarSesionRemota,
+        _recuperarAccesoRemoto = recuperarAccesoRemoto,
+        sincronizacion = sincronizacion ?? Sincronizacion(almacen.repo) {
     // Lo que pasa en la sincronización cambia lo que se ve en pantalla: el
     // contador de la cola, sobre todo.
     this.sincronizacion.addListener(notifyListeners);
@@ -25,11 +45,26 @@ class AppState extends ChangeNotifier {
       ));
 
   final AlmacenLocal almacen;
+  StudyRepository _repo;
+  final AutenticarUsuario? _autenticarUsuario;
+  final CargarRepositorioRemoto? _cargarRepositorioRemoto;
+  final CerrarSesionRemota? _cerrarSesionRemota;
+  final RecuperarAccesoRemoto? _recuperarAccesoRemoto;
 
   /// A qué servidor habla este aparato y qué le falta por enviar.
   final Sincronizacion sincronizacion;
 
-  StudyRepository get repo => almacen.repo;
+  StudyRepository get repo => _repo;
+
+  bool get requiereAutenticacionRemota => _autenticarUsuario != null;
+
+  Future<void> recuperarAcceso(String correo) async {
+    final recuperar = _recuperarAccesoRemoto;
+    if (recuperar == null) {
+      throw StateError('La recuperación remota no está configurada.');
+    }
+    await recuperar(correo);
+  }
 
   Investigador? _usuario;
   Investigador? get usuario => _usuario;
@@ -40,8 +75,55 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Autentica y carga la vista remota antes de abrir el panel.
+  ///
+  /// No se publica una sesión a medias: si Firestore rechaza la lectura, la
+  /// aplicación permanece en el acceso y no conserva un rol sin datos.
+  Future<void> iniciarSesionRemota(String usuario, String contrasena) async {
+    final autenticar = _autenticarUsuario;
+    final cargar = _cargarRepositorioRemoto;
+    if (autenticar == null || cargar == null) {
+      throw StateError('La autenticación remota no está configurada.');
+    }
+    final investigador = await autenticar(usuario, contrasena);
+    await _verificarAparato(investigador);
+    final repositorio = await cargar(investigador);
+    _repo = repositorio;
+    _usuario = investigador;
+    if (almacen.persistente) sincronizacion.vincularFirebase(investigador);
+    notifyListeners();
+  }
+
+  /// Restaura una sesión que Firebase ya mantenía abierta en el navegador.
+  Future<void> restaurarSesionRemota(Investigador investigador) async {
+    final cargar = _cargarRepositorioRemoto;
+    if (cargar == null) return;
+    await _verificarAparato(investigador);
+    _repo = await cargar(investigador);
+    _usuario = investigador;
+    if (almacen.persistente) sincronizacion.vincularFirebase(investigador);
+  }
+
+  /// La base cifrada pertenece a una sola cuenta. Reutilizar el aparato con
+  /// otra cuenta expondría los pacientes guardados sin sincronizar.
+  Future<void> _verificarAparato(Investigador investigador) async {
+    if (!almacen.persistente) return;
+    const clave = 'propietario_uid';
+    final anterior = almacen.repo.ajuste(clave);
+    if (anterior != null && anterior != investigador.id) {
+      await _cerrarSesionRemota?.call();
+      throw StateError(
+          'Este aparato está vinculado a otra cuenta del estudio.');
+    }
+    if (anterior == null) almacen.repo.guardarAjuste(clave, investigador.id);
+  }
+
   void cerrarSesion() {
     _usuario = null;
+    _repo = almacen.repo;
+    sincronizacion.salir();
+    final cerrar = _cerrarSesionRemota;
+    if (cerrar != null) unawaited(cerrar());
     notifyListeners();
   }
 

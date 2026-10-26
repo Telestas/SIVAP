@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../sync/sincronizacion_screen.dart';
@@ -7,9 +9,14 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
 import '../../core/widgets/controls.dart';
 import '../../data/local/seed_data.dart';
+import '../../data/exportacion/descarga.dart';
+import '../../data/exportacion/consentimiento_archivable.dart';
+import '../../data/exportacion/xlsx_estudio.dart';
+import '../../data/remoto/firestore_study_repository.dart';
 import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/protocolo.dart';
+import '../../domain/models/role.dart';
 import '../enrollment/enrollment_screen.dart';
 import '../eventos/paciente_timeline_screen.dart';
 
@@ -67,17 +74,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _Cabecera(
+                  seccion: _seccion,
                   onBuscar: (v) => setState(() => _busqueda = v),
                   filtroProtocolo: _filtroProtocolo,
-                  onFiltroProtocolo: (p) => setState(() => _filtroProtocolo = p),
+                  onFiltroProtocolo: (p) =>
+                      setState(() => _filtroProtocolo = p),
                 ),
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(28, 18, 28, 28),
                     children: [
-                      _TablaPacientes(pacientes: pacientes),
-                      const SizedBox(height: 18),
-                      const _PanelAuditoria(),
+                      ...switch (_seccion) {
+                        'Eventos' => [_PanelEventos(pacientes: pacientes)],
+                        'Consentimientos' => [
+                            _PanelConsentimientos(pacientes: pacientes)
+                          ],
+                        'Auditoría' => const [_PanelAuditoria()],
+                        'Usuarios y roles' => const [_PanelUsuarios()],
+                        'Exportar datos' => const [_PanelExportacion()],
+                        _ => [
+                            _TablaPacientes(pacientes: pacientes),
+                            const SizedBox(height: 18),
+                            const _PanelAuditoria(limite: 6),
+                          ],
+                      },
                     ],
                   ),
                 ),
@@ -137,12 +157,14 @@ class _BarraLateral extends StatelessWidget {
               onTap: () => onSelect(s),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
                 decoration: BoxDecoration(
                   color: s == seleccionada ? T.sidebarActive : null,
                   border: Border(
                     left: BorderSide(
-                        color: s == seleccionada ? T.accent : Colors.transparent,
+                        color:
+                            s == seleccionada ? T.accent : Colors.transparent,
                         width: 3),
                   ),
                 ),
@@ -188,10 +210,13 @@ class _BarraLateral extends StatelessWidget {
 
 class _Cabecera extends StatelessWidget {
   const _Cabecera({
+    required this.seccion,
     required this.onBuscar,
     required this.filtroProtocolo,
     required this.onFiltroProtocolo,
   });
+
+  final String seccion;
 
   final ValueChanged<String> onBuscar;
   final Protocolo? filtroProtocolo;
@@ -219,12 +244,18 @@ class _Cabecera extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Pacientes del ensayo', style: T.h1),
+                    Text(
+                        seccion == 'Pacientes'
+                            ? 'Pacientes del ensayo'
+                            : seccion,
+                        style: T.h1),
                     const SizedBox(height: 4),
                     Text(
-                        '${pacientes.length} enrolados · A: $enA · '
-                        'B: ${pacientes.length - enA}',
-                        style: const TextStyle(fontSize: 13, color: T.secondary)),
+                        seccion == 'Pacientes'
+                            ? '${pacientes.length} enrolados · A: $enA · B: ${pacientes.length - enA}'
+                            : _descripcionSeccion(seccion),
+                        style:
+                            const TextStyle(fontSize: 13, color: T.secondary)),
                   ],
                 ),
               ),
@@ -244,59 +275,72 @@ class _Cabecera extends StatelessWidget {
                 ),
                 const SizedBox(width: 9),
               ],
-              SizedBox(
-                width: 140,
-                child: AppButton('Exportar',
-                    primary: false, onTap: () => _avisoExportacion(context)),
-              ),
+              if (seccion == 'Pacientes')
+                SizedBox(
+                  width: 140,
+                  child: AppButton('Exportar',
+                      primary: false, onTap: () => _avisoExportacion(context)),
+                ),
               const SizedBox(width: 9),
-              SizedBox(
-                width: 120,
-                child: AppButton('+ Enrolar',
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => const EnrollmentScreen()))),
-              ),
+              if (state.repo.admiteEscritura)
+                SizedBox(
+                  width: 120,
+                  child: AppButton('+ Enrolar',
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const EnrollmentScreen()))),
+                ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  onChanged: onBuscar,
-                  style: const TextStyle(fontSize: 13.5, color: T.ink),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: 'Buscar por código, nombre o historia clínica',
-                    hintStyle: const TextStyle(fontSize: 13.5, color: T.faint),
-                    filled: true,
-                    fillColor: T.card,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                    border: fieldBorder(T.line),
-                    enabledBorder: fieldBorder(T.line),
-                    focusedBorder: fieldBorder(T.accent, ancho: 1.5),
+          if (seccion == 'Pacientes') ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: onBuscar,
+                    style: const TextStyle(fontSize: 13.5, color: T.ink),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: 'Buscar por código, nombre o historia clínica',
+                      hintStyle:
+                          const TextStyle(fontSize: 13.5, color: T.faint),
+                      filled: true,
+                      fillColor: T.card,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 9),
+                      border: fieldBorder(T.line),
+                      enabledBorder: fieldBorder(T.line),
+                      focusedBorder: fieldBorder(T.accent, ancho: 1.5),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _FiltroProtocolo(
-                  valor: filtroProtocolo, onChanged: onFiltroProtocolo),
-            ],
-          ),
+                const SizedBox(width: 8),
+                _FiltroProtocolo(
+                    valor: filtroProtocolo, onChanged: onFiltroProtocolo),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 
+  static String _descripcionSeccion(String seccion) => switch (seccion) {
+        'Eventos' =>
+          'Hitos clínicos realmente registrados, sin calendario artificial.',
+        'Consentimientos' =>
+          'Control documental separado de los datos clínicos.',
+        'Auditoría' => 'Historial completo de correcciones, autores y motivos.',
+        'Usuarios y roles' => 'Perfiles aprovisionados para este centro.',
+        'Exportar datos' =>
+          'Identidad y dataset clínico se generan por separado.',
+        _ => '',
+      };
+
   static void _avisoExportacion(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      // La exportación real (.xlsx vía openpyxl) vive en el backend, que es
-      // trabajo de un hito posterior. Decirlo es mejor que un botón que miente.
-      content: Text(
-          'La exportación se genera en el servidor (.xlsx), con la rama como '
-          'A/B. Pendiente del hito de backend.',
-          style: TextStyle(fontSize: 13)),
+      content:
+          Text('Abra «Exportar datos» para descargar los libros separados.'),
       backgroundColor: T.ink,
       behavior: SnackBarBehavior.floating,
     ));
@@ -325,10 +369,10 @@ class _FiltroProtocolo extends StatelessWidget {
             style: const TextStyle(fontSize: 13, color: T.body),
             dropdownColor: T.card,
             items: [
-              const DropdownMenuItem(value: null, child: Text('Protocolo: todos')),
+              const DropdownMenuItem(
+                  value: null, child: Text('Protocolo: todos')),
               for (final p in Protocolo.values)
-                DropdownMenuItem(
-                    value: p, child: Text('Protocolo ${p.letra}')),
+                DropdownMenuItem(value: p, child: Text('Protocolo ${p.letra}')),
             ],
             onChanged: onChanged,
           ),
@@ -498,17 +542,303 @@ class _FilaPaciente extends StatelessWidget {
     );
   }
 
-  static String _recolector(String id) => Seed.porId(id).nombre;
+  static String _recolector(String id) {
+    try {
+      return Seed.porId(id).nombre;
+    } on StateError {
+      // Los perfiles reales no se incorporan al binario. Las reglas solo
+      // permiten leerlos a quien los administra.
+      return 'Investigador del estudio';
+    }
+  }
+}
+
+class _PanelEventos extends StatelessWidget {
+  const _PanelEventos({required this.pacientes});
+
+  final List<Patient> pacientes;
+
+  @override
+  Widget build(BuildContext context) {
+    final repo = AppScope.of(context).repo;
+    final eventos = [
+      for (final paciente in pacientes)
+        for (final evento in repo.eventosDe(paciente.id))
+          (paciente: paciente, evento: evento),
+    ]..sort(
+        (a, b) => b.evento.fechaOcurrencia.compareTo(a.evento.fechaOcurrencia));
+    return _PanelListado(
+      titulo: '${eventos.length} eventos registrados',
+      vacio: 'Todavía no hay eventos clínicos registrados.',
+      filas: [
+        for (final item in eventos)
+          _FilaResumen(
+            principal: item.evento.referencia,
+            secundario:
+                '${item.paciente.codigo} · ${item.evento.institucion.codigo}',
+            derecha:
+                '${F.fechaHora(item.evento.fechaOcurrencia)} · ${item.evento.estado.etiqueta}',
+          ),
+      ],
+    );
+  }
+}
+
+class _PanelConsentimientos extends StatelessWidget {
+  const _PanelConsentimientos({required this.pacientes});
+
+  final List<Patient> pacientes;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final firmados = pacientes.where((p) => p.tieneConsentimiento).length;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _PanelListado(
+        titulo: '$firmados de ${pacientes.length} consentimientos registrados',
+        vacio: 'Todavía no hay pacientes enrolados.',
+        filas: [
+          for (final paciente in pacientes)
+            _FilaResumen(
+              principal: paciente.codigo,
+              secundario: paciente.institucion.codigo,
+              derecha: paciente.tieneConsentimiento
+                  ? 'REGISTRADO · ${paciente.consentimientoId}'
+                  : 'PENDIENTE',
+            ),
+        ],
+      ),
+      for (final paciente in pacientes)
+        if (paciente.consentimientoId case final id?)
+          if (state.repo.consentimiento(id) case final consentimiento?)
+            TextButton.icon(
+              onPressed: () async {
+                try {
+                  if (state.repo is FirestoreStudyRepository) {
+                    await (state.repo as FirestoreStudyRepository)
+                        .registrarArchivoConsentimiento(id);
+                  }
+                  descargarArchivo(
+                    'consentimiento-${paciente.codigo}-$id.html',
+                    utf8.encode(consentimientoArchivable(
+                        consentimiento, paciente.codigo)),
+                    'text/html;charset=utf-8',
+                  );
+                } on Object catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('No se pudo archivar: $error'),
+                    ));
+                  }
+                }
+              },
+              icon: const Icon(Icons.download),
+              label: Text('Archivar consentimiento ${paciente.codigo}'),
+            ),
+    ]);
+  }
+}
+
+class _PanelUsuarios extends StatelessWidget {
+  const _PanelUsuarios();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final usuarios = state.repo.investigadores();
+    final visibles = usuarios.isEmpty ? [state.usuarioActual] : usuarios;
+    return _PanelListado(
+      titulo: '${visibles.length} perfiles del centro',
+      vacio: 'No hay perfiles visibles.',
+      pie:
+          'Las cuentas y los cambios de rol se aprovisionan con la herramienta administrativa; el navegador nunca puede conceder permisos.',
+      filas: [
+        for (final usuario in visibles)
+          _FilaResumen(
+            principal: usuario.nombre,
+            secundario: usuario.usuario,
+            derecha: usuario.etiquetaRoles,
+          ),
+      ],
+    );
+  }
+}
+
+class _PanelExportacion extends StatelessWidget {
+  const _PanelExportacion();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final autor = state.usuario;
+    if (autor == null) return const SizedBox.shrink();
+    final clinico = autor.puedeExportar && autor.veRamaAsignada;
+    final identidad = autor.roles.contains(Rol.investigadorPrincipal);
+    final fecha = DateTime.now().toIso8601String().substring(0, 10);
+    Future<void> entregar(String nombre, List<int> bytes) async {
+      try {
+        if (state.repo is FirestoreStudyRepository) {
+          await (state.repo as FirestoreStudyRepository)
+              .registrarExportacion(nombre);
+        }
+        descargarArchivo(
+          nombre,
+          bytes,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+      } on Object catch (error) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('No se pudo registrar la exportación: $error'),
+          ));
+        }
+      }
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Archivos del centro', style: TextStyle(fontSize: 20)),
+      const SizedBox(height: 12),
+      const Text(
+          'Cada descarga contiene solo los registros visibles de este centro. '
+          'Custodie la ficha de identidad por separado.'),
+      const SizedBox(height: 16),
+      if (clinico)
+        FilledButton.icon(
+          onPressed: () => entregar(
+            'sivap-clinico-$fecha.xlsx',
+            XlsxEstudio.clinico(state.repo, autor),
+          ),
+          icon: const Icon(Icons.download),
+          label: const Text('Descargar dataset clínico'),
+        ),
+      if (identidad) ...[
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => entregar(
+            'sivap-identidad-$fecha.xlsx',
+            XlsxEstudio.identidad(state.repo, autor),
+          ),
+          icon: const Icon(Icons.lock_outline),
+          label: const Text('Descargar ficha de identidad'),
+        ),
+      ],
+      if (!clinico && !identidad)
+        const Text('Su función no permite exportar estos archivos.'),
+    ]);
+  }
+}
+
+class _PanelListado extends StatelessWidget {
+  const _PanelListado({
+    required this.titulo,
+    required this.vacio,
+    required this.filas,
+    this.pie,
+  });
+
+  final String titulo;
+  final String vacio;
+  final List<Widget> filas;
+  final String? pie;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: T.card,
+          border: Border.all(color: T.lineSoft),
+          borderRadius: BorderRadius.circular(T.radiusPanel),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              child: Text(titulo,
+                  style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: T.ink)),
+            ),
+            if (filas.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(vacio,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13, color: T.faint)),
+              )
+            else
+              ...filas,
+            if (pie != null)
+              Container(
+                color: T.subtle,
+                padding: const EdgeInsets.all(14),
+                child: Text(pie!,
+                    style: const TextStyle(
+                        fontSize: 12.5, color: T.secondary, height: 1.45)),
+              ),
+          ],
+        ),
+      );
+}
+
+class _FilaResumen extends StatelessWidget {
+  const _FilaResumen({
+    required this.principal,
+    required this.secundario,
+    required this.derecha,
+  });
+
+  final String principal;
+  final String secundario;
+  final String derecha;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: T.lineHair)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(principal,
+                      style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: T.ink)),
+                  const SizedBox(height: 3),
+                  Text(secundario,
+                      style: const TextStyle(fontSize: 12, color: T.faint)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 18),
+            Text(derecha,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                    fontFamily: T.mono,
+                    fontFamilyFallback: T.monoFallback,
+                    fontSize: 11.5,
+                    color: T.body)),
+          ],
+        ),
+      );
 }
 
 /// Historial de auditoría. Es la prueba visible de que ninguna corrección
 /// ocurrió en silencio.
 class _PanelAuditoria extends StatelessWidget {
-  const _PanelAuditoria();
+  const _PanelAuditoria({this.limite});
+
+  final int? limite;
 
   @override
   Widget build(BuildContext context) {
-    final entradas = AppScope.of(context).repo.auditoria(limite: 6);
+    final entradas = AppScope.of(context).repo.auditoria(limite: limite);
 
     return Container(
       decoration: BoxDecoration(
@@ -525,17 +855,23 @@ class _PanelAuditoria extends StatelessWidget {
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: T.lineHair)),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Historial de auditoría — últimas correcciones',
-                    style: TextStyle(
-                        fontSize: 14.5, fontWeight: FontWeight.w600, color: T.ink)),
-                Text('Ver todo',
-                    style: TextStyle(
-                        fontSize: 12.5,
+                Text(
+                    limite == null
+                        ? 'Historial completo de auditoría'
+                        : 'Historial de auditoría — últimas correcciones',
+                    style: const TextStyle(
+                        fontSize: 14.5,
                         fontWeight: FontWeight.w600,
-                        color: T.accent)),
+                        color: T.ink)),
+                if (limite != null)
+                  const Text('Ver todo',
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: T.accent)),
               ],
             ),
           ),

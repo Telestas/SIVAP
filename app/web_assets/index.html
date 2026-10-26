@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="SIVAP · captura clínica offline-first.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="SIVAP">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon-sivap.png">
+  <link rel="manifest" href="manifest.json">
+  <title>SIVAP</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #f7f7f5; }
+    #sivap-arranque {
+      position: fixed; inset: 0; z-index: 9999; display: grid;
+      place-content: center; gap: 14px; text-align: center;
+      color: #202426; font: 14px system-ui, sans-serif;
+      transition: opacity .2s ease;
+    }
+    #sivap-arranque strong { font-size: 26px; letter-spacing: .5px; }
+    #sivap-arranque span { color: #697074; }
+    #sivap-arranque i {
+      width: 20px; height: 20px; margin: auto; border-radius: 50%;
+      border: 2px solid #d9dcdd; border-top-color: #126e82;
+      animation: girar .8s linear infinite;
+    }
+    @keyframes girar { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="sivap-arranque" role="status" aria-live="polite">
+    <strong>SIVAP</strong>
+    <i aria-hidden="true"></i>
+    <span>Descargando la aplicación… La primera carga puede tardar.</span>
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      const arranque = document.getElementById('sivap-arranque');
+      if (!arranque) return;
+      arranque.style.opacity = '0';
+      setTimeout(function () { arranque.remove(); }, 220);
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

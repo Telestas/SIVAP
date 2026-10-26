@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:http/http.dart' as http;
 
 import '../../core/ids.dart';
+import '../../domain/models/role.dart';
 import '../../domain/repositories/study_repository.dart';
 import 'cliente_api.dart';
 import 'cliente_firebase.dart';
@@ -56,6 +59,86 @@ class Sincronizacion extends ChangeNotifier {
   Sesion? get sesion => _sesion;
 
   ClienteRemoto? get _clienteActivo => usaFirebase ? _firebase : _api;
+
+  /// La sesión principal del móvil ya autenticó este perfil. No se solicitan
+  /// credenciales por segunda vez para enviar datos.
+  void vincularFirebase(Investigador investigador) {
+    if (!usaFirebase) return;
+    _firebase = ClienteFirebase(
+      investigadorId: investigador.id,
+      institucionCodigo: investigador.institucion.codigo,
+      roles: investigador.roles,
+    );
+    _sesion = Sesion(
+      token: 'firebase',
+      expiraEn: DateTime.now().toUtc().add(const Duration(hours: 1)),
+      investigadorId: investigador.id,
+      usuario: investigador.usuario,
+      nombre: investigador.nombre,
+      institucion: investigador.institucion.codigo,
+      roles: investigador.roles.map((r) => r.name).toList(),
+    );
+    notifyListeners();
+  }
+
+  /// Solicita un tramo exclusivo mediante una función privilegiada. Si el
+  /// aparato no tiene red, su tramo local sigue disponible; si se agotó, el
+  /// repositorio impide enrolar.
+  Future<String?> solicitarTramo() async {
+    final repo = _repo;
+    if (!repo.requiereTramos) return 'La demostración no usa tramos reales.';
+    if (repo.asignacionesRestantes > 0) return null;
+    final usuario = FirebaseAuth.instance.currentUser;
+    if (usuario == null || _sesion == null) {
+      return 'Abra sesión para solicitar un tramo.';
+    }
+    try {
+      final perfil = _sesion!;
+      if (!perfil.roles.contains(Rol.reclutador.name) &&
+          !perfil.roles.contains(Rol.investigadorPrincipal.name)) {
+        return 'Su función no permite enrolar.';
+      }
+      final dispositivo = FirebaseFirestore.instance
+          .collection('dispositivos')
+          .doc(_dispositivoId);
+      await dispositivo.set({
+        'autor_uid': usuario.uid,
+        'institucion_codigo': perfil.institucion,
+        'etiqueta': repo.ajuste(claveEtiqueta) ?? 'Aparato de campo',
+        'registrado_en': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)).timeout(const Duration(seconds: 30));
+      final token = await usuario.getIdToken();
+      final proyecto = Firebase.app().options.projectId;
+      final respuesta = await http
+          .post(
+            Uri.parse(
+                'https://us-central1-$proyecto.cloudfunctions.net/solicitarTramo'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'data': {'dispositivo_id': _dispositivoId}
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+      final cuerpo = jsonDecode(respuesta.body) as Map<String, dynamic>;
+      if (respuesta.statusCode != 200 || cuerpo.containsKey('error')) {
+        return (cuerpo['error'] as Map?)?['message']?.toString() ??
+            'No se pudo reservar un tramo.';
+      }
+      final datos =
+          (cuerpo['result'] ?? cuerpo['response']) as Map<String, dynamic>;
+      repo.incorporarTramo(
+          Tramo.desdeJson(datos), datos['etiqueta'] as String, _dispositivoId);
+      notifyListeners();
+      return repo.asignacionesRestantes == 0
+          ? 'Sincronice las asignaciones pendientes antes de pedir otro tramo.'
+          : null;
+    } on Object catch (error) {
+      return 'No se pudo solicitar el tramo: $error';
+    }
+  }
 
   /// Cómo fue el último envío. Vive en memoria: al reabrir la app se pierde el
   /// detalle, pero no el dato — lo que no entró sigue en la cola y el motivo
@@ -209,7 +292,10 @@ class Sincronizacion extends ChangeNotifier {
     notifyListeners();
     try {
       final cola = ColaDeEnvio(
-          repo: _repo, api: api, dispositivoId: _dispositivoId);
+          repo: _repo,
+          api: api,
+          dispositivoId: _dispositivoId,
+          maxPacientesPorLote: api is ClienteFirebase ? 5 : null);
       return _anotar(await cola.sincronizar());
     } finally {
       _enCurso = false;

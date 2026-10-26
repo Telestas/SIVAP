@@ -36,4 +36,4 @@ class AuditEntry {
   final String motivo;
 }
 
-enum AuditEntity { ficha, evento, consentimiento, usuario }
+enum AuditEntity { ficha, evento, consentimiento, usuario, exportacion }

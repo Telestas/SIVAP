@@ -216,3 +216,9 @@ jobs:
       - name: Probar reglas con Firestore Emulator
         working-directory: firebase
         run: npx firebase emulators:exec --project sivap-reglas-prueba --only firestore "npm run test:rules"
+
+      - name: Comprobar reparto de tramos
+        working-directory: firebase
+        run: |
+          node --check functions/index.js
+          node --test functions/test/tramo.test.mjs

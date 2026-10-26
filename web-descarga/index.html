@@ -218,17 +218,16 @@ code {
   <p class="marca">Sistema SIVAP · nombre de trabajo</p>
   <h1>Aplicación de campo</h1>
   <p class="entradilla">
-    Registro clínico del estudio de cohorte. Captura de visitas sin conexión,
+    Registro clínico del ensayo LIVERE. Captura de eventos sin conexión,
     con la base de datos del dispositivo cifrada.
   </p>
 
   <div class="banda">
     <span class="punto" aria-hidden="true"></span>
     <span>
-      <strong>Versión de prueba. No para pacientes reales.</strong><br>
-      El estudio está pendiente de aprobación del Comité de Ética de la
-      Investigación. La app arranca en modo demostración: los pacientes que
-      aparecen son inventados.
+      <strong>Compruebe la versión indicada debajo.</strong><br>
+      La 0.2.0 permite probar instalación, acceso y pantallas con captura real
+      bloqueada. Las versiones anteriores son de demostración.
     </span>
   </div>
 
@@ -293,9 +292,8 @@ function formatoFecha(iso) {
   return `${d.getDate()} ${meses[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-// `/releases/latest` NO sirve aquí: excluye las prereleases, y mientras el CEI
-// no apruebe el estudio todas las versiones son prerelease. Se pide la lista y
-// se toma la primera, que es la más reciente.
+// Se pide la lista completa para incluir versiones antiguas de prueba y se
+// toma la primera, que es la más reciente.
 fetch(`https://api.github.com/repos/${REPO}/releases?per_page=1`)
   .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
   .then(([release]) => {

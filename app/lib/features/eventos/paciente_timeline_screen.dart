@@ -47,16 +47,22 @@ class PacienteTimelineScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(T.gutter, 12, T.gutter, 28),
           children: [
             StatusBanner(
-              texto: state.hayCola
-                  ? 'Guardado en el dispositivo · falta enviarlo'
-                  : 'Todo lo registrado está en el servidor',
-              tono: state.hayCola ? BannerTone.aviso : BannerTone.ok,
-              accion: state.textoSyncCorto,
-              onAccion: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => const SincronizacionScreen())),
+              texto: !state.repo.admiteEscritura
+                  ? 'Consulta del servidor · panel de solo lectura'
+                  : state.hayCola
+                      ? 'Guardado en el dispositivo · falta enviarlo'
+                      : 'Todo lo registrado está en el servidor',
+              tono: state.hayCola && state.repo.admiteEscritura
+                  ? BannerTone.aviso
+                  : BannerTone.ok,
+              accion:
+                  state.repo.admiteEscritura ? state.textoSyncCorto : null,
+              onAccion: state.repo.admiteEscritura
+                  ? () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const SincronizacionScreen()))
+                  : null,
             ),
             const SizedBox(height: 8),
-
             for (final fase in FaseEstudio.values) ...[
               _Fase(
                 fase: fase,
@@ -67,7 +73,9 @@ class PacienteTimelineScreen extends StatelessWidget {
                 // desenlaces. Es la separación de funciones del ensayo, no una
                 // jerarquía de permisos (BASES §4).
                 puedeCapturar: (t) =>
-                    usuario.puedeCapturar(t) && definicion.tieneFormulario(t),
+                    state.repo.admiteEscritura &&
+                    usuario.puedeCapturar(t) &&
+                    definicion.tieneFormulario(t),
               ),
             ],
           ],
@@ -103,8 +111,7 @@ class _Fase extends StatelessWidget {
             Expanded(child: SectionLabel(fase.etiqueta)),
             FasePill(
               fase: fase,
-              registrados:
-                  eventos.where((e) => e.estado.esInmutable).length,
+              registrados: eventos.where((e) => e.estado.esInmutable).length,
               enBorrador: eventos.any((e) => !e.estado.esInmutable),
             ),
           ],
@@ -176,8 +183,8 @@ class _Hito extends StatelessWidget {
               const SizedBox(height: 10),
               GestureDetector(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => EventoFormScreen.nuevo(
-                      patientId: patientId, tipo: tipo),
+                  builder: (_) =>
+                      EventoFormScreen.nuevo(patientId: patientId, tipo: tipo),
                 )),
                 behavior: HitTestBehavior.opaque,
                 child: Row(
@@ -239,7 +246,9 @@ class _Ocurrencia extends StatelessWidget {
               Text(
                 '${evento.correcciones} corr.',
                 style: const TextStyle(
-                    fontSize: 11.5, fontWeight: FontWeight.w600, color: T.accent),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: T.accent),
               ),
               const SizedBox(width: 8),
             ],

@@ -14,7 +14,7 @@ import 'seed_data.dart';
 ///
 /// El almacén de producción es SQLite cifrado (`SqliteStudyRepository`). Las
 /// dos hablan la misma interfaz y muestran los mismos datos de demostración.
-class InMemoryStudyRepository implements StudyRepository {
+class InMemoryStudyRepository extends StudyRepository {
   InMemoryStudyRepository()
       : _allocation = SequentialAllocation(
           secuencia: Seed.secuenciaAleatorizacion,
@@ -30,6 +30,9 @@ class InMemoryStudyRepository implements StudyRepository {
   final Map<String, Consent> _consentimientos = {};
   final List<AuditEntry> _auditoria = [];
 
+  @override
+  List<Investigador> investigadores() => List.unmodifiable(Seed.investigadores);
+
   /// Identificadores que el servidor ya acusó, con el lote que los llevó.
   ///
   /// Es el equivalente en el dispositivo del diario de lotes del servidor, y
@@ -38,6 +41,9 @@ class InMemoryStudyRepository implements StudyRepository {
 
   @override
   StudyConfig get config => Seed.config;
+
+  @override
+  bool get admiteEscritura => true;
 
   // ── Lectura ────────────────────────────────────────────────────
 
@@ -52,6 +58,9 @@ class InMemoryStudyRepository implements StudyRepository {
 
   @override
   Patient? paciente(String id) => _pacientes[id];
+
+  @override
+  Consent? consentimiento(String id) => _consentimientos[id];
 
   @override
   List<EventoClinico> eventosDe(String patientId) {
@@ -211,10 +220,8 @@ class InMemoryStudyRepository implements StudyRepository {
   /// mismo código hasta que sincronicen. Es molesto pero no corrompe nada, la
   /// clave real es el identificador aleatorio.
   String _siguienteCodigo(Institucion institucion) {
-    final n = _pacientes.values
-            .where((p) => p.institucion == institucion)
-            .length +
-        1;
+    final n =
+        _pacientes.values.where((p) => p.institucion == institucion).length + 1;
     return '${institucion.codigo}-${n.toString().padLeft(3, '0')}';
   }
 
@@ -227,6 +234,9 @@ class InMemoryStudyRepository implements StudyRepository {
     if (!autor.puedeEnrolar) {
       throw PermissionDenied(autor, 'registrar consentimientos');
     }
+    if (_pacientes[patientId]?.tieneConsentimiento != false) {
+      throw StateError('El paciente ya tiene consentimiento o no existe.');
+    }
     final doc = config.documentoConsentimiento;
     final consent = Consent(
       id: Ids.nuevo(),
@@ -236,6 +246,7 @@ class InMemoryStudyRepository implements StudyRepository {
       firmadoEn: DateTime.now(),
       testigoId: autor.id,
       firmaTrazos: firmaTrazos,
+      documentoFirmado: doc,
     );
     _consentimientos[consent.id] = consent;
     _pacientes[patientId] =

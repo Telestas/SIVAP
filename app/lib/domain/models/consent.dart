@@ -11,6 +11,7 @@ class Consent {
     required this.firmadoEn,
     required this.testigoId,
     required this.firmaTrazos,
+    this.documentoFirmado,
   });
 
   final String id;
@@ -23,6 +24,9 @@ class Consent {
   /// Trazos normalizados de la firma (0..1 en ambos ejes), independientes del
   /// tamaño de pantalla del dispositivo que capturó.
   final List<List<({double x, double y})>> firmaTrazos;
+
+  /// Instantánea inmutable del texto que se mostró al firmar.
+  final ConsentDocument? documentoFirmado;
 }
 
 /// Texto del modelo de consentimiento aprobado. Es dato, no código: se

@@ -42,10 +42,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
     final state = AppScope.of(context);
     final usuario = state.usuarioActual;
     // Quien no captura ni enrola solo consulta: el analista.
-    final soloLectura = !usuario.puedeCapturarEventos && !usuario.puedeEnrolar;
+    final soloLectura = !state.repo.admiteEscritura ||
+        (!usuario.puedeCapturarEventos && !usuario.puedeEnrolar);
 
-    final propios = state.repo.pacientes(
-        recolectorId: usuario.veCohorteCompleta ? null : usuario.id);
+    final propios = state.repo
+        .pacientes(recolectorId: usuario.veCohorteCompleta ? null : usuario.id);
     final visibles = propios.where((p) => _coincide(state, p)).toList();
 
     return Scaffold(
@@ -62,8 +63,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
               onBuscar: (v) => setState(() => _busqueda = v),
             ),
             _Pendientes(
-              alertas: Alertas.pendientes(state.repo,
-                  hoy: Seed.hoy, para: usuario),
+              alertas:
+                  Alertas.pendientes(state.repo, hoy: Seed.hoy, para: usuario),
             ),
             Expanded(
               child: soloLectura
@@ -73,7 +74,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: usuario.puedeEnrolar
+      bottomNavigationBar: state.repo.admiteEscritura && usuario.puedeEnrolar
           ? BottomActions(children: [
               Expanded(
                 child: AppButton('+ Enrolar paciente',
@@ -97,8 +98,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
     return switch (_filtro) {
       _Filtro.todos => true,
       _Filtro.conBorrador => eventos.any((e) => !e.estado.esInmutable),
-      _Filtro.sinRegistroHoy => !eventos
-          .any((e) => F.diasEntre(Seed.hoy, e.fechaOcurrencia) == 0),
+      _Filtro.sinRegistroHoy =>
+        !eventos.any((e) => F.diasEntre(Seed.hoy, e.fechaOcurrencia) == 0),
     };
   }
 }
@@ -142,7 +143,8 @@ class _Encabezado extends StatelessWidget {
                         style: T.h2),
                     const SizedBox(height: 2),
                     Text('${usuario.nombre} · ${usuario.etiquetaRoles}',
-                        style: const TextStyle(fontSize: 12, color: T.secondary)),
+                        style:
+                            const TextStyle(fontSize: 12, color: T.secondary)),
                   ],
                 ),
               ),
@@ -168,13 +170,19 @@ class _Encabezado extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           StatusBanner(
-            texto: state.hayCola
-                ? '${state.textoSync} · se enviará cuando haya conexión'
-                : state.textoSync,
-            tono: state.hayCola ? BannerTone.aviso : BannerTone.ok,
-            accion: 'SINCRONIZAR',
-            onAccion: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const SincronizacionScreen())),
+            texto: !state.repo.admiteEscritura
+                ? 'Datos consolidados en el servidor · panel de solo lectura'
+                : state.hayCola
+                    ? '${state.textoSync} · se enviará cuando haya conexión'
+                    : state.textoSync,
+            tono: state.hayCola && state.repo.admiteEscritura
+                ? BannerTone.aviso
+                : BannerTone.ok,
+            accion: state.repo.admiteEscritura ? 'SINCRONIZAR' : null,
+            onAccion: state.repo.admiteEscritura
+                ? () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const SincronizacionScreen()))
+                : null,
           ),
           if (soloLectura) ...[
             const SizedBox(height: 12),
@@ -211,7 +219,9 @@ class _Encabezado extends StatelessWidget {
 
 class _Filtros extends StatelessWidget {
   const _Filtros(
-      {required this.seleccionado, required this.onSelect, required this.total});
+      {required this.seleccionado,
+      required this.onSelect,
+      required this.total});
 
   final _Filtro seleccionado;
   final ValueChanged<_Filtro> onSelect;
@@ -220,7 +230,8 @@ class _Filtros extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
-    final pacientes = state.repo.pacientes(recolectorId: state.usuarioActual.id);
+    final pacientes =
+        state.repo.pacientes(recolectorId: state.usuarioActual.id);
 
     var conBorrador = 0;
     var sinHoy = 0;
@@ -274,7 +285,9 @@ class _ResumenRamas extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text('$n',
                     style: TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.w600, color: color)),
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                        color: color)),
               ],
             ),
           ),
@@ -403,7 +416,9 @@ class _TarjetaCarga extends StatelessWidget {
                         ? 'Al día'
                         : 'En cola',
                     ultimo?.sync == SyncStatus.sincronizado ? T.okFg : T.warnFg,
-                    ultimo?.sync == SyncStatus.sincronizado ? T.okDot : T.warnDot,
+                    ultimo?.sync == SyncStatus.sincronizado
+                        ? T.okDot
+                        : T.warnDot,
                   ),
               ],
             ),
@@ -605,7 +620,8 @@ class _FilaAlerta extends StatelessWidget {
     final dias = alerta.diasEsperando(Seed.hoy);
     return GestureDetector(
       onTap: () => Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => PacienteTimelineScreen(patientId: alerta.paciente.id))),
+          builder: (_) =>
+              PacienteTimelineScreen(patientId: alerta.paciente.id))),
       behavior: HitTestBehavior.opaque,
       child: Row(
         children: [

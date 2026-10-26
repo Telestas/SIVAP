@@ -18,7 +18,7 @@ cada hito.
 | Captura por eventos clínicos | Línea de tiempo por fases, hitos repetibles, trayectorias incompletas |
 | Campos del Anexo 4 | Los cinco módulos de la revisión, con condicionales y cálculos |
 | Cegamiento | Solo Protocolo A y B; el evaluador de desenlaces no ve la rama |
-| Separación de funciones | Seis funciones; la captura va por tipo de hito |
+| Separación de funciones | Cinco funciones; la captura va por tipo de hito |
 | Multicéntrico | Centro en ficha, evento e investigador |
 | Minimización | Sin carné ni dirección |
 | Auditoría | Correcciones con motivo; solo-inserción por disparadores |
@@ -31,6 +31,10 @@ cada hito.
 | Sincronización en la app | Pantalla propia: servidor, sesión, envío y motivos de rechazo |
 | Alertas | Seguimiento a los 7, 14 y 28 días, y paciente listo para evaluar |
 | Distribución | APK firmado, con icono, publicado y descargable sin cuenta |
+| Acceso del panel web | Firebase Authentication; función, centro y permisos salen del perfil aprovisionado |
+| Lectura del panel web | Pacientes, identidad permitida, asignación, eventos y auditoría se leen de Firestore |
+| Vistas del panel web | Eventos, consentimientos, auditoría completa y perfiles del centro |
+| Recuperación de acceso web | Solicitud de cambio de contraseña desde el propio acceso |
 | Integración continua | App, esquema y api en cada push; aviso por Telegram al publicar |
 
 ---
@@ -60,11 +64,11 @@ El envío es **manual, a propósito**. Un reintento automático en bucle sobre u
 conexión que va y viene gasta batería y no añade nada que un botón no dé; y la
 captura no depende de él en ningún caso.
 
-Falta la parte de la aleatorización:
-
-- pedir el tramo de secuencia al servidor en vez de llevar la secuencia entera;
-- **dejar de enrolar** cuando se quede sin tramo y sin conexión. Improvisar una
-  asignación es lo que la aleatorización pre-generada existe para evitar.
+Android ya solicita tramos a una función privilegiada, los guarda en SQLite
+cifrado y detiene el enrolamiento al agotarse. Falta desplegar la función,
+cargar fuera de Git la secuencia aprobada y verificar el ciclo completo en
+teléfonos con conexión intermitente. La compilación distribuida sigue en modo
+demostración hasta cerrar las aprobaciones del estudio.
 
 Y dos cosas menores: que el detalle de los rechazos sobreviva a cerrar la app
 —hoy vive en memoria, aunque el dato rechazado no se pierde— y poner etiqueta
@@ -76,33 +80,47 @@ Dos archivos: dataset clínico —sin identidad, con la rama en A/B, formato
 largo— y ficha de identidad aparte. Es lo que el bioestadista necesita para
 poder existir en el proyecto. La vista `dataset_clinico` ya está en el esquema.
 
-### 3. Autenticación real en la app
+### 3. Autenticación real en la app móvil
 
-El acceso de hoy es de demostración: se elige la función al entrar. En un
-ensayo donde los permisos sostienen el cegamiento, que alguien elija los suyos
-no es aceptable fuera de una demostración.
+Android ya autentica con Firebase y toma función y centro del perfil
+aprovisionado. La base cifrada se vincula a un UID y una sesión validada puede
+restaurarse sin conexión. Falta comprobarlo en teléfono real y decidir cuánto
+tiempo puede seguir vigente un perfil guardado sin red cuando sus permisos
+cambien en el servidor. iOS aún no tiene configuración Firebase registrada.
 
-### 4. El panel de administración
+### 4. Terminar el panel de administración
 
-De sus seis secciones **solo «Pacientes» tiene contenido**. Faltan Eventos,
-Consentimientos, Auditoría completa —el «Ver todo» no lleva a ninguna parte—,
-Usuarios y roles, y Exportar.
+Pacientes, Eventos, Consentimientos, Auditoría completa y Usuarios y roles ya
+consultan la vista consolidada. Los perfiles se siguen aprovisionando fuera del
+navegador: ningún cliente puede conceder funciones ni cambiar de institución.
+
+Falta conectar «Exportar datos» con el endpoint `.xlsx` descrito en el punto 2.
+La pantalla ya deja explícita la separación entre ficha identificable y dataset
+clínico, pero no ofrece una descarga ficticia mientras el backend no la genere.
 
 ### 5. Piezas sueltas
 
-- **Auditoría de la ficha y del consentimiento.** El modelo lo contempla
-  (`AuditEntity`), el repositorio solo cubre eventos.
+- **Auditoría de la ficha y del consentimiento.** Las altas ya generan entradas
+  de auditoría. Si se habilitan rectificaciones de identidad o nuevas firmas,
+  requieren una operación versionada con motivo; hoy se rechaza la segunda firma.
 - **Eliminar pacientes y eventos** (BASES §4 se lo atribuye al investigador
   principal). Antes hay que precisar qué significa: el esquema impide borrar un
   paciente aleatorizado, y con razón. Probablemente sea «retirar del
   seguimiento», no borrar la fila.
 - **Cargar la secuencia real** desde el panel: hoy la semilla de demostración
   está en el código.
-- **Activar el estudio** tras la aprobación del CEI: el flag existe pero solo
-  se cambia tocando código.
-- **El consentimiento como documento archivable.** Hoy se guardan los trazos de
-  la firma; falta componerlos con el texto firmado en algo que se pueda
-  archivar.
+- **Activar el estudio**: la app ya lee aprobación por centro y texto vigente
+  de Firestore. Falta cargar los datos reales aprobados fuera del repositorio y
+  desplegar la función de tramos antes de enrolar. Las reglas ya se probaron y
+  publicaron; la función requiere actualizar Firebase al plan Blaze. Por
+  decisión del equipo, la captura real permanece bloqueada mientras tanto.
+- **Consentimiento archivable.** El texto exacto y la firma ya se conservan y
+  se descargan como HTML autónomo imprimible. Falta acordar si el archivo legal
+  de custodia debe ser PDF/A y quién guarda su copia fuera de la app.
+- **Exportación.** El panel descarga XLSX clínico e identidad en archivos
+  separados y registra cada solicitud en auditoría. Falta validar el formato
+  final del dataset con el equipo de análisis y el procedimiento de custodia
+  del archivo identificable.
 
 ### 6. Despliegue
 

@@ -4,6 +4,8 @@ import 'package:sivap/app.dart';
 import 'package:sivap/core/app_state.dart';
 import 'package:sivap/core/widgets/controls.dart';
 import 'package:sivap/data/local/seed_data.dart';
+import 'package:sivap/data/local/almacen_local.dart';
+import 'package:sivap/data/local/in_memory_study_repository.dart';
 import 'package:sivap/domain/models/evento_clinico.dart';
 import 'package:sivap/domain/models/patient.dart';
 import 'package:sivap/features/admin/admin_dashboard_screen.dart';
@@ -135,8 +137,7 @@ void main() {
     // `findRichText`: la fila compone código, tipo y detalle en un solo
     // párrafo, y sin esto el buscador no entra a mirarlo.
     expect(
-      find.textContaining('Listo para evaluar desenlaces',
-          findRichText: true),
+      find.textContaining('Listo para evaluar desenlaces', findRichText: true),
       findsOneWidget,
     );
   });
@@ -145,7 +146,8 @@ void main() {
     lienzo(tester, alto: 2400);
     // El reclutador no captura desenlaces ni seguimiento. Una lista con avisos
     // que uno no puede resolver se aprende a ignorar.
-    final state = AppState.enMemoria()..iniciarSesion(Seed.reclutadorCardiologia);
+    final state = AppState.enMemoria()
+      ..iniciarSesion(Seed.reclutadorCardiologia);
     await tester.pumpWidget(montar(const PatientListScreen(), estado: state));
 
     expect(find.text('PENDIENTE'), findsNothing);
@@ -179,13 +181,13 @@ void main() {
       edad: 62,
       sexo: Sexo.masculino,
     );
-    await tester.pumpWidget(
-        montar(const SincronizacionScreen(), estado: state));
+    await tester
+        .pumpWidget(montar(const SincronizacionScreen(), estado: state));
 
     // Que no se pueda enviar no impide trabajar, y tiene que decirlo
     // (CLAUDE.md §12).
-    expect(find.textContaining('seguir capturando sin conexión'),
-        findsOneWidget);
+    expect(
+        find.textContaining('seguir capturando sin conexión'), findsOneWidget);
     // Sin sesión con el servidor no se puede enviar, y el botón lo refleja.
     final boton = tester.widget<AppButton>(
         find.widgetWithText(AppButton, 'Enviar lo pendiente'));
@@ -224,7 +226,7 @@ void main() {
   testWidgets('un usuario que no existe no entra, y lo dice', (tester) async {
     lienzo(tester);
     final state = AppState.enMemoria();
-    await tester.pumpWidget(montar(const LoginScreen(), estado: state));
+    await tester.pumpWidget(raizDeLaApp(state));
 
     await tester.enterText(
         find.widgetWithText(TextField, 'Ej.: investigador.uno'), 'nadie');
@@ -246,8 +248,96 @@ void main() {
     expect(find.text('Evaluador de desenlaces'), findsOneWidget);
     expect(find.text('Investigador principal'), findsOneWidget);
     expect(find.text('Analista'), findsOneWidget);
-    // El CEI no ha aprobado: la advertencia tiene que estar a la vista.
-    expect(find.textContaining('Modo demostración'), findsOneWidget);
+    // Sin configuración aprobada, la advertencia queda a la vista.
+    expect(find.textContaining('La aprobación del centro'), findsOneWidget);
+  });
+
+  testWidgets('el acceso remoto no permite elegir función', (tester) async {
+    lienzo(tester);
+    final repo = InMemoryStudyRepository();
+    final state = AppState(
+      AlmacenLocal(
+        repo: repo,
+        persistente: false,
+        cifrado: false,
+        descripcion: 'Prueba remota',
+      ),
+      autenticarUsuario: (usuario, clave) async => Seed.analista,
+      cargarRepositorioRemoto: (investigador) async => repo,
+    );
+    await tester.pumpWidget(montar(const LoginScreen(), estado: state));
+
+    expect(find.text('Función en el ensayo'), findsNothing);
+    expect(find.text('Aplicador'), findsNothing);
+    expect(find.textContaining('valida Firebase'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'correo@institucion.cu'),
+        findsOneWidget);
+  });
+
+  testWidgets('el acceso remoto permite solicitar recuperación',
+      (tester) async {
+    lienzo(tester);
+    final repo = InMemoryStudyRepository();
+    String? correoSolicitado;
+    final state = AppState(
+      AlmacenLocal(
+        repo: repo,
+        persistente: false,
+        cifrado: false,
+        descripcion: 'Prueba remota',
+      ),
+      autenticarUsuario: (usuario, clave) async => Seed.analista,
+      cargarRepositorioRemoto: (investigador) async => repo,
+      recuperarAccesoRemoto: (correo) async => correoSolicitado = correo,
+    );
+    await tester.pumpWidget(montar(const LoginScreen(), estado: state));
+
+    await tester.enterText(
+        find.widgetWithText(TextField, 'correo@institucion.cu'),
+        'persona@estudio.cu');
+    await tester.tap(find.textContaining('Enviar recuperación'));
+    await tester.pump();
+
+    expect(correoSolicitado, 'persona@estudio.cu');
+    expect(find.textContaining('Solicitud enviada'), findsOneWidget);
+  });
+
+  testWidgets('el acceso remoto autentica antes de abrir la cohorte',
+      (tester) async {
+    lienzo(tester);
+    final repo = InMemoryStudyRepository();
+    var autentico = false;
+    var cargo = false;
+    final state = AppState(
+      AlmacenLocal(
+        repo: InMemoryStudyRepository(),
+        persistente: false,
+        cifrado: false,
+        descripcion: 'Prueba remota',
+      ),
+      autenticarUsuario: (usuario, clave) async {
+        autentico = usuario == 'analista@estudio.cu' && clave == 'secreta';
+        return Seed.analista;
+      },
+      cargarRepositorioRemoto: (investigador) async {
+        cargo = true;
+        return repo;
+      },
+    );
+    await tester.pumpWidget(raizDeLaApp(state));
+
+    await tester.enterText(
+        find.widgetWithText(TextField, 'correo@institucion.cu'),
+        'analista@estudio.cu');
+    await tester.enterText(find.byType(TextField).at(1), 'secreta');
+    await tester.tap(find.text('Entrar'));
+    await tester.pumpAndSettle();
+
+    expect(autentico, isTrue);
+    expect(cargo, isTrue);
+    expect(state.usuario, Seed.analista);
+    expect(state.repo, same(repo));
+    expect(find.text('Cohorte completa'), findsOneWidget);
   });
 
   testWidgets('el recolector ve su carga y puede enrolar', (tester) async {
@@ -353,7 +443,8 @@ void main() {
       (tester) async {
     lienzo(tester, ancho: 1600, alto: 1600);
     final state = AppState.enMemoria()..iniciarSesion(Seed.principal);
-    await tester.pumpWidget(montar(const AdminDashboardScreen(), estado: state));
+    await tester
+        .pumpWidget(montar(const AdminDashboardScreen(), estado: state));
 
     expect(find.text('Pacientes del ensayo'), findsOneWidget);
     expect(find.text('AVANCE POR MÓDULOS'), findsOneWidget);

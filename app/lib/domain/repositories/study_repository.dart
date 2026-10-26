@@ -5,6 +5,7 @@ import '../models/evento_clinico.dart';
 import '../models/institucion.dart';
 import '../models/patient.dart';
 import '../models/role.dart';
+import '../../data/remoto/lote.dart';
 
 /// Configuración del estudio. Vive como dato, no como constantes en el código.
 class StudyConfig {
@@ -134,8 +135,23 @@ class Pendiente {
 abstract class StudyRepository {
   StudyConfig get config;
 
+  /// Tramos de asignación disponibles en este dispositivo móvil.
+  bool get requiereTramos => false;
+  int get asignacionesRestantes => 0;
+  void incorporarTramo(Tramo tramo, String etiqueta, String dispositivoId) {
+    throw UnsupportedError('Este almacén no recibe tramos.');
+  }
+
+  /// Si este almacén admite captura y correcciones.
+  ///
+  /// El panel web consulta el servidor, pero no captura: el navegador no tiene
+  /// el almacén local cifrado que exige el estudio. Las pantallas usan esta
+  /// propiedad para no ofrecer acciones que el almacén no puede garantizar.
+  bool get admiteEscritura => true;
+
   List<Patient> pacientes({String? recolectorId});
   Patient? paciente(String id);
+  Consent? consentimiento(String id);
 
   /// Todos los eventos registrados de un paciente, en orden cronológico.
   ///
@@ -151,6 +167,10 @@ abstract class StudyRepository {
   EventoClinico? borradorAbierto(String patientId, TipoEvento tipo);
 
   List<AuditEntry> auditoria({String? entidadId, int? limite});
+
+  /// Perfiles visibles para quien administra usuarios. Las implementaciones
+  /// locales no exponen un directorio; el servidor aplica institución y rol.
+  List<Investigador> investigadores() => const [];
 
   int get registrosEnCola;
   int get dispositivosConCola;

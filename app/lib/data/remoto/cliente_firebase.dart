@@ -36,7 +36,7 @@ class ClienteFirebase implements ClienteRemoto {
   @override
   Future<ResultadoLote> enviar(Lote lote) async {
     if (!_activa) throw const SesionCaducada('La sesión Firebase se cerró.');
-    final escrituras = lote.pacientes.length * 3 +
+    final escrituras = lote.pacientes.length * 4 +
         lote.consentimientos.length +
         lote.eventos.length +
         lote.auditoria.length +
@@ -88,14 +88,27 @@ class ClienteFirebase implements ClienteRemoto {
             'protocolo': p.protocolo.name,
             'asignado_en': p.asignadoEn.toUtc().toIso8601String(),
           });
+          tx.set(
+              _firestore
+                  .collection('posiciones')
+                  .doc(p.posicionSecuencia.toString()),
+              {
+                ...comunes,
+                'paciente_id': p.id,
+                'posicion': p.posicionSecuencia,
+                'secuencia_etiqueta': p.secuencia,
+              });
         }
 
         for (final enviable in lote.consentimientos) {
-          tx.set(_firestore.collection('consentimientos')
-              .doc(enviable.consentimiento.id), {
-            ...comunes,
-            ...enviable.aJson(),
-          });
+          tx.set(
+              _firestore
+                  .collection('consentimientos')
+                  .doc(enviable.consentimiento.id),
+              {
+                ...comunes,
+                ...enviable.aJsonFirestore(),
+              });
         }
         for (final enviable in lote.eventos) {
           tx.set(_firestore.collection('eventos').doc(enviable.evento.id), {
@@ -126,8 +139,8 @@ class ClienteFirebase implements ClienteRemoto {
       }
       if (error.code == 'permission-denied' ||
           error.code == 'unauthenticated') {
-        throw ErrorDelServidor(403,
-            error.message ?? 'Firebase rechazó los permisos del envío.');
+        throw ErrorDelServidor(
+            403, error.message ?? 'Firebase rechazó los permisos del envío.');
       }
       throw ErrorDelServidor(
           500, error.message ?? 'Firebase no pudo guardar el lote.');

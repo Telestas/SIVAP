@@ -16,7 +16,8 @@ Future<AlmacenLocal> abrirAlmacen(ModoAlmacen modo) async {
   final base = SivapDatabase.abrir(ruta: ruta, claveHex: clave);
   final repo = SqliteStudyRepository(
     base,
-    secuencia: Seed.secuenciaAleatorizacion,
+    secuencia:
+        modo == ModoAlmacen.demostracion ? Seed.secuenciaAleatorizacion : null,
   );
 
   if (modo == ModoAlmacen.demostracion) repo.sembrarDemostracionSiVacia();

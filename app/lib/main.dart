@@ -10,14 +10,17 @@ import 'core/theme/tokens.dart';
 import 'core/widgets/controls.dart';
 import 'data/local/abrir_almacen.dart';
 import 'data/local/almacen_local.dart';
+import 'data/remoto/autenticacion_firebase.dart';
+import 'data/remoto/configuracion_movil.dart';
+import 'data/remoto/firestore_study_repository.dart';
 import 'firebase_options.dart';
 
 /// Modo de almacén con el que arranca esta compilación.
 ///
 /// Demostración y producción usan archivos de base de datos distintos, así que
 /// cambiar esta constante nunca mezcla datos inventados con datos reales.
-/// Pasará a `produccion` cuando el CEI apruebe el estudio.
-const ModoAlmacen modoAlmacen = ModoAlmacen.demostracion;
+/// Los datos reales se guardan en un archivo distinto al de demostración.
+const ModoAlmacen modoAlmacen = ModoAlmacen.produccion;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +48,39 @@ class _SivapAppState extends State<SivapApp> {
 
   Future<AppState> _abrir() async {
     final almacen = await abrirAlmacen(modoAlmacen);
-    return _state = AppState(almacen);
+    if (!kIsWeb && defaultTargetPlatform != TargetPlatform.android) {
+      if (modoAlmacen == ModoAlmacen.produccion) {
+        throw UnsupportedError('Firebase aún no está configurado para esta '
+            'plataforma móvil.');
+      }
+      return _state = AppState(almacen);
+    }
+    final autenticacion = AutenticacionFirebase();
+    final state = AppState(
+      almacen,
+      autenticarUsuario: autenticacion.entrar,
+      cargarRepositorioRemoto: (investigador) async {
+        if (!kIsWeb) {
+          return cargarConfiguracionMovil(almacen.repo, investigador);
+        }
+        final repo = FirestoreStudyRepository(investigador: investigador);
+        await repo.cargar();
+        return repo;
+      },
+      cerrarSesionRemota: autenticacion.salir,
+      recuperarAccesoRemoto: autenticacion.recuperarAcceso,
+    );
+    try {
+      final investigador = await autenticacion.restaurar();
+      if (investigador != null) {
+        await state.restaurarSesionRemota(investigador);
+      }
+    } on Object {
+      // Una sesión antigua, revocada o sin red no debe dejar toda la web en
+      // la pantalla de fallo de arranque. Se vuelve al acceso, que mostrará el
+      // error concreto cuando la persona intente entrar.
+    }
+    return _state = state;
   }
 
   @override
@@ -103,7 +138,8 @@ class _Abriendo extends StatelessWidget {
               SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: T.accent),
+                child:
+                    CircularProgressIndicator(strokeWidth: 2, color: T.accent),
               ),
             ],
           ),
@@ -137,7 +173,8 @@ class _FalloDeArranque extends StatelessWidget {
                   const Text(
                       'La app no arranca porque no puede guardar los datos con '
                       'las garantías que exige el estudio.',
-                      style: TextStyle(fontSize: 15, color: T.ink, height: 1.5)),
+                      style:
+                          TextStyle(fontSize: 15, color: T.ink, height: 1.5)),
                   const SizedBox(height: 16),
                   StatusBanner(texto: error.toString(), alineaArriba: true),
                 ],

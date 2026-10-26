@@ -19,9 +19,9 @@ universal si hace falta.
 
 ### Dos cosas que aprendimos publicando la primera versión
 
-**`/releases/latest` no sirve aquí.** Excluye las prereleases, y mientras el CEI
-no apruebe el estudio todas las versiones lo son. La página pide la lista
-completa y toma la primera.
+La página pide la lista de releases y toma la primera con APK. La versión 0.2.0
+usa el almacén cifrado de producción, exige el llavero del estudio y se
+distribuye como prerelease de pruebas operativas con captura real bloqueada.
 
 **El `if` de un paso no ve su propio `env`.** El paso de firma llevaba
 `if: env.LLAVERO != ''` con `LLAVERO` definido en el mismo paso, así que se
@@ -78,18 +78,16 @@ gh secret set ANDROID_KEY_PASSWORD      --repo Telestas/SIVAP
 El `-w0` de `base64` es lo que evita los saltos de línea. Con ellos, el
 `base64 -d` del pipeline falla con un error que no dice lo que pasa.
 
-Si no están los cuatro, el APK sale firmado con la clave de depuración que
-genera Flutter.
-Se instala igual, y para enseñar la app es suficiente. Pero:
+Si no están los cuatro, la publicación de producción se detiene. Una APK de
+desarrollo puede instalarse para revisar la interfaz, pero no debe capturar
+datos reales porque al cambiar la firma se perdería el acceso a la base local.
 
 > El día que se pase a una clave propia, Android tratará la app como una
 > **aplicación distinta**. Cada usuario tendrá que desinstalar la anterior. Y
 > al desinstalar se borra la clave de cifrado del Keystore del dispositivo, y
 > con ella **todo lo capturado que no se hubiera sincronizado**.
 
-Como todavía no hay sincronización, hoy eso significaría perderlo todo. La
-conclusión práctica es sencilla: **crear el llavero antes de que nadie capture
-un solo dato real.**
+**Cree y custodie el llavero antes de capturar un solo dato real.**
 
 ```bash
 keytool -genkey -v -keystore sivap.jks -keyalg RSA -keysize 4096 \

@@ -122,7 +122,9 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
   }
 
   static bool _vacio(Object? v) =>
-      v == null || (v is String && v.trim().isEmpty) || (v is List && v.isEmpty);
+      v == null ||
+      (v is String && v.trim().isEmpty) ||
+      (v is List && v.isEmpty);
 
   /// Rehace lo que depende de otros campos, después de cada cambio.
   ///
@@ -190,8 +192,12 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
 
     final usuario = state.usuarioActual;
     final cerrado = evento?.estado.esInmutable ?? false;
-    final puedeCorregir = cerrado && usuario.puedeCorregirRegistrado;
-    final soloLectura = cerrado || !usuario.puedeCapturar(widget.tipo);
+    final puedeCorregir = state.repo.admiteEscritura &&
+        cerrado &&
+        usuario.puedeCorregirRegistrado;
+    final soloLectura = !state.repo.admiteEscritura ||
+        cerrado ||
+        !usuario.puedeCapturar(widget.tipo);
 
     if (definicion == null) {
       return Scaffold(
@@ -210,7 +216,6 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
         ),
       );
     }
-
 
     return Scaffold(
       backgroundColor: T.surface,
@@ -315,8 +320,8 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
               const SizedBox(width: 10),
               Expanded(
                 flex: 15,
-                child: AppButton('Registrar',
-                    onTap: () => _registrar(definicion)),
+                child:
+                    AppButton('Registrar', onTap: () => _registrar(definicion)),
               ),
             ]),
     );
@@ -396,8 +401,9 @@ class _Seccion extends StatelessWidget {
         i++;
         continue;
       }
-      final siguiente =
-          i + 1 < campos.length && campos[i + 1].ancho == 1 ? campos[i + 1] : null;
+      final siguiente = i + 1 < campos.length && campos[i + 1].ancho == 1
+          ? campos[i + 1]
+          : null;
       // `start` y no `stretch`: dentro de una lista la fila no tiene altura
       // acotada, y estirar al alto de la fila pediría altura infinita.
       filas.add(Row(
@@ -405,7 +411,8 @@ class _Seccion extends StatelessWidget {
         children: [
           Expanded(child: _input(campo)),
           const SizedBox(width: 9),
-          Expanded(child: siguiente == null ? const SizedBox() : _input(siguiente)),
+          Expanded(
+              child: siguiente == null ? const SizedBox() : _input(siguiente)),
         ],
       ));
       i += siguiente == null ? 1 : 2;

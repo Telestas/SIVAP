@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'autenticacion_firebase.dart';
 import '../../domain/models/role.dart';
 import '../../domain/repositories/study_repository.dart';
 import '../local/sqlite_study_repository.dart';
@@ -33,7 +34,7 @@ Future<StudyRepository> cargarConfiguracionMovil(
       );
     }
   } on FirebaseException catch (error) {
-    if (error.code != 'unavailable' && error.code != 'network-request-failed') {
+    if (!AutenticacionFirebase.errorPermiteCache(error.code)) {
       rethrow;
     }
   }

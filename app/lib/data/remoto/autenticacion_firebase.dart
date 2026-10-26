@@ -19,7 +19,8 @@ class AutenticacionFirebase {
           email: correo.trim(), password: contrasena);
       await credencial.user!.sendEmailVerification();
     } on FirebaseAuthException catch (error) {
-      throw AccesoFirebaseRechazado(_mensaje(error.code));
+      throw AccesoFirebaseRechazado(
+          mensajeAutenticacion(error.code, detalle: error.message));
     } finally {
       await _auth.signOut();
     }
@@ -57,7 +58,8 @@ class AutenticacionFirebase {
         'solicitado_en': FieldValue.serverTimestamp(),
       });
     } on FirebaseAuthException catch (error) {
-      throw AccesoFirebaseRechazado(_mensaje(error.code));
+      throw AccesoFirebaseRechazado(
+          mensajeAutenticacion(error.code, detalle: error.message));
     } on FirebaseException catch (error) {
       throw AccesoFirebaseRechazado(error.code == 'permission-denied'
           ? 'No se pudo registrar la solicitud. Compruebe el código del centro.'
@@ -73,7 +75,8 @@ class AutenticacionFirebase {
           email: correo.trim(), password: contrasena);
       return await _leerPerfil(credencial.user!);
     } on FirebaseAuthException catch (error) {
-      throw AccesoFirebaseRechazado(_mensaje(error.code));
+      throw AccesoFirebaseRechazado(
+          mensajeAutenticacion(error.code, detalle: error.message));
     } on FirebaseException catch (error) {
       throw AccesoFirebaseRechazado(
           error.message ?? 'No se pudo leer el perfil.');
@@ -87,8 +90,7 @@ class AutenticacionFirebase {
     try {
       return await _leerPerfil(usuario);
     } on FirebaseException catch (error) {
-      if (error.code == 'unavailable' ||
-          error.code == 'network-request-failed') {
+      if (errorPermiteCache(error.code)) {
         return _leerPerfil(usuario, soloCache: true);
       }
       await _auth.signOut();
@@ -162,6 +164,25 @@ class AutenticacionFirebase {
       throw AccesoFirebaseRechazado(_mensajeRecuperacion(error.code));
     }
   }
+
+  /// Android puede entregar UNKNOWN para una falla que el plugin no clasificó.
+  /// Mostrar el mensaje nativo permite distinguir red, servicio y credenciales.
+  static String mensajeAutenticacion(String codigo, {String? detalle}) {
+    if (codigo.toLowerCase() == 'unknown') {
+      final texto = detalle?.trim();
+      return texto == null || texto.isEmpty
+          ? 'Firebase no pudo completar el acceso. Compruebe la conexión e inténtelo de nuevo (UNKNOWN).'
+          : 'Firebase no pudo completar el acceso: $texto';
+    }
+    return _mensaje(codigo);
+  }
+
+  /// Solo conserva la sesión previamente validada; nunca crea un perfil local.
+  static bool errorPermiteCache(String codigo) => const {
+        'unavailable',
+        'network-request-failed',
+        'unknown'
+      }.contains(codigo.toLowerCase());
 
   static String _mensaje(String codigo) => switch (codigo) {
         'invalid-credential' ||

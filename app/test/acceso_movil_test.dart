@@ -20,6 +20,18 @@ void main() {
     expect(perfil['institucion_codigo'], 'centro-1');
   });
 
+  test('UNKNOWN muestra el detalle y permite restaurar solo un perfil cacheado',
+      () {
+    expect(
+      AutenticacionFirebase.mensajeAutenticacion('UNKNOWN',
+          detalle: 'No se pudo conectar con el servicio.'),
+      contains('No se pudo conectar con el servicio.'),
+    );
+    expect(AutenticacionFirebase.errorPermiteCache('UNKNOWN'), isTrue);
+    expect(
+        AutenticacionFirebase.errorPermiteCache('permission-denied'), isFalse);
+  });
+
   test('el móvil toma el rol del perfil y vincula su base a una cuenta',
       () async {
     final repo = InMemoryStudyRepository();

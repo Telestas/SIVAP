@@ -15,6 +15,7 @@ import '../../domain/models/protocolo.dart';
 import '../consent/consent_screen.dart';
 import '../enrollment/enrollment_screen.dart';
 import '../eventos/paciente_timeline_screen.dart';
+import '../actualizaciones/actualizaciones_button.dart';
 
 /// Lista de pacientes, con dos caras: la carga del recolector y la cohorte
 /// completa en solo lectura para el analista. Es la misma información leída
@@ -33,7 +34,7 @@ class PatientListScreen extends StatefulWidget {
 /// no hay nada registrado hoy, que es lo que de verdad necesita el equipo.
 enum _Filtro { todos, conBorrador, sinRegistroHoy }
 
-enum _AccionCuenta { perfil, sincronizacion, salir }
+enum _AccionCuenta { perfil, actualizaciones, sincronizacion, salir }
 
 class _PatientListScreenState extends State<PatientListScreen> {
   _Filtro _filtro = _Filtro.todos;
@@ -154,6 +155,7 @@ class _Encabezado extends StatelessWidget {
                 const MetaChip('SOLO LECTURA'),
                 const SizedBox(width: 10),
               ],
+              const CampanaActualizaciones(),
               PopupMenuButton<_AccionCuenta>(
                 tooltip: 'Opciones de la cuenta',
                 onSelected: (accion) {
@@ -187,6 +189,8 @@ class _Encabezado extends StatelessWidget {
                     case _AccionCuenta.sincronizacion:
                       Navigator.of(context).push(MaterialPageRoute(
                           builder: (_) => const SincronizacionScreen()));
+                    case _AccionCuenta.actualizaciones:
+                      mostrarActualizaciones(context, comprobarDeNuevo: true);
                     case _AccionCuenta.salir:
                       state.cerrarSesion();
                   }
@@ -206,6 +210,11 @@ class _Encabezado extends StatelessWidget {
                     value: _AccionCuenta.sincronizacion,
                     child: Text('Sincronización'),
                   ),
+                  if (state.actualizaciones != null)
+                    const PopupMenuItem(
+                      value: _AccionCuenta.actualizaciones,
+                      child: Text('Buscar actualización'),
+                    ),
                   const PopupMenuItem(
                     value: _AccionCuenta.salir,
                     child: Text('Cerrar sesión'),

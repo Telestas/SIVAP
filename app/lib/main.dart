@@ -11,6 +11,7 @@ import 'core/widgets/controls.dart';
 import 'data/local/abrir_almacen.dart';
 import 'data/local/almacen_local.dart';
 import 'data/remoto/autenticacion_firebase.dart';
+import 'data/remoto/actualizaciones.dart';
 import 'data/remoto/configuracion_movil.dart';
 import 'data/remoto/firestore_study_repository.dart';
 import 'firebase_options.dart';
@@ -71,6 +72,10 @@ class _SivapAppState extends State<SivapApp> {
       recuperarAccesoRemoto: autenticacion.recuperarAcceso,
       crearCuentaRemota: autenticacion.crearCuenta,
       solicitarAccesoRemoto: autenticacion.solicitarAcceso,
+      actualizaciones:
+          !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+              ? Actualizaciones()
+              : null,
     );
     try {
       final investigador = await autenticacion.restaurar();

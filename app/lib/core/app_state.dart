@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../data/local/almacen_local.dart';
 import '../data/local/in_memory_study_repository.dart';
+import '../data/remoto/actualizaciones.dart';
 import '../data/remoto/sincronizacion.dart';
 import '../domain/models/role.dart';
 import '../domain/repositories/study_repository.dart';
@@ -30,6 +31,7 @@ class AppState extends ChangeNotifier {
     RecuperarAccesoRemoto? recuperarAccesoRemoto,
     CrearCuentaRemota? crearCuentaRemota,
     SolicitarAccesoRemoto? solicitarAccesoRemoto,
+    this.actualizaciones,
   })  : _repo = almacen.repo,
         _autenticarUsuario = autenticarUsuario,
         _cargarRepositorioRemoto = cargarRepositorioRemoto,
@@ -41,6 +43,7 @@ class AppState extends ChangeNotifier {
     // Lo que pasa en la sincronización cambia lo que se ve en pantalla: el
     // contador de la cola, sobre todo.
     this.sincronizacion.addListener(notifyListeners);
+    actualizaciones?.addListener(notifyListeners);
   }
 
   /// Almacén volátil, para pruebas y para el arranque en navegador.
@@ -63,6 +66,7 @@ class AppState extends ChangeNotifier {
 
   /// A qué servidor habla este aparato y qué le falta por enviar.
   final Sincronizacion sincronizacion;
+  final Actualizaciones? actualizaciones;
 
   StudyRepository get repo => _repo;
 
@@ -99,6 +103,7 @@ class AppState extends ChangeNotifier {
 
   void iniciarSesion(Investigador investigador) {
     _usuario = investigador;
+    _buscarActualizaciones();
     notifyListeners();
   }
 
@@ -118,6 +123,7 @@ class AppState extends ChangeNotifier {
     _repo = repositorio;
     _usuario = investigador;
     if (almacen.persistente) sincronizacion.vincularFirebase(investigador);
+    _buscarActualizaciones();
     notifyListeners();
   }
 
@@ -129,6 +135,12 @@ class AppState extends ChangeNotifier {
     _repo = await cargar(investigador);
     _usuario = investigador;
     if (almacen.persistente) sincronizacion.vincularFirebase(investigador);
+    _buscarActualizaciones();
+  }
+
+  void _buscarActualizaciones() {
+    final servicio = actualizaciones;
+    if (servicio != null) unawaited(servicio.buscar());
   }
 
   /// La base cifrada pertenece a una sola cuenta. Reutilizar el aparato con
@@ -175,6 +187,8 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     sincronizacion.removeListener(notifyListeners);
+    actualizaciones?.removeListener(notifyListeners);
+    actualizaciones?.dispose();
     super.dispose();
   }
 }

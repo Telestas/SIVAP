@@ -21,8 +21,14 @@ base en modo producción, nunca en modo de prueba.
 
 ## Operación
 
-Los perfiles se aprovisionan desde una herramienta administrativa confiable; la
-app no puede crear usuarios, elevar roles ni cambiar instituciones. Cada perfil,
+Una persona puede crear una cuenta con correo y contraseña, verificar el correo
+y solicitar acceso indicando el código de un centro existente. También puede
+solicitar acceso si ya tiene una cuenta en Firebase Authentication. La solicitud
+no concede acceso clínico. El investigador principal ve únicamente las
+solicitudes de su centro en «Usuarios y roles» y aprueba una función permitida;
+la aprobación crea el perfil y cierra la solicitud en un mismo lote. El rol de
+investigador principal sigue requiriendo aprovisionamiento administrativo.
+Cada perfil,
 con el UID de Firebase Authentication como identificador, debe contener
 `nombre`, `institucion_codigo` y `roles`; `institucion_nombre` es opcional. El
 nombre visible se lee de `instituciones/{codigo}.nombre` si está disponible:
@@ -55,9 +61,9 @@ archiva una instantánea junto a cada firma. Si falta la aprobación del centro,
 el consentimiento o un tramo, el enrolamiento se detiene.
 
 El panel web autentica primero y solo entonces carga pacientes, asignaciones,
-identidades permitidas, eventos y auditoría. Es de solo lectura: no enrola ni
-corrige desde el navegador, incluso si el perfil tiene permisos de escritura en
-la app móvil.
+identidades permitidas, eventos y auditoría. Permite al investigador principal
+aprobar solicitudes de su centro. Los datos clínicos siguen en modo de solo
+lectura en el navegador: no enrola ni corrige desde allí.
 
 Tras crear la base y probar las reglas con Emulator Suite:
 

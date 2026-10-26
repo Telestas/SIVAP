@@ -4,8 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../domain/models/institucion.dart';
 import '../../domain/models/role.dart';
 
-/// Acceso remoto para la sincronización. No crea cuentas: los perfiles se
-/// aprovisionan fuera de la app para que nadie pueda concederse funciones.
+/// Acceso remoto. Una cuenta nueva no recibe funciones hasta su aprobación.
 class AutenticacionFirebase {
   AutenticacionFirebase({FirebaseAuth? auth, FirebaseFirestore? firestore})
       : _auth = auth ?? FirebaseAuth.instance,
@@ -14,10 +13,64 @@ class AutenticacionFirebase {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
 
+  Future<void> crearCuenta(String correo, String contrasena) async {
+    try {
+      final credencial = await _auth.createUserWithEmailAndPassword(
+          email: correo.trim(), password: contrasena);
+      await credencial.user!.sendEmailVerification();
+    } on FirebaseAuthException catch (error) {
+      throw AccesoFirebaseRechazado(_mensaje(error.code));
+    } finally {
+      await _auth.signOut();
+    }
+  }
+
+  Future<void> solicitarAcceso(String correo, String contrasena, String nombre,
+      String codigoCentro) async {
+    try {
+      final credencial = await _auth.signInWithEmailAndPassword(
+          email: correo.trim(), password: contrasena);
+      final usuario = credencial.user!;
+      await usuario.reload();
+      final actual = _auth.currentUser!;
+      await actual.getIdToken(true);
+      if (!actual.emailVerified) {
+        await actual.sendEmailVerification();
+        throw const AccesoFirebaseRechazado(
+            'Verifique su correo y vuelva a solicitar acceso. Enviamos un nuevo enlace.');
+      }
+      if ((await _firestore.collection('investigadores').doc(actual.uid).get())
+          .exists) {
+        throw const AccesoFirebaseRechazado('Esta cuenta ya está aprobada.');
+      }
+      final referencia =
+          _firestore.collection('solicitudes_acceso').doc(actual.uid);
+      if ((await referencia.get()).exists) {
+        throw const AccesoFirebaseRechazado(
+            'Su solicitud ya fue registrada. Espere la decisión del investigador principal.');
+      }
+      await referencia.set({
+        'correo': actual.email,
+        'nombre': nombre.trim(),
+        'institucion_codigo': codigoCentro.trim(),
+        'estado': 'pendiente',
+        'solicitado_en': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseAuthException catch (error) {
+      throw AccesoFirebaseRechazado(_mensaje(error.code));
+    } on FirebaseException catch (error) {
+      throw AccesoFirebaseRechazado(error.code == 'permission-denied'
+          ? 'No se pudo registrar la solicitud. Compruebe el código del centro.'
+          : (error.message ?? 'No se pudo registrar la solicitud.'));
+    } finally {
+      await _auth.signOut();
+    }
+  }
+
   Future<Investigador> entrar(String correo, String contrasena) async {
     try {
       final credencial = await _auth.signInWithEmailAndPassword(
-          email: correo, password: contrasena);
+          email: correo.trim(), password: contrasena);
       return await _leerPerfil(credencial.user!);
     } on FirebaseAuthException catch (error) {
       throw AccesoFirebaseRechazado(_mensaje(error.code));
@@ -116,8 +169,14 @@ class AutenticacionFirebase {
         'user-not-found' =>
           'Correo o contraseña incorrectos.',
         'network-request-failed' => 'Sin conexión con Firebase.',
+        'email-already-in-use' =>
+          'El correo ya tiene una cuenta. Use «Ya tengo cuenta».',
+        'weak-password' => 'La contraseña debe tener al menos seis caracteres.',
+        'invalid-email' => 'El correo no tiene un formato válido.',
+        'operation-not-allowed' =>
+          'El acceso con correo y contraseña no está habilitado en Firebase.',
         'too-many-requests' => 'Demasiados intentos. Intente más tarde.',
-        _ => 'No se pudo abrir la sesión remota.',
+        _ => 'No se pudo abrir la sesión remota (Firebase: $codigo).',
       };
 
   static String _mensajeRecuperacion(String codigo) => switch (codigo) {
@@ -132,7 +191,7 @@ class PerfilNoAprovisionado implements Exception {
   const PerfilNoAprovisionado();
   @override
   String toString() =>
-      'Esta cuenta no tiene un perfil aprobado para el estudio.';
+      'Esta cuenta no tiene un perfil aprobado. Pulse «Solicitar acceso o crear cuenta».';
 }
 
 class AccesoFirebaseRechazado implements Exception {

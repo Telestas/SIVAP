@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../sync/sincronizacion_screen.dart';
 import '../../core/app_state.dart';
@@ -639,19 +640,89 @@ class _PanelConsentimientos extends StatelessWidget {
   }
 }
 
-class _PanelUsuarios extends StatelessWidget {
+class _PanelUsuarios extends StatefulWidget {
   const _PanelUsuarios();
+
+  @override
+  State<_PanelUsuarios> createState() => _PanelUsuariosState();
+}
+
+class _PanelUsuariosState extends State<_PanelUsuarios> {
+  bool _ocupado = false;
+
+  Future<void> _aprobar(QueryDocumentSnapshot<Map<String, dynamic>> solicitud,
+      Rol rol, String codigoCentro) async {
+    if (_ocupado) return;
+    setState(() => _ocupado = true);
+    try {
+      final datos = solicitud.data();
+      if (datos['institucion_codigo'] != codigoCentro ||
+          datos['estado'] != 'pendiente' ||
+          rol == Rol.investigadorPrincipal) {
+        throw StateError('La solicitud o la función no son aprobables.');
+      }
+      final db = FirebaseFirestore.instance;
+      final lote = db.batch();
+      final ahora = FieldValue.serverTimestamp();
+      final aprobador = AppScope.read(context).usuarioActual.id;
+      lote.set(db.collection('investigadores').doc(solicitud.id), {
+        'nombre': datos['nombre'],
+        'correo': datos['correo'],
+        'institucion_codigo': codigoCentro,
+        'roles': [rol.name],
+        'aprobado_por': aprobador,
+        'aprobado_en': ahora,
+      });
+      lote.update(solicitud.reference, {
+        'estado': 'aprobado',
+        'rol_aprobado': rol.name,
+        'aprobado_por': aprobador,
+        'aprobado_en': ahora,
+      });
+      await lote.commit();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('Acceso aprobado. La persona ya puede iniciar sesión.')));
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No se pudo aprobar la solicitud: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+  }
+
+  Future<void> _elegirRol(QueryDocumentSnapshot<Map<String, dynamic>> solicitud,
+      String codigoCentro) async {
+    final rol = await showDialog<Rol>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text('Aprobar a ${solicitud.data()['nombre']}'),
+        children: [
+          for (final opcion in Rol.values)
+            if (opcion != Rol.investigadorPrincipal)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, opcion),
+                child: Text(opcion.etiqueta),
+              ),
+        ],
+      ),
+    );
+    if (rol != null && mounted) await _aprobar(solicitud, rol, codigoCentro);
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final usuarios = state.repo.investigadores();
     final visibles = usuarios.isEmpty ? [state.usuarioActual] : usuarios;
-    return _PanelListado(
+    final listado = _PanelListado(
       titulo: '${visibles.length} perfiles del centro',
       vacio: 'No hay perfiles visibles.',
-      pie:
-          'Las cuentas y los cambios de rol se aprovisionan con la herramienta administrativa; el navegador nunca puede conceder permisos.',
+      pie: 'Los roles existentes no se cambian desde este panel.',
       filas: [
         for (final usuario in visibles)
           _FilaResumen(
@@ -661,6 +732,51 @@ class _PanelUsuarios extends StatelessWidget {
           ),
       ],
     );
+    if (!state.usuarioActual.puedeGestionarUsuarios ||
+        !state.requiereAutenticacionRemota) {
+      return listado;
+    }
+    final codigo = state.usuarioActual.institucion.codigo;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('solicitudes_acceso')
+            .where('institucion_codigo', isEqualTo: codigo)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Text(
+                'No se pudieron cargar las solicitudes: ${snapshot.error}');
+          }
+          if (!snapshot.hasData) return const LinearProgressIndicator();
+          final pendientes = snapshot.data!.docs
+              .where((d) => d.data()['estado'] == 'pendiente')
+              .toList();
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Solicitudes pendientes: ${pendientes.length}',
+                    style: const TextStyle(fontSize: 18)),
+                const SizedBox(height: 8),
+                for (final solicitud in pendientes)
+                  Card(
+                    child: ListTile(
+                      title: Text('${solicitud.data()['nombre']}'),
+                      subtitle: Text('${solicitud.data()['correo']}'),
+                      trailing: FilledButton(
+                        onPressed: _ocupado
+                            ? null
+                            : () => _elegirRol(solicitud, codigo),
+                        child: const Text('Aprobar'),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 20),
+              ]);
+        },
+      ),
+      listado,
+    ]);
   }
 }
 

@@ -17,6 +17,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { serverTimestamp } from 'firebase/firestore';
 
 const proyecto = 'sivap-reglas-prueba';
 let entorno;
@@ -95,6 +96,87 @@ test('los roles no se crean ni se elevan desde un cliente', async () => {
     institucion_codigo: 'centro-demo',
     roles: ['investigadorPrincipal'],
   }));
+});
+
+test('una cuenta verificada solicita acceso sin obtener permisos clínicos', async () => {
+  await sembrarPerfil('principal', ['investigadorPrincipal']);
+  const db = entorno.authenticatedContext('nuevo', {
+    email: 'nuevo@ejemplo.test', email_verified: true,
+  }).firestore();
+  const solicitud = doc(db, 'solicitudes_acceso', 'nuevo');
+  await assertSucceeds(setDoc(solicitud, {
+    correo: 'nuevo@ejemplo.test', nombre: 'Persona de prueba',
+    institucion_codigo: 'centro-demo', estado: 'pendiente',
+    solicitado_en: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(db, 'investigadores', 'nuevo'), {
+    nombre: 'Persona de prueba', roles: ['investigadorPrincipal'],
+    institucion_codigo: 'centro-demo',
+  }));
+  await assertFails(setDoc(doc(db, 'pacientes', 'p-nuevo'), {
+    ...campos('centro-demo', 'nuevo'), codigo: 'DEM-002',
+  }));
+  await assertFails(setDoc(solicitud, {
+    correo: 'nuevo@ejemplo.test', nombre: 'Persona cambiada',
+    institucion_codigo: 'centro-demo', estado: 'pendiente',
+    solicitado_en: serverTimestamp(),
+  }));
+});
+
+test('correo sin verificar y centro inexistente no pueden solicitar acceso', async () => {
+  await sembrarPerfil('principal', ['investigadorPrincipal']);
+  const datos = {
+    correo: 'nuevo@ejemplo.test', nombre: 'Persona de prueba',
+    institucion_codigo: 'centro-demo', estado: 'pendiente',
+    solicitado_en: serverTimestamp(),
+  };
+  const sinVerificar = entorno.authenticatedContext('nuevo', {
+    email: 'nuevo@ejemplo.test', email_verified: false,
+  }).firestore();
+  await assertFails(setDoc(doc(sinVerificar, 'solicitudes_acceso', 'nuevo'), datos));
+  const verificado = entorno.authenticatedContext('nuevo', {
+    email: 'nuevo@ejemplo.test', email_verified: true,
+  }).firestore();
+  await assertFails(setDoc(doc(verificado, 'solicitudes_acceso', 'nuevo'), {
+    ...datos, institucion_codigo: 'centro-inexistente',
+  }));
+});
+
+test('solo el principal del centro aprueba y crea un rol permitido en el mismo lote', async () => {
+  await sembrarPerfil('principal', ['investigadorPrincipal']);
+  await sembrarPerfil('otro-principal', ['investigadorPrincipal'], 'otro-centro');
+  await sembrarPerfil('reclutador', ['reclutador']);
+  await entorno.withSecurityRulesDisabled(async (contexto) => {
+    await setDoc(doc(contexto.firestore(), 'solicitudes_acceso', 'nuevo'), {
+      correo: 'nuevo@ejemplo.test', nombre: 'Persona de prueba',
+      institucion_codigo: 'centro-demo', estado: 'pendiente',
+    });
+  });
+  async function aprobar(uid, rol, autor) {
+    const db = entorno.authenticatedContext(autor).firestore();
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'investigadores', uid), {
+      correo: 'nuevo@ejemplo.test', nombre: 'Persona de prueba',
+      institucion_codigo: 'centro-demo', roles: [rol],
+      aprobado_por: autor, aprobado_en: serverTimestamp(),
+    });
+    lote.update(doc(db, 'solicitudes_acceso', uid), {
+      estado: 'aprobado', rol_aprobado: rol,
+      aprobado_por: autor, aprobado_en: serverTimestamp(),
+    });
+    return lote.commit();
+  }
+  await assertFails(aprobar('nuevo', 'investigadorPrincipal', 'principal'));
+  await assertFails(aprobar('nuevo', 'reclutador', 'reclutador'));
+  await assertFails(aprobar('nuevo', 'reclutador', 'otro-principal'));
+  const principalDb = entorno.authenticatedContext('principal').firestore();
+  await assertSucceeds(getDocs(query(collection(principalDb, 'solicitudes_acceso'),
+    where('institucion_codigo', '==', 'centro-demo'))));
+  await assertFails(getDocs(collection(principalDb, 'solicitudes_acceso')));
+  await assertSucceeds(aprobar('nuevo', 'reclutador', 'principal'));
+  const db = entorno.authenticatedContext('nuevo').firestore();
+  assert.equal((await getDoc(doc(db, 'investigadores', 'nuevo'))).data().roles[0],
+    'reclutador');
 });
 
 test('un dispositivo queda ligado al investigador que lo registró', async () => {

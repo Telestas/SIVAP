@@ -69,6 +69,8 @@ class _SivapAppState extends State<SivapApp> {
       },
       cerrarSesionRemota: autenticacion.salir,
       recuperarAccesoRemoto: autenticacion.recuperarAcceso,
+      crearCuentaRemota: autenticacion.crearCuenta,
+      solicitarAccesoRemoto: autenticacion.solicitarAcceso,
     );
     try {
       final investigador = await autenticacion.restaurar();

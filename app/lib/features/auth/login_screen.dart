@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../sync/sincronizacion_screen.dart';
+import 'solicitar_acceso_screen.dart';
 import '../../core/app_state.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
@@ -253,6 +254,13 @@ class _LoginScreenState extends State<LoginScreen> {
             AppButton(_entrando ? 'Entrando…' : 'Entrar',
                 enabled: !_entrando, onTap: _entrar),
             if (remoto) ...[
+              TextButton(
+                onPressed: _entrando
+                    ? null
+                    : () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const SolicitarAccesoScreen())),
+                child: const Text('Solicitar acceso o crear cuenta'),
+              ),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: _entrando || _recuperando ? null : _recuperarAcceso,
@@ -262,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            Text('v0.2 · ${config.definicionFormulario.version}',
+            Text('v0.2.1 · ${config.definicionFormulario.version}',
                 textAlign: TextAlign.center,
                 style: T.label(size: 10.5, color: T.faint, tracking: 0.05)),
           ],

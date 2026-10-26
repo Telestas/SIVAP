@@ -1,8 +1,7 @@
 rules_version = '2';
 
 // La base Firebase consolida la cola local; no es un almacén abierto al cliente.
-// Los perfiles se aprovisionan desde una herramienta administrativa confiable,
-// nunca desde la app. Cada documento clínico conserva su institución y autor.
+// Las solicitudes no conceden acceso clínico. Un principal aprueba en su centro.
 service cloud.firestore {
   match /databases/{database}/documents {
     function autenticado() {
@@ -89,12 +88,71 @@ service cloud.firestore {
               ]);
     }
 
-    // Perfiles y configuración no se administran desde clientes clínicos.
+    function rolAprobable(rol) {
+      return rol in ['reclutador', 'aplicador', 'evaluadorDesenlaces', 'analista'];
+    }
+
+    match /solicitudes_acceso/{uid} {
+      allow get: if autenticado() && (uid == request.auth.uid ||
+          (esPrincipal() && mismaInstitucionExistente()));
+      allow list: if esPrincipal() && mismaInstitucionExistente();
+      allow create: if autenticado() && uid == request.auth.uid &&
+          request.auth.token.email_verified == true &&
+          !perfilExiste() &&
+          request.resource.data.keys().hasAll([
+            'correo', 'nombre', 'institucion_codigo', 'estado', 'solicitado_en'
+          ]) && request.resource.data.keys().hasOnly([
+            'correo', 'nombre', 'institucion_codigo', 'estado', 'solicitado_en'
+          ]) &&
+          request.resource.data.correo == request.auth.token.email &&
+          request.resource.data.nombre is string &&
+          request.resource.data.nombre.size() >= 2 &&
+          request.resource.data.nombre.size() <= 120 &&
+          request.resource.data.institucion_codigo is string &&
+          exists(/databases/$(database)/documents/instituciones/$(request.resource.data.institucion_codigo)) &&
+          request.resource.data.estado == 'pendiente' &&
+          request.resource.data.solicitado_en == request.time;
+      allow update: if esPrincipal() && uid != request.auth.uid &&
+          mismaInstitucionExistente() && resource.data.estado == 'pendiente' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'estado', 'aprobado_por', 'aprobado_en', 'rol_aprobado'
+          ]) &&
+          request.resource.data.estado == 'aprobado' &&
+          request.resource.data.aprobado_por == request.auth.uid &&
+          request.resource.data.aprobado_en == request.time &&
+          rolAprobable(request.resource.data.rol_aprobado) &&
+          getAfter(/databases/$(database)/documents/investigadores/$(uid))
+              .data.roles == [request.resource.data.rol_aprobado];
+      allow delete: if false;
+    }
+
+    // El perfil se crea junto a la aprobación; el solicitante no lo escribe.
     match /investigadores/{uid} {
       allow get: if autenticado() && (uid == request.auth.uid ||
           (esPrincipal() && mismaInstitucionExistente()));
       allow list: if esPrincipal() && mismaInstitucionExistente();
-      allow create, update, delete: if false;
+      allow create: if esPrincipal() && uid != request.auth.uid &&
+          request.resource.data.institucion_codigo == perfil().institucion_codigo &&
+          request.resource.data.keys().hasAll([
+            'nombre', 'correo', 'institucion_codigo', 'roles', 'aprobado_por', 'aprobado_en'
+          ]) && request.resource.data.keys().hasOnly([
+            'nombre', 'correo', 'institucion_codigo', 'roles', 'aprobado_por', 'aprobado_en'
+          ]) &&
+          request.resource.data.roles is list &&
+          request.resource.data.roles.size() == 1 &&
+          rolAprobable(request.resource.data.roles[0]) &&
+          request.resource.data.aprobado_por == request.auth.uid &&
+          request.resource.data.aprobado_en == request.time &&
+          request.resource.data.correo ==
+              getAfter(/databases/$(database)/documents/solicitudes_acceso/$(uid)).data.correo &&
+          request.resource.data.nombre ==
+              getAfter(/databases/$(database)/documents/solicitudes_acceso/$(uid)).data.nombre &&
+          getAfter(/databases/$(database)/documents/solicitudes_acceso/$(uid)).data.estado == 'aprobado' &&
+          getAfter(/databases/$(database)/documents/solicitudes_acceso/$(uid)).data.institucion_codigo ==
+              request.resource.data.institucion_codigo &&
+          getAfter(/databases/$(database)/documents/solicitudes_acceso/$(uid)).data.rol_aprobado ==
+              request.resource.data.roles[0];
+      allow update, delete: if false;
     }
 
     match /estudios/{estudioId} {

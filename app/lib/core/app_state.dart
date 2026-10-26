@@ -14,6 +14,10 @@ typedef CargarRepositorioRemoto = Future<StudyRepository> Function(
     Investigador investigador);
 typedef CerrarSesionRemota = Future<void> Function();
 typedef RecuperarAccesoRemoto = Future<void> Function(String correo);
+typedef CrearCuentaRemota = Future<void> Function(
+    String correo, String contrasena);
+typedef SolicitarAccesoRemoto = Future<void> Function(
+    String correo, String contrasena, String nombre, String codigoCentro);
 
 /// Estado de sesión de la app.
 class AppState extends ChangeNotifier {
@@ -24,11 +28,15 @@ class AppState extends ChangeNotifier {
     CargarRepositorioRemoto? cargarRepositorioRemoto,
     CerrarSesionRemota? cerrarSesionRemota,
     RecuperarAccesoRemoto? recuperarAccesoRemoto,
+    CrearCuentaRemota? crearCuentaRemota,
+    SolicitarAccesoRemoto? solicitarAccesoRemoto,
   })  : _repo = almacen.repo,
         _autenticarUsuario = autenticarUsuario,
         _cargarRepositorioRemoto = cargarRepositorioRemoto,
         _cerrarSesionRemota = cerrarSesionRemota,
         _recuperarAccesoRemoto = recuperarAccesoRemoto,
+        _crearCuentaRemota = crearCuentaRemota,
+        _solicitarAccesoRemoto = solicitarAccesoRemoto,
         sincronizacion = sincronizacion ?? Sincronizacion(almacen.repo) {
     // Lo que pasa en la sincronización cambia lo que se ve en pantalla: el
     // contador de la cola, sobre todo.
@@ -50,6 +58,8 @@ class AppState extends ChangeNotifier {
   final CargarRepositorioRemoto? _cargarRepositorioRemoto;
   final CerrarSesionRemota? _cerrarSesionRemota;
   final RecuperarAccesoRemoto? _recuperarAccesoRemoto;
+  final CrearCuentaRemota? _crearCuentaRemota;
+  final SolicitarAccesoRemoto? _solicitarAccesoRemoto;
 
   /// A qué servidor habla este aparato y qué le falta por enviar.
   final Sincronizacion sincronizacion;
@@ -57,6 +67,23 @@ class AppState extends ChangeNotifier {
   StudyRepository get repo => _repo;
 
   bool get requiereAutenticacionRemota => _autenticarUsuario != null;
+
+  Future<void> crearCuenta(String correo, String contrasena) async {
+    final crear = _crearCuentaRemota;
+    if (crear == null) {
+      throw StateError('El registro remoto no está configurado.');
+    }
+    await crear(correo, contrasena);
+  }
+
+  Future<void> solicitarAcceso(String correo, String contrasena, String nombre,
+      String codigoCentro) async {
+    final solicitar = _solicitarAccesoRemoto;
+    if (solicitar == null) {
+      throw StateError('La solicitud de acceso no está configurada.');
+    }
+    await solicitar(correo, contrasena, nombre, codigoCentro);
+  }
 
   Future<void> recuperarAcceso(String correo) async {
     final recuperar = _recuperarAccesoRemoto;

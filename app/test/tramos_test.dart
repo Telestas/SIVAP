@@ -1,6 +1,7 @@
-import 'dart:ffi';
+import 'dart:ffi' show DynamicLibrary;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 import 'package:sqlite3/open.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:sivap/data/local/db/sivap_database.dart';
@@ -9,6 +10,12 @@ import 'package:sivap/data/local/seed_data.dart';
 import 'package:sivap/data/exportacion/consentimiento_archivable.dart';
 import 'package:sivap/data/remoto/lote.dart';
 import 'package:sivap/domain/models/patient.dart';
+import 'package:sivap/app.dart';
+import 'package:sivap/core/app_state.dart';
+import 'package:sivap/core/widgets/controls.dart';
+import 'package:sivap/data/local/almacen_local.dart';
+import 'package:sivap/features/enrollment/enrollment_screen.dart';
+import 'package:sivap/features/consent/consent_screen.dart';
 
 void main() {
   late Database db;
@@ -58,6 +65,110 @@ void main() {
   test('sin tramo reservado no se enrola ni crea ficha', () {
     expect(() => enrolar(), throwsStateError);
     expect(repo.pacientes(), isEmpty);
+  });
+
+  testWidgets('el enrolamiento integrado habilita guardar y firma sobre SQLite',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    repo.guardarConfiguracionAprobada(
+        institucion: Seed.coordinador,
+        ceiAprobado: false,
+        pruebasIntegradas: true,
+        consentimiento: {
+          'aprobado': false,
+          'tipo': 'prueba',
+          'habilitado': true,
+          'version': 'preproduccion-v1',
+          'codigo_cei': 'PRUEBA-SIN-VALIDEZ-CEI',
+          'vigente_desde': '2026-10-26',
+          'parrafos': ['Documento ficticio para pruebas integradas.'],
+          'declaraciones': ['Confirmo que es ficticio.'],
+        });
+    repo.incorporarTramo(tramo(1, '1'), 'preproduccion-1', 'aparato-1');
+    final estado = AppState(AlmacenLocal(
+        repo: repo,
+        persistente: true,
+        cifrado: true,
+        descripcion: 'SQLite para prueba integrada'))
+      ..iniciarSesion(Seed.principal);
+    addTearDown(estado.dispose);
+    await tester
+        .pumpWidget(raizDeLaApp(estado, inicio: const EnrollmentScreen()));
+    await tester.tap(find.text('Ninguno está presente'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('PREPRODUCCIÓN'), findsOneWidget);
+    expect(
+        tester
+            .widget<AppButton>(find.widgetWithText(AppButton, 'Guardar'))
+            .enabled,
+        isTrue);
+    final datos = {
+      'Nombre y apellidos': 'Paciente Inventado',
+      'Núm. de historia clínica': 'PRUEBA-001',
+      'Edad': '60',
+      'Teléfono de contacto': '55512345'
+    };
+    for (final entrada in datos.entries) {
+      await tester.enterText(
+          find.descendant(
+              of: find.byWidgetPredicate(
+                  (w) => w is LabeledField && w.label == entrada.key),
+              matching: find.byType(TextField)),
+          entrada.value);
+    }
+    await tester.tap(find.text('Guardar'));
+    await tester.pumpAndSettle();
+    expect(repo.pacientes(), hasLength(1));
+    expect(repo.asignacionesRestantes, 0);
+    await tester.tap(find.text('Ir a consentimiento'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirmo que es ficticio.'));
+    await tester.drag(find.byType(SignaturePad), const Offset(100, 20));
+    await tester.pump();
+    await tester.tap(find.text('Registrar consentimiento'));
+    await tester.pumpAndSettle();
+    expect(repo.pacientes().single.tieneConsentimiento, isTrue);
+    expect(repo.pendienteDeEnvio().consentimientos, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
+  test('preproducción usa SQLite, tramo y firma sin fingir aprobación clínica',
+      () {
+    final documento = {
+      'aprobado': false,
+      'tipo': 'prueba',
+      'habilitado': true,
+      'version': 'preproduccion-v1',
+      'codigo_cei': 'PRUEBA-SIN-VALIDEZ-CEI',
+      'vigente_desde': '2026-10-26',
+      'parrafos': ['Documento ficticio para pruebas integradas.'],
+      'declaraciones': ['Confirmo que es ficticio.'],
+    };
+    repo.guardarConfiguracionAprobada(
+        institucion: Seed.coordinador,
+        ceiAprobado: false,
+        consentimiento: documento,
+        pruebasIntegradas: true);
+    repo.incorporarTramo(tramo(1, '10'), 'preproduccion-1', 'aparato-1');
+    expect(repo.config.consentimientoAprobadoPorCei, isFalse);
+    expect(repo.config.pruebasIntegradas, isTrue);
+    final paciente = enrolar();
+    repo.registrarConsentimiento(
+        autor: Seed.reclutador,
+        patientId: paciente.id,
+        firmaTrazos: [
+          [(x: 0.1, y: 0.2), (x: 0.3, y: 0.4)]
+        ]);
+    expect(repo.paciente(paciente.id)!.tieneConsentimiento, isTrue);
+    expect(repo.pendienteDeEnvio().pacientes, hasLength(1));
+    repo.guardarConfiguracionAprobada(
+        institucion: Seed.coordinador,
+        ceiAprobado: false,
+        consentimiento: documento);
+    expect(repo.config.capturaHabilitada, isFalse);
+    expect(() => enrolar(), throwsStateError);
   });
 
   test('sin aprobación configurada no se usa un tramo ya reservado', () {

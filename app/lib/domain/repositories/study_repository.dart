@@ -17,6 +17,7 @@ class StudyConfig {
     required this.permiteAcumularRoles,
     required this.documentoConsentimiento,
     required this.definicionFormulario,
+    this.pruebasIntegradas = false,
   });
 
   final String nombreEstudio;
@@ -38,6 +39,11 @@ class StudyConfig {
   /// admite enrolamiento de pacientes reales. Se gestiona en configuración del
   /// estudio, nunca tocando el código.
   final bool consentimientoAprobadoPorCei;
+
+  /// Configuración explícita del servidor para ensayar con pacientes ficticios.
+  final bool pruebasIntegradas;
+  bool get capturaHabilitada =>
+      consentimientoAprobadoPorCei || pruebasIntegradas;
 
   final ConsentDocument documentoConsentimiento;
   final EstudioFormDefinition definicionFormulario;

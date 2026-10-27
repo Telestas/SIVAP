@@ -111,9 +111,11 @@ clínico, pero no ofrece una descarga ficticia mientras el backend no la genere.
   está en el código.
 - **Activar el estudio**: la app ya lee aprobación por centro y texto vigente
   de Firestore. Falta cargar los datos reales aprobados fuera del repositorio y
-  desplegar la función de tramos antes de enrolar. Las reglas ya se probaron y
-  publicaron; la función requiere actualizar Firebase al plan Blaze. Por
-  decisión del equipo, la captura real permanece bloqueada mientras tanto.
+  preparar la secuencia clínica antes de enrolar. Spark utiliza reservas
+  preparadas por CLI y reclamadas de forma exclusiva por el teléfono. El
+  proyecto actual permite pruebas integradas con cuenta y sincronización en
+  `preproduccion`; el consentimiento y la secuencia de prueba no habilitan
+  pacientes del estudio al cambiar a producción. Ver `DISTRIBUCION.md`.
 - **Consentimiento archivable.** El texto exacto y la firma ya se conservan y
   se descargan como HTML autónomo imprimible. Falta acordar si el archivo legal
   de custodia debe ser PDF/A y quién guarda su copia fuera de la app.

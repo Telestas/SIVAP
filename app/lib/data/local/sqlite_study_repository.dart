@@ -60,6 +60,8 @@ class SqliteStudyRepository extends StudyRepository {
         instituciones: [institucion],
         consentimientoAprobadoPorCei:
             datos['cei_aprobado'] == true && consentimiento['aprobado'] == true,
+        pruebasIntegradas: datos['pruebas_integradas'] == true &&
+            consentimiento['tipo'] == 'prueba',
         permiteAcumularRoles: Seed.config.permiteAcumularRoles,
         documentoConsentimiento: documento,
         definicionFormulario: Seed.config.definicionFormulario,
@@ -91,6 +93,7 @@ class SqliteStudyRepository extends StudyRepository {
     required Institucion institucion,
     required bool ceiAprobado,
     required Map<String, dynamic> consentimiento,
+    bool pruebasIntegradas = false,
   }) {
     if (!_usaTramos) return;
     final version = consentimiento['version'];
@@ -120,6 +123,7 @@ class SqliteStudyRepository extends StudyRepository {
           'institucion_codigo': institucion.codigo,
           'institucion_nombre': institucion.nombre,
           'cei_aprobado': ceiAprobado,
+          'pruebas_integradas': pruebasIntegradas,
           'consentimiento': consentimiento,
         }));
   }
@@ -428,7 +432,7 @@ class SqliteStudyRepository extends StudyRepository {
       throw StateError('Solo se puede enrolar en el centro de su perfil.');
     }
     if (_usaTramos &&
-        (!config.consentimientoAprobadoPorCei ||
+        (!config.capturaHabilitada ||
             !config.instituciones.any((c) => c.codigo == institucion.codigo))) {
       throw StateError('Falta la aprobación del centro o el consentimiento '
           'aprobado en la configuración del estudio.');
@@ -546,7 +550,7 @@ class SqliteStudyRepository extends StudyRepository {
       throw StateError('El paciente ya tiene consentimiento o no existe.');
     }
     if (_usaTramos &&
-        (!config.consentimientoAprobadoPorCei ||
+        (!config.capturaHabilitada ||
             !config.instituciones
                 .any((c) => c.codigo == autor.institucion.codigo))) {
       throw StateError('El consentimiento aprobado no está disponible.');

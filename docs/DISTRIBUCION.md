@@ -13,10 +13,52 @@ prueba y capturar eventos. Usa una secuencia ficticia ya generada. Todo queda en
 memoria, no se sincroniza y se borra al salir de la prueba. Nunca introducir
 datos de pacientes reales en esta sesión.
 
-En la sesión del estudio, **Solicitar tramo** pide al servicio una reserva
-exclusiva de posiciones de la secuencia A/B para este dispositivo. La función
-remota aún no está publicada, por lo que el enrolamiento real sigue bloqueado.
-Tampoco se sustituye por una asignación local improvisada.
+## Pruebas integradas con cuenta y sincronización
+
+Desde v0.2.6 el proyecto puede configurarse como `preproduccion` para ensayar con
+la cuenta Firebase habitual, SQLite cifrado, firmas, eventos y sincronización.
+La app muestra una banda permanente: solo pacientes ficticios. Los datos
+permanecen al cerrar y se consultan en el panel web. El consentimiento de prueba
+se identifica como ficticio, sin declarar una aprobación clínica inexistente.
+
+Se mantiene Spark. Cloud Functions requiere Blaze, por lo que la CLI reserva
+tramos de la secuencia en una transacción administrativa. Al pulsar **Solicitar
+tramo**, la app reclama la reserva de su cuenta en un único dispositivo. Las
+reglas impiden cambiar sus ramas o reclamarla desde otro teléfono. El servicio
+no usa contraseñas de administrador en la app; la CLI utiliza la sesión local
+de Firebase del operador. La secuencia completa queda privada en Firestore.
+
+Preparar por primera vez un proyecto de pruebas sin secuencia clínica:
+
+```bash
+npm --prefix firebase ci
+firebase login
+node firebase/administrar.mjs preparar-preproduccion --proyecto ID --centro CODIGO
+node firebase/administrar.mjs reservar --proyecto ID --uid UID_DE_LA_CUENTA
+```
+
+La reserva pendiente se conserva si se repite el comando. Después de reclamarla,
+la CLI puede preparar la siguiente; antes de recogerla en el mismo teléfono,
+la app exige sincronizar los pacientes del tramo anterior. El reparto avanza
+siempre y no repite posiciones. La secuencia inicial de preproducción contiene
+400 posiciones ficticias, con reservas de 50. Se genera fuera de la app.
+
+Si Node falla inmediatamente con `ETIMEDOUT` en una red de doble pila lenta,
+puede ejecutarse con `node --no-network-family-autoselection`.
+
+### Limpieza antes de uso clínico
+
+No basta borrar pacientes del servidor: el teléfono conserva la base cifrada,
+los acuses y las asignaciones pendientes. La limpieza de pruebas debe incluir
+identidades, pacientes, asignaciones, posiciones, consentimientos, eventos,
+auditoría de prueba, lotes, tramos y reservas; también hay que reiniciar la
+base local de cada aparato de pruebas. Conservar las cuentas y perfiles.
+
+Antes de activar producción se debe cambiar el entorno a `produccion`, cargar
+el consentimiento real aprobado y una nueva secuencia clínica, y registrar la
+aprobación de los centros. Las reglas vuelven a exigir esas aprobaciones fuera
+de preproducción. No se reutiliza la secuencia de prueba ni se limpia una base
+que ya contenga pacientes del estudio. Esta entrega no borra ningún dato.
 
 ## Acceso desde Cuba
 

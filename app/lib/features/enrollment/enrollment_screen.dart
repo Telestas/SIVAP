@@ -178,9 +178,10 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
     final state = AppScope.of(context);
     final config = state.repo.config;
     final bloqueadoPorConfiguracion =
-        state.repo.requiereTramos && !config.consentimientoAprobadoPorCei;
-    final sinTramo =
-        state.repo.requiereTramos && state.repo.asignacionesRestantes == 0;
+        state.repo.requiereTramos && !config.capturaHabilitada;
+    final sinTramo = _guardado == null &&
+        state.repo.requiereTramos &&
+        state.repo.asignacionesRestantes == 0;
     final accionesBloqueadas = bloqueadoPorConfiguracion || sinTramo;
 
     final puerta = _puerta(context);
@@ -238,7 +239,8 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
             // Anexo 4 —«si no marca ninguno, desplegar los campos»— y evita el
             // botón apagado que nadie sabe por qué está apagado.
             if (!excluido && resuelta) ...[
-              if (state.repo.requiereTramos &&
+              if (_guardado == null &&
+                  state.repo.requiereTramos &&
                   state.repo.asignacionesRestantes == 0) ...[
                 const StatusBanner(
                   texto: 'Este aparato no tiene posiciones reservadas. '
@@ -269,7 +271,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
                   alineaArriba: true,
                 ),
                 const SizedBox(height: 16),
-              ] else if (!config.consentimientoAprobadoPorCei) ...[
+              ] else if (!config.capturaHabilitada) ...[
                 const StatusBanner(
                   texto: 'La aprobación del centro o el consentimiento vigente '
                       'no están disponibles. El enrolamiento queda detenido.',

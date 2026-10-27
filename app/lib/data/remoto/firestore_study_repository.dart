@@ -69,7 +69,8 @@ class FirestoreStudyRepository extends StudyRepository {
   final List<Investigador> _investigadores = [];
 
   @override
-  StudyConfig get config => Seed.config;
+  StudyConfig get config => _config;
+  StudyConfig _config = Seed.config;
 
   @override
   bool get admiteEscritura => false;
@@ -80,6 +81,20 @@ class FirestoreStudyRepository extends StudyRepository {
   /// optimización: las reglas de Firestore rechazan una consulta que pudiera
   /// devolver documentos de otro centro.
   Future<void> cargar() async {
+    final estudio = await _firestore.collection('estudios').doc('livere').get();
+    if (estudio.data()?['entorno'] == 'preproduccion' &&
+        estudio.data()?['captura_habilitada'] == true) {
+      _config = StudyConfig(
+        nombreEstudio: Seed.config.nombreEstudio,
+        acronimo: Seed.config.acronimo,
+        instituciones: [investigador.institucion],
+        consentimientoAprobadoPorCei: false,
+        permiteAcumularRoles: Seed.config.permiteAcumularRoles,
+        documentoConsentimiento: Seed.config.documentoConsentimiento,
+        definicionFormulario: Seed.config.definicionFormulario,
+        pruebasIntegradas: true,
+      );
+    }
     final codigoCentro = investigador.institucion.codigo;
     Query<Map<String, dynamic>> visibles(String coleccion) {
       var consulta = _firestore

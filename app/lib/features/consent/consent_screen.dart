@@ -88,7 +88,8 @@ class _ConsentScreenState extends State<ConsentScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 13, 14, 16),
                   children: [
                     SectionLabel(
-                        state.esDemostracion
+                        state.esDemostracion ||
+                                state.repo.config.pruebasIntegradas
                             ? 'Documento ficticio para probar el flujo'
                             : 'Modelo aprobado · ${doc.codigoCei} · vigente desde ${doc.vigenteDesde}',
                         size: 10,

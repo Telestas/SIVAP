@@ -39,15 +39,29 @@ service cloud.firestore {
       return request.resource.data.autor_uid == request.auth.uid;
     }
 
+    function esPreproduccion() {
+      return exists(/databases/$(database)/documents/estudios/livere) &&
+          get(/databases/$(database)/documents/estudios/livere).data.entorno == 'preproduccion' &&
+          get(/databases/$(database)/documents/estudios/livere).data.captura_habilitada == true;
+    }
+
     function centroAprobado() {
       return perfilExiste() &&
           get(/databases/$(database)/documents/instituciones/$(perfil().institucion_codigo))
-              .data.cei_aprobado == true;
+              .data.cei_aprobado == true ||
+          (perfilExiste() && esPreproduccion() &&
+              get(/databases/$(database)/documents/instituciones/$(perfil().institucion_codigo))
+                  .data.habilitado_pruebas == true);
     }
 
     function consentimientoAprobado() {
       return get(/databases/$(database)/documents/estudios/livere/configuracion/consentimiento)
-          .data.aprobado == true;
+          .data.aprobado == true ||
+          (esPreproduccion() &&
+              get(/databases/$(database)/documents/estudios/livere/configuracion/consentimiento)
+                  .data.tipo == 'prueba' &&
+              get(/databases/$(database)/documents/estudios/livere/configuracion/consentimiento)
+                  .data.habilitado == true);
     }
 
     function asignacionReservada() {
@@ -174,7 +188,31 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /tramos/{id} {
-      allow read, write: if false;
+      allow get: if (tieneRol('reclutador') || esPrincipal()) &&
+          get(/databases/$(database)/documents/dispositivos/$(id)).data.autor_uid == request.auth.uid;
+      allow create, update: if (tieneRol('reclutador') || esPrincipal()) &&
+          centroAprobado() && consentimientoAprobado() &&
+          request.resource.data.autor_uid == request.auth.uid &&
+          mismaInstitucionNueva() &&
+          get(/databases/$(database)/documents/dispositivos/$(id)).data.autor_uid == request.auth.uid &&
+          get(/databases/$(database)/documents/reservas_tramos/$(request.auth.uid)).data.dispositivo_id == null &&
+          request.resource.data ==
+              get(/databases/$(database)/documents/reservas_tramos/$(request.auth.uid)).data.tramo &&
+          getAfter(/databases/$(database)/documents/reservas_tramos/$(request.auth.uid)).data.dispositivo_id == id;
+      allow list, delete: if false;
+    }
+    // La CLI administrativa crea la reserva; el cliente solo la reclama una vez.
+    match /reservas_tramos/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid &&
+          (tieneRol('reclutador') || esPrincipal());
+      allow update: if request.auth != null && request.auth.uid == uid &&
+          (tieneRol('reclutador') || esPrincipal()) &&
+          resource.data.dispositivo_id == null &&
+          request.resource.data.dispositivo_id is string &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dispositivo_id']) &&
+          getAfter(/databases/$(database)/documents/tramos/$(request.resource.data.dispositivo_id)).data ==
+              resource.data.tramo;
+      allow list, create, delete: if false;
     }
 
     match /dispositivos/{id} {
@@ -299,13 +337,13 @@ service cloud.firestore {
     match /lotes/{id} {
       allow create: if perfilExiste() && creadoPorUsuarioActual() &&
           mismaInstitucionNueva();
-      allow get: if autenticado() && resource.data.autor_uid == request.auth.uid;
+      allow get: if autenticado() &&
+          (!exists(/databases/$(database)/documents/lotes/$(id)) ||
+              resource.data.autor_uid == request.auth.uid);
       allow list, update, delete: if false;
     }
 
-    // La aleatorización no se implementa con acceso directo del cliente.
-    // Ninguna regla habilita secuencias ni tramos hasta disponer de una
-    // operación privilegiada, auditable y aprobada por el equipo.
+    // La secuencia completa y la administración permanecen privadas.
     match /{document=**} {
       allow read, write: if false;
     }

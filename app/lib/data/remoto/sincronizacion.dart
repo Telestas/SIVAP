@@ -12,6 +12,7 @@ import '../../domain/models/role.dart';
 import '../../domain/repositories/study_repository.dart';
 import 'cliente_api.dart';
 import 'cliente_firebase.dart';
+import 'cliente_tramos_firestore.dart';
 import 'cliente_remoto.dart';
 import 'autenticacion_firebase.dart';
 import 'cola_de_envio.dart';
@@ -105,9 +106,12 @@ class Sincronizacion extends ChangeNotifier {
     final repo = _repo;
     if (!repo.requiereTramos) return 'La demostración no usa tramos reales.';
     if (repo.asignacionesRestantes > 0) return null;
-    if (!repo.config.consentimientoAprobadoPorCei) {
+    if (!repo.config.capturaHabilitada) {
       return 'El enrolamiento sigue bloqueado: falta el consentimiento '
           'aprobado del estudio para este centro.';
+    }
+    if (repo.pendienteDeEnvio().pacientes.isNotEmpty) {
+      return 'Sincronice los pacientes pendientes antes de solicitar otro tramo.';
     }
     final usuario = FirebaseAuth.instance.currentUser;
     if (usuario == null || _sesion == null) {
@@ -128,6 +132,18 @@ class Sincronizacion extends ChangeNotifier {
         'etiqueta': repo.ajuste(claveEtiqueta) ?? 'Aparato de campo',
         'registrado_en': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true)).timeout(const Duration(seconds: 30));
+      if (repo.ajuste('entrega_tramos') == 'reservas') {
+        final datos = await ClienteTramosFirestore()
+            .recoger(usuario.uid, _dispositivoId)
+            .timeout(const Duration(seconds: 30));
+        repo.incorporarTramo(Tramo.desdeJson(datos),
+            datos['etiqueta'] as String, _dispositivoId);
+        notifyListeners();
+        return repo.asignacionesRestantes > 0
+            ? null
+            : 'El tramo está agotado. La administración debe preparar '
+                'la siguiente reserva desde la CLI.';
+      }
       final token = await usuario.getIdToken();
       final proyecto = Firebase.app().options.projectId;
       final respuesta = await http
@@ -333,7 +349,7 @@ class Sincronizacion extends ChangeNotifier {
           repo: _repo,
           api: api,
           dispositivoId: _dispositivoId,
-          maxPacientesPorLote: api is ClienteFirebase ? 5 : null);
+          maxPacientesPorLote: api is ClienteFirebase ? 1 : null);
       return _anotar(await cola.sincronizar());
     } finally {
       _enCurso = false;

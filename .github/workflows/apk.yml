@@ -198,9 +198,12 @@ jobs:
           prerelease: true
           body: |
             **Versión de pruebas operativas. No capture pacientes reales.**
-            La app usa el almacén cifrado de producción, pero el enrolamiento
-            permanece bloqueado mientras falten el consentimiento aprobado en
-            Firebase y la función que entrega tramos de aleatorización.
+            La app usa SQLite cifrado, la cuenta Firebase y sincronización real.
+            El proyecto actual está en preproducción para probar el recorrido
+            completo con pacientes ficticios. Las reservas de asignación se
+            preparan mediante la CLI administrativa y se recogen desde la app,
+            sin exigir Blaze. El consentimiento y la secuencia de prueba deben
+            sustituirse antes de habilitar el estudio clínico.
 
             ### Cuál descargar
 

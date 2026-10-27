@@ -132,9 +132,9 @@ class ColaDeEnvio {
     final pacientes = limitado
         ? pendiente.pacientes.take(maxPacientesPorLote!)
         : pendiente.pacientes;
-    // Cada evento consulta paciente y consentimiento en las reglas. Ocho
-    // dejan margen bajo el límite de 20 accesos por transacción de Firestore.
-    var cupo = 8;
+    // Seis dejan margen para perfil, centro, entorno y consentimiento vigente
+    // además de paciente y firma de cada evento (20 accesos por transacción).
+    var cupo = 6;
     final consentimientos = soloPacientes
         ? const <Consent>[]
         : pendiente.consentimientos

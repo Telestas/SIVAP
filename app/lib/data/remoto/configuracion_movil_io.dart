@@ -19,18 +19,30 @@ Future<StudyRepository> cargarConfiguracionMovil(
       FirebaseFirestore.instance
           .collection('estudios')
           .doc('livere')
+          .get(const GetOptions(source: Source.server)),
+      FirebaseFirestore.instance
+          .collection('estudios')
+          .doc('livere')
           .collection('configuracion')
           .doc('consentimiento')
           .get(const GetOptions(source: Source.server)),
     ]);
     final centro = resultados[0].data();
-    final consentimiento = resultados[1].data();
+    final estudio = resultados[1].data();
+    final consentimiento = resultados[2].data();
+    repo.guardarAjuste('entrega_tramos',
+        estudio?['entrega_tramos'] == 'reservas' ? 'reservas' : 'funcion');
     repo.guardarAjuste('configuracion_aprobada', '');
     if (centro != null && consentimiento != null) {
       repo.guardarConfiguracionAprobada(
         institucion: investigador.institucion,
         ceiAprobado: centro['cei_aprobado'] == true,
         consentimiento: consentimiento,
+        pruebasIntegradas: estudio?['entorno'] == 'preproduccion' &&
+            estudio?['captura_habilitada'] == true &&
+            centro['habilitado_pruebas'] == true &&
+            consentimiento['tipo'] == 'prueba' &&
+            consentimiento['habilitado'] == true,
       );
     }
   } on FirebaseException catch (error) {

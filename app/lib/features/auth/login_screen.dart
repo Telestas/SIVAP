@@ -284,7 +284,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            Text('v0.2.5 · ${config.definicionFormulario.version}',
+            Text('v0.2.6 · ${config.definicionFormulario.version}',
                 textAlign: TextAlign.center,
                 style: T.label(size: 10.5, color: T.faint, tracking: 0.05)),
           ],

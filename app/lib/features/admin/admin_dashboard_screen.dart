@@ -49,6 +49,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final movil = MediaQuery.sizeOf(context).width < 900;
     final state = AppScope.of(context);
     final pacientes = state.repo.pacientes().where((p) {
       if (_filtroProtocolo != null && p.protocolo != _filtroProtocolo) {
@@ -63,17 +64,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     return Scaffold(
       backgroundColor: T.surface,
+      drawer: movil
+          ? Drawer(
+              child: _BarraLateral(
+                seleccionada: _seccion,
+                secciones: _secciones,
+                onSelect: (s) {
+                  setState(() => _seccion = s);
+                  Navigator.of(context).pop();
+                },
+              ),
+            )
+          : null,
       body: Row(
         children: [
-          _BarraLateral(
-            seleccionada: _seccion,
-            secciones: _secciones,
-            onSelect: (s) => setState(() => _seccion = s),
-          ),
+          if (!movil)
+            _BarraLateral(
+              seleccionada: _seccion,
+              secciones: _secciones,
+              onSelect: (s) => setState(() => _seccion = s),
+            ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (movil)
+                  Builder(
+                      builder: (context) => Container(
+                            color: T.sidebar,
+                            child: SafeArea(
+                                bottom: false,
+                                child: Row(children: [
+                                  IconButton(
+                                    tooltip: 'Abrir secciones',
+                                    icon:
+                                        const Icon(Icons.menu, color: T.onInk),
+                                    onPressed: () =>
+                                        Scaffold.of(context).openDrawer(),
+                                  ),
+                                  Text(_seccion,
+                                      style: const TextStyle(
+                                          color: T.onInk,
+                                          fontWeight: FontWeight.w600)),
+                                ])),
+                          )),
                 _Cabecera(
                   seccion: _seccion,
                   onBuscar: (v) => setState(() => _busqueda = v),
@@ -83,7 +117,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(28, 18, 28, 28),
+                    padding: EdgeInsets.fromLTRB(
+                        movil ? 16 : 28, 18, movil ? 16 : 28, 28),
                     children: [
                       ...switch (_seccion) {
                         'Eventos' => [_PanelEventos(pacientes: pacientes)],
@@ -228,13 +263,14 @@ class _Cabecera extends StatelessWidget {
     final state = AppScope.of(context);
     final pacientes = state.repo.pacientes();
     final enA = pacientes.where((p) => p.protocolo == Protocolo.a).length;
+    final movil = MediaQuery.sizeOf(context).width < 700;
 
     return Container(
       decoration: const BoxDecoration(
         color: T.card,
         border: Border(bottom: BorderSide(color: T.lineFaint)),
       ),
-      padding: const EdgeInsets.fromLTRB(28, 20, 28, 16),
+      padding: EdgeInsets.fromLTRB(movil ? 16 : 28, 20, movil ? 16 : 28, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -260,7 +296,7 @@ class _Cabecera extends StatelessWidget {
                   ],
                 ),
               ),
-              if (state.enCola > 0) ...[
+              if (!movil && state.enCola > 0) ...[
                 // Ancho fijo: dentro de un Row la banda no tiene restricción
                 // horizontal propia y su `Expanded` interno no sabría medirse.
                 SizedBox(
@@ -276,14 +312,14 @@ class _Cabecera extends StatelessWidget {
                 ),
                 const SizedBox(width: 9),
               ],
-              if (seccion == 'Pacientes')
+              if (!movil && seccion == 'Pacientes')
                 SizedBox(
                   width: 140,
                   child: AppButton('Exportar',
                       primary: false, onTap: () => _avisoExportacion(context)),
                 ),
-              const SizedBox(width: 9),
-              if (state.repo.admiteEscritura)
+              if (!movil) const SizedBox(width: 9),
+              if (!movil && state.repo.admiteEscritura)
                 SizedBox(
                   width: 120,
                   child: AppButton('+ Enrolar',
@@ -292,34 +328,56 @@ class _Cabecera extends StatelessWidget {
                 ),
             ],
           ),
+          if (movil &&
+              (state.enCola > 0 ||
+                  seccion == 'Pacientes' ||
+                  state.repo.admiteEscritura)) ...[
+            const SizedBox(height: 12),
+            if (state.enCola > 0)
+              StatusBanner(
+                texto: '${state.enCola} registros en cola',
+                accion: 'SINCRONIZAR',
+                onAccion: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const SincronizacionScreen())),
+              ),
+            if (state.enCola > 0) const SizedBox(height: 8),
+            Row(children: [
+              if (seccion == 'Pacientes')
+                Expanded(
+                    child: AppButton('Exportar',
+                        primary: false,
+                        onTap: () => _avisoExportacion(context))),
+              if (seccion == 'Pacientes' && state.repo.admiteEscritura)
+                const SizedBox(width: 8),
+              if (state.repo.admiteEscritura)
+                Expanded(
+                    child: AppButton('+ Enrolar',
+                        onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const EnrollmentScreen())))),
+            ]),
+          ],
           if (seccion == 'Pacientes') ...[
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    onChanged: onBuscar,
-                    style: const TextStyle(fontSize: 13.5, color: T.ink),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: 'Buscar por código, nombre o historia clínica',
-                      hintStyle:
-                          const TextStyle(fontSize: 13.5, color: T.faint),
-                      filled: true,
-                      fillColor: T.card,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 9),
-                      border: fieldBorder(T.line),
-                      enabledBorder: fieldBorder(T.line),
-                      focusedBorder: fieldBorder(T.accent, ancho: 1.5),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _FiltroProtocolo(
-                    valor: filtroProtocolo, onChanged: onFiltroProtocolo),
-              ],
-            ),
+            if (movil)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _BuscadorPacientes(onBuscar: onBuscar),
+                  const SizedBox(height: 8),
+                  _FiltroProtocolo(
+                      valor: filtroProtocolo, onChanged: onFiltroProtocolo),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(child: _BuscadorPacientes(onBuscar: onBuscar)),
+                  const SizedBox(width: 8),
+                  _FiltroProtocolo(
+                      valor: filtroProtocolo, onChanged: onFiltroProtocolo),
+                ],
+              ),
           ],
         ],
       ),
@@ -346,6 +404,29 @@ class _Cabecera extends StatelessWidget {
       behavior: SnackBarBehavior.floating,
     ));
   }
+}
+
+class _BuscadorPacientes extends StatelessWidget {
+  const _BuscadorPacientes({required this.onBuscar});
+  final ValueChanged<String> onBuscar;
+
+  @override
+  Widget build(BuildContext context) => TextField(
+        onChanged: onBuscar,
+        style: const TextStyle(fontSize: 13.5, color: T.ink),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'Buscar por código, nombre o historia clínica',
+          hintStyle: const TextStyle(fontSize: 13.5, color: T.faint),
+          filled: true,
+          fillColor: T.card,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          border: fieldBorder(T.line),
+          enabledBorder: fieldBorder(T.line),
+          focusedBorder: fieldBorder(T.accent, ancho: 1.5),
+        ),
+      );
 }
 
 class _FiltroProtocolo extends StatelessWidget {
@@ -401,37 +482,46 @@ class _TablaPacientes extends StatelessWidget {
   Widget build(BuildContext context) {
     final repo = AppScope.of(context).repo;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: T.card,
-        border: Border.all(color: T.lineSoft),
-        borderRadius: BorderRadius.circular(T.radiusPanel),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Container(
-            color: T.subtle,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-            child: Row(
-              children: [
-                for (var i = 0; i < _titulos.length; i++)
-                  Expanded(
-                    flex: (columnas[i] * 10).round(),
-                    child: SectionLabel(_titulos[i], size: 10),
-                  ),
-              ],
-            ),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(
+        width: MediaQuery.sizeOf(context).width < 900
+            ? 900
+            : MediaQuery.sizeOf(context).width - 290,
+        child: Container(
+          decoration: BoxDecoration(
+            color: T.card,
+            border: Border.all(color: T.lineSoft),
+            borderRadius: BorderRadius.circular(T.radiusPanel),
           ),
-          if (pacientes.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 28),
-              child: Text('Ningún paciente coincide con el filtro.',
-                  style: TextStyle(fontSize: 13.5, color: T.faint)),
-            ),
-          for (final p in pacientes)
-            _FilaPaciente(paciente: p, eventos: repo.eventosDe(p.id)),
-        ],
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              Container(
+                color: T.subtle,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _titulos.length; i++)
+                      Expanded(
+                        flex: (columnas[i] * 10).round(),
+                        child: SectionLabel(_titulos[i], size: 10),
+                      ),
+                  ],
+                ),
+              ),
+              if (pacientes.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 28),
+                  child: Text('Ningún paciente coincide con el filtro.',
+                      style: TextStyle(fontSize: 13.5, color: T.faint)),
+                ),
+              for (final p in pacientes)
+                _FilaPaciente(paciente: p, eventos: repo.eventosDe(p.id)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -521,9 +611,10 @@ class _FilaPaciente extends StatelessWidget {
               5,
               Row(children: [
                 SyncDot(enCola ? SyncStatus.enCola : SyncStatus.sincronizado),
-                const SizedBox(width: 6),
-                Text(enCola ? 'En cola' : 'Al día',
-                    style: const TextStyle(fontSize: 12.5, color: T.body)),
+                const SizedBox(width: 4),
+                Flexible(
+                    child: Text(enCola ? 'En cola' : 'Al día',
+                        style: const TextStyle(fontSize: 12.5, color: T.body))),
               ]),
             ),
             celda(
@@ -702,6 +793,11 @@ class _PanelUsuariosState extends State<_PanelUsuarios> {
       builder: (context) => SimpleDialog(
         title: Text('Aprobar a ${solicitud.data()['nombre']}'),
         children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: Text('El rol de Investigador principal se asigna mediante '
+                'aprovisionamiento administrativo en Firebase.'),
+          ),
           for (final opcion in Rol.values)
             if (opcion != Rol.investigadorPrincipal)
               SimpleDialogOption(
@@ -760,14 +856,25 @@ class _PanelUsuariosState extends State<_PanelUsuarios> {
                 const SizedBox(height: 8),
                 for (final solicitud in pendientes)
                   Card(
-                    child: ListTile(
-                      title: Text('${solicitud.data()['nombre']}'),
-                      subtitle: Text('${solicitud.data()['correo']}'),
-                      trailing: FilledButton(
-                        onPressed: _ocupado
-                            ? null
-                            : () => _elegirRol(solicitud, codigo),
-                        child: const Text('Aprobar'),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${solicitud.data()['nombre']}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
+                          Text('${solicitud.data()['correo']}'),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FilledButton(
+                              onPressed: _ocupado
+                                  ? null
+                                  : () => _elegirRol(solicitud, codigo),
+                              child: const Text('Aprobar'),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -932,14 +1039,15 @@ class _FilaResumen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 18),
-            Text(derecha,
-                textAlign: TextAlign.right,
-                style: const TextStyle(
-                    fontFamily: T.mono,
-                    fontFamilyFallback: T.monoFallback,
-                    fontSize: 11.5,
-                    color: T.body)),
+            const SizedBox(width: 12),
+            Flexible(
+                child: Text(derecha,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                        fontFamily: T.mono,
+                        fontFamilyFallback: T.monoFallback,
+                        fontSize: 11.5,
+                        color: T.body))),
           ],
         ),
       );
@@ -971,8 +1079,10 @@ class _PanelAuditoria extends StatelessWidget {
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: T.lineHair)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 12,
+              runSpacing: 4,
               children: [
                 Text(
                     limite == null
@@ -1004,37 +1114,56 @@ class _PanelAuditoria extends StatelessWidget {
               decoration: const BoxDecoration(
                 border: Border(bottom: BorderSide(color: Color(0xFFF2F3F4))),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 11,
-                    child: Text(F.fechaHora(a.ocurridoEn),
-                        style: const TextStyle(
-                            fontFamily: T.mono,
-                            fontFamilyFallback: T.monoFallback,
-                            fontSize: 12,
-                            color: T.muted)),
-                  ),
-                  Expanded(
-                    flex: 16,
-                    child: Text(a.descripcionObjetivo,
-                        style: const TextStyle(fontSize: 13, color: T.ink)),
-                  ),
-                  Expanded(
-                    flex: 26,
-                    child: _Cambio(
-                        campo: a.campo,
-                        anterior: a.valorAnterior,
-                        nuevo: a.valorNuevo,
-                        motivo: a.motivo),
-                  ),
-                  Expanded(
-                    flex: 10,
-                    child: Text(a.autorNombre,
-                        style: const TextStyle(fontSize: 13, color: T.body)),
-                  ),
-                ],
-              ),
+              child: MediaQuery.sizeOf(context).width < 900
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(F.fechaHora(a.ocurridoEn),
+                            style:
+                                const TextStyle(fontSize: 12, color: T.muted)),
+                        const SizedBox(height: 4),
+                        Text(a.descripcionObjetivo),
+                        _Cambio(
+                            campo: a.campo,
+                            anterior: a.valorAnterior,
+                            nuevo: a.valorNuevo,
+                            motivo: a.motivo),
+                        Text(a.autorNombre),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          flex: 11,
+                          child: Text(F.fechaHora(a.ocurridoEn),
+                              style: const TextStyle(
+                                  fontFamily: T.mono,
+                                  fontFamilyFallback: T.monoFallback,
+                                  fontSize: 12,
+                                  color: T.muted)),
+                        ),
+                        Expanded(
+                          flex: 16,
+                          child: Text(a.descripcionObjetivo,
+                              style:
+                                  const TextStyle(fontSize: 13, color: T.ink)),
+                        ),
+                        Expanded(
+                          flex: 26,
+                          child: _Cambio(
+                              campo: a.campo,
+                              anterior: a.valorAnterior,
+                              nuevo: a.valorNuevo,
+                              motivo: a.motivo),
+                        ),
+                        Expanded(
+                          flex: 10,
+                          child: Text(a.autorNombre,
+                              style:
+                                  const TextStyle(fontSize: 13, color: T.body)),
+                        ),
+                      ],
+                    ),
             ),
         ],
       ),

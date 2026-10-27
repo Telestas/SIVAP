@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/app_state.dart';
@@ -46,12 +47,11 @@ class Raiz extends StatelessWidget {
     final state = AppScope.of(context);
     if (state.usuario == null) return const LoginScreen();
 
-    // Quien administra o analiza trabaja en escritorio; en pantalla estrecha
-    // recibe la misma lista que el resto, para no dejarlo sin app en el móvil.
+    // El panel web muestra sus secciones también en navegadores estrechos.
     final usuario = state.usuarioActual;
     final ancha = MediaQuery.sizeOf(context).width >= 900;
     final panel = usuario.puedeGestionarUsuarios || usuario.puedeExportar;
-    return !state.esDemostracion && panel && ancha
+    return !state.esDemostracion && panel && (ancha || kIsWeb)
         ? const AdminDashboardScreen()
         : const PatientListScreen();
   }

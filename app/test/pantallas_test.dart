@@ -10,6 +10,8 @@ import 'package:sivap/domain/models/evento_clinico.dart';
 import 'package:sivap/domain/models/patient.dart';
 import 'package:sivap/features/admin/admin_dashboard_screen.dart';
 import 'package:sivap/features/auth/login_screen.dart';
+import 'package:sivap/features/auth/solicitar_acceso_screen.dart';
+import 'package:sivap/data/remoto/autenticacion_firebase.dart';
 import 'package:sivap/domain/models/role.dart';
 import 'package:sivap/features/enrollment/enrollment_screen.dart';
 import 'package:sivap/features/eventos/evento_form_screen.dart';
@@ -273,6 +275,105 @@ void main() {
     expect(find.bySemanticsLabel('Logo de SIVAP'), findsOneWidget);
     expect(find.widgetWithText(TextField, 'correo@institucion.cu'),
         findsOneWidget);
+  });
+
+  testWidgets('el mismo formulario solicita acceso para una cuenta existente',
+      (tester) async {
+    lienzo(tester, alto: 850);
+    var intentosCrear = 0;
+    var solicitudes = 0;
+    final repo = InMemoryStudyRepository();
+    final estado = AppState(
+      AlmacenLocal(
+          repo: repo,
+          persistente: false,
+          cifrado: false,
+          descripcion: 'Prueba de acceso'),
+      autenticarUsuario: (_, __) async => Seed.principal,
+      crearCuentaRemota: (_, __) async {
+        intentosCrear++;
+        throw const CuentaYaExiste();
+      },
+      solicitarAccesoRemoto: (_, __, nombre, centro) async {
+        expect(nombre, 'Persona inventada');
+        expect(centro, 'C01');
+        solicitudes++;
+      },
+    );
+    addTearDown(estado.dispose);
+    await tester
+        .pumpWidget(montar(const SolicitarAccesoScreen(), estado: estado));
+    await tester.enterText(
+        find.byType(TextField).at(0), 'persona@ejemplo.test');
+    await tester.enterText(find.byType(TextField).at(1), 'clave-prueba');
+    await tester.enterText(find.byType(TextField).at(2), 'Persona inventada');
+    await tester.enterText(find.byType(TextField).at(3), 'C01');
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(intentosCrear, 1);
+    expect(solicitudes, 1);
+    expect(find.textContaining('Solicitud enviada'), findsOneWidget);
+    expect(find.text('Ya tengo cuenta'), findsNothing);
+  });
+
+  testWidgets('una cuenta nueva pide verificar antes de enviar solicitud',
+      (tester) async {
+    lienzo(tester, alto: 850);
+    var solicitudes = 0;
+    final repo = InMemoryStudyRepository();
+    final estado = AppState(
+      AlmacenLocal(
+          repo: repo,
+          persistente: false,
+          cifrado: false,
+          descripcion: 'Prueba de acceso'),
+      autenticarUsuario: (_, __) async => Seed.principal,
+      crearCuentaRemota: (_, __) async {},
+      solicitarAccesoRemoto: (_, __, ___, ____) async {
+        solicitudes++;
+      },
+    );
+    addTearDown(estado.dispose);
+    await tester
+        .pumpWidget(montar(const SolicitarAccesoScreen(), estado: estado));
+    await tester.enterText(
+        find.byType(TextField).at(0), 'persona@ejemplo.test');
+    await tester.enterText(find.byType(TextField).at(1), 'clave-prueba');
+    await tester.enterText(find.byType(TextField).at(2), 'Persona inventada');
+    await tester.enterText(find.byType(TextField).at(3), 'C01');
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(solicitudes, 0);
+    expect(find.textContaining('Verifique el correo'), findsOneWidget);
+  });
+
+  testWidgets('el panel estrecho deja entrar a Usuarios y roles',
+      (tester) async {
+    lienzo(tester, ancho: 360, alto: 720);
+    final estado = AppState.enMemoria()..iniciarSesion(Seed.principal);
+    addTearDown(estado.dispose);
+    await tester
+        .pumpWidget(montar(const AdminDashboardScreen(), estado: estado));
+    for (final seccion in [
+      'Usuarios y roles',
+      'Eventos',
+      'Consentimientos',
+      'Auditoría',
+      'Exportar datos',
+      'Pacientes',
+    ]) {
+      await tester.tap(find.byTooltip('Abrir secciones'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(seccion).last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: seccion);
+    }
+    await tester.tap(find.byTooltip('Abrir secciones'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Usuarios y roles').last);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('perfiles del centro'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('el acceso limita el ancho de los campos en escritorio',

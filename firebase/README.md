@@ -28,6 +28,16 @@ no concede acceso clínico. El investigador principal ve únicamente las
 solicitudes de su centro en «Usuarios y roles» y aprueba una función permitida;
 la aprobación crea el perfil y cierra la solicitud en un mismo lote. El rol de
 investigador principal sigue requiriendo aprovisionamiento administrativo.
+Para crear otro principal, un operador con permisos administrativos en Firebase
+verifica primero la identidad y crea la cuenta en Authentication (o usa la
+cuenta que esa persona ya verificó). Copia su UID y crea en Firestore el
+documento `investigadores/{uid}` con `nombre` y `correo` de esa cuenta,
+`institucion_codigo` del centro autorizado y `roles` como arreglo con el único
+valor `investigadorPrincipal`. Si existe una solicitud pendiente para el mismo
+UID, el operador debe resolverla administrativamente para que no siga figurando
+como pendiente; el panel no puede conceder ese rol. El operador registra esta
+asignación en el expediente administrativo del estudio. Esta operación exige
+acceso a la consola de Firebase y no se realiza desde una cuenta solicitante.
 Cada perfil,
 con el UID de Firebase Authentication como identificador, debe contener
 `nombre`, `institucion_codigo` y `roles`; `institucion_nombre` es opcional. El

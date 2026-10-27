@@ -19,6 +19,9 @@ class AutenticacionFirebase {
           email: correo.trim(), password: contrasena);
       await credencial.user!.sendEmailVerification();
     } on FirebaseAuthException catch (error) {
+      if (error.code == 'email-already-in-use') {
+        throw const CuentaYaExiste();
+      }
       throw AccesoFirebaseRechazado(
           mensajeAutenticacion(error.code, detalle: error.message));
     } finally {
@@ -198,8 +201,7 @@ class AutenticacionFirebase {
         'user-not-found' =>
           'Correo o contraseña incorrectos.',
         'network-request-failed' => 'Sin conexión con Firebase.',
-        'email-already-in-use' =>
-          'El correo ya tiene una cuenta. Use «Ya tengo cuenta».',
+        'email-already-in-use' => 'El correo ya tiene una cuenta.',
         'weak-password' => 'La contraseña debe tener al menos seis caracteres.',
         'invalid-email' => 'El correo no tiene un formato válido.',
         'operation-not-allowed' =>
@@ -228,4 +230,9 @@ class AccesoFirebaseRechazado implements Exception {
   final String mensaje;
   @override
   String toString() => mensaje;
+}
+
+/// Permite continuar el mismo formulario con una cuenta ya registrada.
+class CuentaYaExiste implements Exception {
+  const CuentaYaExiste();
 }

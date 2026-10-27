@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SIVAP — Descargar la app</title>
-<meta name="description" content="Descarga de la aplicación de campo del estudio de cohorte SIVAP.">
+<meta name="description" content="Descarga de SIVAP, aplicación de campo del ensayo LIVERE.">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/png" href="icono.png">
 <style>
@@ -66,7 +66,14 @@ body {
   justify-content: center;
 }
 
-main { width: 100%; max-width: 560px; }
+main { width: 100%; max-width: 940px; min-width: 0; }
+.cabecera { display: flex; align-items: center; gap: 18px; margin-bottom: 24px; }
+.logo { width: 76px; height: 76px; flex: none; }
+.cabecera-texto { min-width: 0; }
+.cabecera .marca { margin: 0 0 7px; }
+.cabecera h1 { margin: 0; font-size: clamp(24px, 4vw, 34px); }
+.contenido { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.contenido .tarjeta { min-width: 0; margin-bottom: 0; }
 
 .marca {
   font-family: var(--mono);
@@ -142,7 +149,7 @@ h1 {
 .datos {
   margin-top: 18px;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 8px 16px;
   font-size: 13px;
   align-items: baseline;
@@ -207,6 +214,22 @@ code {
 }
 .pie a { color: var(--accent); }
 
+@media (max-width: 680px) {
+  body { padding: 24px 16px 40px; }
+  .contenido { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .logo { width: 60px; height: 60px; }
+  .cabecera { gap: 14px; margin-bottom: 18px; }
+  .tarjeta { padding: 18px; }
+  .marca { font-size: 10px; letter-spacing: .08em; }
+}
+@media (max-width: 360px) {
+  body { padding-inline: 12px; }
+  .datos { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+  .datos dd { margin-bottom: 9px; }
+  .cabecera .marca { font-size: 9px; }
+  .logo { width: 52px; height: 52px; }
+}
+
 @media (prefers-color-scheme: dark) {
   /* Deliberadamente sin tema oscuro: la app es de superficie clara y esta
      página es su puerta de entrada. Dos estéticas distintas confundirían. */
@@ -215,8 +238,13 @@ code {
 </head>
 <body>
 <main>
-  <p class="marca">Sistema SIVAP · nombre de trabajo</p>
-  <h1>Aplicación de campo</h1>
+  <header class="cabecera">
+    <img class="logo" src="logo.png" width="76" height="76" alt="Logo de SIVAP">
+    <div class="cabecera-texto">
+      <p class="marca">SIVAP · Ensayo LIVERE</p>
+      <h1>Aplicación de campo</h1>
+    </div>
+  </header>
   <p class="entradilla">
     Registro clínico del ensayo LIVERE. Captura de eventos sin conexión,
     con la base de datos del dispositivo cifrada.
@@ -225,12 +253,13 @@ code {
   <div class="banda">
     <span class="punto" aria-hidden="true"></span>
     <span>
-      <strong>Compruebe la versión indicada debajo.</strong><br>
-      La versión publicada permite probar instalación, acceso y pantallas con
-      captura real bloqueada mientras falten los requisitos del estudio.
+      <strong>Versión para pruebas.</strong><br>
+      Utilice únicamente pacientes ficticios para comprobar el funcionamiento
+      de la app antes de su uso clínico.
     </span>
   </div>
 
+  <div class="contenido">
   <div class="tarjeta">
     <a class="boton" id="descarga" href="#" rel="noopener">Descargar para Android</a>
     <dl class="datos">
@@ -263,6 +292,7 @@ code {
     </ol>
   </div>
 
+  </div>
   <p class="pie">
     Los datos capturados se guardan cifrados en el propio dispositivo y no
     salen de él hasta que haya conexión. Al desinstalar la app se borra la

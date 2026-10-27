@@ -24,12 +24,15 @@ Se observó una respuesta HTML `403 Forbidden` de Identity Toolkit sin VPN,
 mientras la misma cuenta y configuración funcionan con VPN. Google indica que
 restringe algunos servicios de Cloud en Cuba:
 <https://docs.cloud.google.com/billing/docs/how-to/create-billing-account>.
-Esto apunta a una restricción por origen de la conexión, no a un problema de
-contraseña; no identifica por sí solo cuál servicio aplica la restricción. La
-app muestra un mensaje breve para ese caso. Una configuración de Firebase no
-puede convertir ese HTML 403 en una sesión válida. Hasta contar con un backend
-aprobado y accesible, el acceso real requiere una ruta de red que alcance los
-servicios de Firebase. La prueba local descrita arriba funciona sin esa ruta.
+Se verificó que las claves Android y web permiten `identitytoolkit.googleapis.com`
+y `securetoken.googleapis.com`, las API necesarias para autenticación. Junto con
+el acceso correcto por VPN, esto apunta a una restricción por origen de la
+conexión, no a un problema de contraseña o de lista de API de la clave; no
+identifica por sí solo cuál servicio aplica la restricción. La app muestra un
+mensaje breve para ese caso. Una configuración de Firebase no puede convertir
+ese HTML 403 en una sesión válida. Hasta contar con un backend aprobado y
+accesible, el acceso real requiere una ruta de red que alcance los servicios
+de Firebase. La prueba local descrita arriba funciona sin esa ruta.
 
 ### Se publican dos APK, y hay que saber por qué
 

@@ -155,123 +155,135 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: T.surface,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
-          children: [
-            Row(children: [
-              Image.asset('assets/icono/sivap_icon_rounded_512.png',
-                  width: 58, height: 58, semanticLabel: 'Logo de SIVAP'),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('SIVAP',
-                        style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                            color: T.ink)),
-                    Text('Ensayo ${config.acronimo}',
-                        style:
-                            const TextStyle(fontSize: 13, color: T.secondary)),
+        child: LayoutBuilder(
+          builder: (context, limites) => Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: limites.maxWidth > 640 ? 460 : limites.maxWidth,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
+                children: [
+                  Row(children: [
+                    Image.asset('assets/icono/sivap_icon_rounded_512.png',
+                        width: 58, height: 58, semanticLabel: 'Logo de SIVAP'),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('SIVAP',
+                              style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                  color: T.ink)),
+                          Text('Ensayo ${config.acronimo}',
+                              style: const TextStyle(
+                                  fontSize: 13, color: T.secondary)),
+                        ],
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(config.nombreEstudio,
+                      style: const TextStyle(
+                          fontSize: 13, color: T.secondary, height: 1.5)),
+                  const SizedBox(height: 22),
+
+                  // Qué garantiza el almacén de esta compilación. Si no cifra o no
+                  // persiste, se dice aquí y no en letra pequeña.
+                  if (state.almacen.advertencia != null) ...[
+                    const SizedBox(height: 12),
+                    StatusBanner(
+                        texto: state.almacen.advertencia!, alineaArriba: true),
                   ],
-                ),
+
+                  // El CEI aún no ha aprobado: la app funciona, pero no con pacientes
+                  // reales. Decirlo aquí y no en letra pequeña es deliberado.
+                  if (!remoto && !config.consentimientoAprobadoPorCei) ...[
+                    const SizedBox(height: 12),
+                    const StatusBanner(
+                      texto:
+                          'La aprobación del centro o el consentimiento vigente '
+                          'aún no están disponibles en este aparato. No se admite '
+                          'el enrolamiento.',
+                      alineaArriba: true,
+                    ),
+                  ],
+
+                  const SizedBox(height: 22),
+                  LabeledField(
+                      label: 'Usuario',
+                      controller: _usuario,
+                      hint: remoto
+                          ? 'correo@institucion.cu'
+                          : 'Ej.: investigador.uno'),
+                  const SizedBox(height: 14),
+                  LabeledField(
+                    label: 'Contraseña',
+                    controller: _clave,
+                    oculto: true,
+                    onSubmitted: (_) {
+                      if (!_entrando) _entrar();
+                    },
+                  ),
+
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    StatusBanner(texto: _error!, alineaArriba: true),
+                  ],
+
+                  if (!remoto) ...[
+                    const SizedBox(height: 22),
+                    const SectionLabel('Función en el ensayo'),
+                    const SizedBox(height: 6),
+                    const Text(
+                        'El diseño del ensayo separa funciones por razones '
+                        'metodológicas: quien selecciona pacientes está cegado a la '
+                        'secuencia, y quien evalúa desenlaces, a la rama asignada. '
+                        'Elegir una rellena el usuario, y al revés.',
+                        style: TextStyle(
+                            fontSize: 12, color: T.secondary, height: 1.45)),
+                    const SizedBox(height: 12),
+                    for (final i in Seed.investigadores) ...[
+                      _OpcionFuncion(
+                        investigador: i,
+                        seleccionado: _seleccionado.id == i.id,
+                        onTap: () => _elegir(i),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
+
+                  const SizedBox(height: 20),
+                  AppButton(_entrando ? 'Entrando…' : 'Entrar',
+                      enabled: !_entrando, onTap: _entrar),
+                  if (remoto) ...[
+                    TextButton(
+                      onPressed: _entrando
+                          ? null
+                          : () => Navigator.of(context).push(MaterialPageRoute(
+                              builder: (_) => const SolicitarAccesoScreen())),
+                      child: const Text('Solicitar acceso o crear cuenta'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed:
+                          _entrando || _recuperando ? null : _recuperarAcceso,
+                      child: Text(_recuperando
+                          ? 'Solicitando…'
+                          : '¿No recibió el correo? Enviar recuperación'),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Text('v0.2.6 · ${config.definicionFormulario.version}',
+                      textAlign: TextAlign.center,
+                      style:
+                          T.label(size: 10.5, color: T.faint, tracking: 0.05)),
+                ],
               ),
-            ]),
-            const SizedBox(height: 8),
-            Text(config.nombreEstudio,
-                style: const TextStyle(
-                    fontSize: 13, color: T.secondary, height: 1.5)),
-            const SizedBox(height: 22),
-
-            // Qué garantiza el almacén de esta compilación. Si no cifra o no
-            // persiste, se dice aquí y no en letra pequeña.
-            if (state.almacen.advertencia != null) ...[
-              const SizedBox(height: 12),
-              StatusBanner(
-                  texto: state.almacen.advertencia!, alineaArriba: true),
-            ],
-
-            // El CEI aún no ha aprobado: la app funciona, pero no con pacientes
-            // reales. Decirlo aquí y no en letra pequeña es deliberado.
-            if (!remoto && !config.consentimientoAprobadoPorCei) ...[
-              const SizedBox(height: 12),
-              const StatusBanner(
-                texto: 'La aprobación del centro o el consentimiento vigente '
-                    'aún no están disponibles en este aparato. No se admite '
-                    'el enrolamiento.',
-                alineaArriba: true,
-              ),
-            ],
-
-            const SizedBox(height: 22),
-            LabeledField(
-                label: 'Usuario',
-                controller: _usuario,
-                hint:
-                    remoto ? 'correo@institucion.cu' : 'Ej.: investigador.uno'),
-            const SizedBox(height: 14),
-            LabeledField(
-              label: 'Contraseña',
-              controller: _clave,
-              oculto: true,
-              onSubmitted: (_) {
-                if (!_entrando) _entrar();
-              },
             ),
-
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              StatusBanner(texto: _error!, alineaArriba: true),
-            ],
-
-            if (!remoto) ...[
-              const SizedBox(height: 22),
-              const SectionLabel('Función en el ensayo'),
-              const SizedBox(height: 6),
-              const Text(
-                  'El diseño del ensayo separa funciones por razones '
-                  'metodológicas: quien selecciona pacientes está cegado a la '
-                  'secuencia, y quien evalúa desenlaces, a la rama asignada. '
-                  'Elegir una rellena el usuario, y al revés.',
-                  style: TextStyle(
-                      fontSize: 12, color: T.secondary, height: 1.45)),
-              const SizedBox(height: 12),
-              for (final i in Seed.investigadores) ...[
-                _OpcionFuncion(
-                  investigador: i,
-                  seleccionado: _seleccionado.id == i.id,
-                  onTap: () => _elegir(i),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ],
-
-            const SizedBox(height: 20),
-            AppButton(_entrando ? 'Entrando…' : 'Entrar',
-                enabled: !_entrando, onTap: _entrar),
-            if (remoto) ...[
-              TextButton(
-                onPressed: _entrando
-                    ? null
-                    : () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => const SolicitarAccesoScreen())),
-                child: const Text('Solicitar acceso o crear cuenta'),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: _entrando || _recuperando ? null : _recuperarAcceso,
-                child: Text(_recuperando
-                    ? 'Solicitando…'
-                    : '¿No recibió el correo? Enviar recuperación'),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Text('v0.2.6 · ${config.definicionFormulario.version}',
-                textAlign: TextAlign.center,
-                style: T.label(size: 10.5, color: T.faint, tracking: 0.05)),
-          ],
+          ),
         ),
       ),
     );

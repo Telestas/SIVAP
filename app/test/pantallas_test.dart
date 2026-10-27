@@ -275,6 +275,15 @@ void main() {
         findsOneWidget);
   });
 
+  testWidgets('el acceso limita el ancho de los campos en escritorio',
+      (tester) async {
+    lienzo(tester, ancho: 1200);
+    await tester.pumpWidget(montar(const LoginScreen()));
+
+    expect(tester.getSize(find.byType(ListView)), const Size(460, 2400));
+    expect(tester.getSize(find.byType(TextField).first).width, 412);
+  });
+
   testWidgets('el acceso remoto permite solicitar recuperación',
       (tester) async {
     lienzo(tester);

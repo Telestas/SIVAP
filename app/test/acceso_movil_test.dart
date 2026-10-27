@@ -32,6 +32,15 @@ void main() {
         AutenticacionFirebase.errorPermiteCache('permission-denied'), isFalse);
   });
 
+  test('HTML 403 de Google se explica sin mostrar código HTML', () {
+    final mensaje = AutenticacionFirebase.mensajeAutenticacion('UNKNOWN',
+        detalle: 'Json conversion failed: <!DOCTYPE html><html>'
+            '<title>Error 403 (Forbidden)</title>');
+    expect(mensaje, contains('HTTP 403'));
+    expect(mensaje, contains('VPN'));
+    expect(mensaje, isNot(contains('<html>')));
+  });
+
   test('el móvil toma el rol del perfil y vincula su base a una cuenta',
       () async {
     final repo = InMemoryStudyRepository();

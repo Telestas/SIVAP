@@ -88,7 +88,9 @@ class _ConsentScreenState extends State<ConsentScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 13, 14, 16),
                   children: [
                     SectionLabel(
-                        'Modelo aprobado · ${doc.codigoCei} · vigente desde ${doc.vigenteDesde}',
+                        state.esDemostracion
+                            ? 'Documento ficticio para probar el flujo'
+                            : 'Modelo aprobado · ${doc.codigoCei} · vigente desde ${doc.vigenteDesde}',
                         size: 10,
                         color: T.faint),
                     const SizedBox(height: 9),
@@ -108,8 +110,9 @@ class _ConsentScreenState extends State<ConsentScreen> {
               _Declaracion(
                 texto: doc.declaraciones[i],
                 marcada: _declaraciones.contains(i),
-                onTap: () => setState(() =>
-                    _declaraciones.contains(i) ? _declaraciones.remove(i) : _declaraciones.add(i)),
+                onTap: () => setState(() => _declaraciones.contains(i)
+                    ? _declaraciones.remove(i)
+                    : _declaraciones.add(i)),
               ),
               const SizedBox(height: 8),
             ],
@@ -123,7 +126,8 @@ class _ConsentScreenState extends State<ConsentScreen> {
                   GestureDetector(
                     onTap: () => setState(_firma.borrar),
                     child: Text('borrar',
-                        style: T.label(size: 10.5, color: T.ghost, tracking: 0)),
+                        style:
+                            T.label(size: 10.5, color: T.ghost, tracking: 0)),
                   ),
               ],
             ),
@@ -136,18 +140,28 @@ class _ConsentScreenState extends State<ConsentScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Testigo: ${state.usuarioActual.nombre}',
-                    style: T.label(size: 10.5, color: T.faint, tracking: 0)),
-                Text('${F.fechaLarga(DateTime.now())} · ${F.hora(DateTime.now())}',
-                    style: T.label(size: 10.5, color: T.faint, tracking: 0)),
+                Expanded(
+                  child: Text('Testigo: ${state.usuarioActual.nombre}',
+                      style: T.label(size: 10.5, color: T.faint, tracking: 0)),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                      '${F.fechaLarga(DateTime.now())} · ${F.hora(DateTime.now())}',
+                      textAlign: TextAlign.end,
+                      style: T.label(size: 10.5, color: T.faint, tracking: 0)),
+                ),
               ],
             ),
 
             const SizedBox(height: 16),
-            const StatusBanner(
-              texto: 'El consentimiento se guarda cifrado en el dispositivo y se '
-                  'envía al servidor al recuperar señal. No se podrá capturar '
-                  'eventos clínicos hasta registrarlo.',
+            StatusBanner(
+              texto: state.esDemostracion
+                  ? 'Prueba: la firma se conserva solo durante esta sesión y '
+                      'se borra al salir. No se envía al estudio.'
+                  : 'El consentimiento se guarda cifrado en el dispositivo y se '
+                      'envía al servidor al recuperar señal. No se podrá capturar '
+                      'eventos clínicos hasta registrarlo.',
               alineaArriba: true,
             ),
           ],
@@ -187,7 +201,8 @@ class _Declaracion extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: marcada ? T.ink : T.card,
-                  border: marcada ? null : Border.all(color: T.line, width: 1.5),
+                  border:
+                      marcada ? null : Border.all(color: T.line, width: 1.5),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: marcada
@@ -217,7 +232,10 @@ class SignatureController {
 
 class SignaturePad extends StatelessWidget {
   const SignaturePad(
-      {super.key, required this.controller, required this.onChanged, this.altura = 118});
+      {super.key,
+      required this.controller,
+      required this.onChanged,
+      this.altura = 118});
 
   final SignatureController controller;
   final VoidCallback onChanged;
@@ -256,7 +274,8 @@ class SignaturePad extends StatelessWidget {
               child: controller.trazos.isEmpty
                   ? Center(
                       child: Text('firmar con el dedo o el lápiz',
-                          style: T.label(size: 11.5, color: T.ghost, tracking: 0)),
+                          style:
+                              T.label(size: 11.5, color: T.ghost, tracking: 0)),
                     )
                   : CustomPaint(painter: _SignaturePainter(controller.trazos)),
             ),

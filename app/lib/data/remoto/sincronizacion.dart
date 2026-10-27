@@ -42,7 +42,8 @@ String? mensajeRespuestaTramo(http.Response respuesta) {
 /// bucle ni nada que pueda dejar la interfaz esperando: sincronizar es una
 /// acción que alguien decide, y que dice en qué quedó.
 class Sincronizacion extends ChangeNotifier {
-  Sincronizacion(this._repo, {ClienteApi Function(Uri)? construirCliente})
+  Sincronizacion(this._repo,
+      {ClienteApi Function(Uri)? construirCliente, this.soloLocal = false})
       : _construirCliente =
             construirCliente ?? ((base) => ClienteApi(base: base)) {
     _cargar();
@@ -54,6 +55,7 @@ class Sincronizacion extends ChangeNotifier {
 
   final StudyRepository _repo;
   final ClienteApi Function(Uri) _construirCliente;
+  final bool soloLocal;
 
   ClienteApi? _api;
   ClienteFirebase? _firebase;
@@ -67,8 +69,8 @@ class Sincronizacion extends ChangeNotifier {
   Uri? get servidor => _servidor;
   String get dispositivoId => _dispositivoId;
   bool get enCurso => _enCurso;
-  bool get configurado => usaFirebase || _servidor != null;
-  bool get usaFirebase => Firebase.apps.isNotEmpty;
+  bool get configurado => !soloLocal && (usaFirebase || _servidor != null);
+  bool get usaFirebase => !soloLocal && Firebase.apps.isNotEmpty;
   bool get haySesion => _clienteActivo?.haySesion ?? false;
   Sesion? get sesion => _sesion;
 
@@ -99,6 +101,7 @@ class Sincronizacion extends ChangeNotifier {
   /// aparato no tiene red, su tramo local sigue disponible; si se agotó, el
   /// repositorio impide enrolar.
   Future<String?> solicitarTramo() async {
+    if (soloLocal) return 'La demostración no usa tramos reales.';
     final repo = _repo;
     if (!repo.requiereTramos) return 'La demostración no usa tramos reales.';
     if (repo.asignacionesRestantes > 0) return null;
@@ -209,6 +212,7 @@ class Sincronizacion extends ChangeNotifier {
 
   /// Fija a qué servidor habla este aparato. Se guarda para el próximo arranque.
   void configurar(String url) {
+    if (soloLocal) return;
     final limpia = url.trim();
     if (limpia.isEmpty) return;
     _repo.guardarAjuste(claveServidor, limpia);
@@ -223,6 +227,7 @@ class Sincronizacion extends ChangeNotifier {
   /// el envío, y el token se queda en memoria — una base que se pueda copiar no
   /// debe llevar dentro con qué entrar.
   Future<String?> entrar(String usuario, String contrasena) async {
+    if (soloLocal) return 'Los datos de demostración no se sincronizan.';
     if (usaFirebase) return _entrarFirebase(usuario, contrasena);
     final api = _api;
     if (api == null) return 'Falta configurar la dirección del servidor.';
@@ -310,6 +315,10 @@ class Sincronizacion extends ChangeNotifier {
   /// la mitad y hay que repetir entero es peor que varios pequeños. Si quedan
   /// pendientes, se vuelve a pulsar.
   Future<EnvioRealizado> sincronizar() async {
+    if (soloLocal) {
+      return _anotar(const EnvioRealizado.sinConexion(
+          SinConexion('Los datos de demostración no se sincronizan.')));
+    }
     final api = _clienteActivo;
     if (api == null) {
       return _anotar(const EnvioRealizado.sinConexion(

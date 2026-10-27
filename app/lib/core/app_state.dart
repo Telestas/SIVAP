@@ -32,6 +32,7 @@ class AppState extends ChangeNotifier {
     CrearCuentaRemota? crearCuentaRemota,
     SolicitarAccesoRemoto? solicitarAccesoRemoto,
     this.actualizaciones,
+    this.esDemostracion = false,
   })  : _repo = almacen.repo,
         _autenticarUsuario = autenticarUsuario,
         _cargarRepositorioRemoto = cargarRepositorioRemoto,
@@ -55,6 +56,23 @@ class AppState extends ChangeNotifier {
         advertencia: 'Almacén en memoria: los datos se pierden al cerrar.',
       ));
 
+  /// Datos ficticios separados de la sesión Firebase y sin ruta de envío.
+  factory AppState.demostracion() {
+    final repo = InMemoryStudyRepository();
+    return AppState(
+      AlmacenLocal(
+        repo: repo,
+        persistente: false,
+        cifrado: false,
+        descripcion: 'Demostración temporal en memoria',
+        advertencia:
+            'Demostración: use solo datos ficticios. Se borran al salir.',
+      ),
+      sincronizacion: Sincronizacion(repo, soloLocal: true),
+      esDemostracion: true,
+    );
+  }
+
   final AlmacenLocal almacen;
   StudyRepository _repo;
   final AutenticarUsuario? _autenticarUsuario;
@@ -67,6 +85,7 @@ class AppState extends ChangeNotifier {
   /// A qué servidor habla este aparato y qué le falta por enviar.
   final Sincronizacion sincronizacion;
   final Actualizaciones? actualizaciones;
+  final bool esDemostracion;
 
   StudyRepository get repo => _repo;
 
@@ -174,12 +193,18 @@ class AppState extends ChangeNotifier {
 
   bool get hayCola => enCola > 0;
 
-  String get textoSync => hayCola
-      ? '$enCola ${enCola == 1 ? 'registro pendiente' : 'registros pendientes'} '
-          'de envío'
-      : 'Todo enviado al servidor';
+  String get textoSync => esDemostracion
+      ? 'Datos de prueba: no se envían y se borran al salir'
+      : hayCola
+          ? '$enCola ${enCola == 1 ? 'registro pendiente' : 'registros pendientes'} '
+              'de envío'
+          : 'Todo enviado al servidor';
 
-  String get textoSyncCorto => hayCola ? '$enCola en cola' : 'AL DÍA';
+  String get textoSyncCorto => esDemostracion
+      ? 'PRUEBA'
+      : hayCola
+          ? '$enCola en cola'
+          : 'AL DÍA';
 
   /// Refresca tras una escritura en el repositorio.
   void refrescar() => notifyListeners();
@@ -187,6 +212,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     sincronizacion.removeListener(notifyListeners);
+    sincronizacion.dispose();
     actualizaciones?.removeListener(notifyListeners);
     actualizaciones?.dispose();
     super.dispose();

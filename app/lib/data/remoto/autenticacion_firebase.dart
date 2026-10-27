@@ -170,6 +170,14 @@ class AutenticacionFirebase {
   static String mensajeAutenticacion(String codigo, {String? detalle}) {
     if (codigo.toLowerCase() == 'unknown') {
       final texto = detalle?.trim();
+      final respuestaHtml = texto?.toLowerCase() ?? '';
+      if (respuestaHtml.contains('403') &&
+          (respuestaHtml.contains('<!doctype html') ||
+              respuestaHtml.contains('<html'))) {
+        return 'Firebase rechazó la conexión de este teléfono (HTTP 403). '
+            'No indica que el correo o la contraseña sean incorrectos. '
+            'Si está en Cuba, pruebe con la VPN para acceder al servicio.';
+      }
       return texto == null || texto.isEmpty
           ? 'Firebase no pudo completar el acceso. Compruebe la conexión e inténtelo de nuevo (UNKNOWN).'
           : 'Firebase no pudo completar el acceso: $texto';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'solicitar_acceso_screen.dart';
+import '../demo/demo_session.dart';
 import '../../core/app_state.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
@@ -266,9 +267,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     ? 'Solicitando…'
                     : '¿No recibió el correo? Enviar recuperación'),
               ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: _entrando
+                    ? null
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const DemoSession())),
+                child: const Text('Probar flujo sin conexión'),
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                'Use solo datos ficticios. La prueba no requiere cuenta, '
+                'no se sincroniza y se borra al salir.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: T.secondary),
+              ),
             ],
             const SizedBox(height: 12),
-            Text('v0.2.4 · ${config.definicionFormulario.version}',
+            Text('v0.2.5 · ${config.definicionFormulario.version}',
                 textAlign: TextAlign.center,
                 style: T.label(size: 10.5, color: T.faint, tracking: 0.05)),
           ],

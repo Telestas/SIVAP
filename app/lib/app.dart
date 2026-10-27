@@ -51,7 +51,7 @@ class Raiz extends StatelessWidget {
     final usuario = state.usuarioActual;
     final ancha = MediaQuery.sizeOf(context).width >= 900;
     final panel = usuario.puedeGestionarUsuarios || usuario.puedeExportar;
-    return panel && ancha
+    return !state.esDemostracion && panel && ancha
         ? const AdminDashboardScreen()
         : const PatientListScreen();
   }

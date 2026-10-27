@@ -206,19 +206,21 @@ class _Encabezado extends StatelessWidget {
                     value: _AccionCuenta.perfil,
                     child: Text('Mi perfil'),
                   ),
-                  const PopupMenuItem(
-                    value: _AccionCuenta.sincronizacion,
-                    child: Text('Sincronización'),
-                  ),
+                  if (!state.esDemostracion)
+                    const PopupMenuItem(
+                      value: _AccionCuenta.sincronizacion,
+                      child: Text('Sincronización'),
+                    ),
                   if (state.actualizaciones != null)
                     const PopupMenuItem(
                       value: _AccionCuenta.actualizaciones,
                       child: Text('Buscar actualización'),
                     ),
-                  const PopupMenuItem(
-                    value: _AccionCuenta.salir,
-                    child: Text('Cerrar sesión'),
-                  ),
+                  if (!state.esDemostracion)
+                    const PopupMenuItem(
+                      value: _AccionCuenta.salir,
+                      child: Text('Cerrar sesión'),
+                    ),
                 ],
                 child: Container(
                   width: 38,
@@ -237,16 +239,20 @@ class _Encabezado extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           StatusBanner(
-            texto: !state.repo.admiteEscritura
-                ? 'Datos consolidados en el servidor · panel de solo lectura'
-                : state.hayCola
-                    ? '${state.textoSync} · se enviará cuando haya conexión'
-                    : state.textoSync,
+            texto: state.esDemostracion
+                ? state.textoSync
+                : !state.repo.admiteEscritura
+                    ? 'Datos consolidados en el servidor · panel de solo lectura'
+                    : state.hayCola
+                        ? '${state.textoSync} · se enviará cuando haya conexión'
+                        : state.textoSync,
             tono: state.hayCola && state.repo.admiteEscritura
                 ? BannerTone.aviso
                 : BannerTone.ok,
-            accion: state.repo.admiteEscritura ? 'SINCRONIZAR' : null,
-            onAccion: state.repo.admiteEscritura
+            accion: state.repo.admiteEscritura && !state.esDemostracion
+                ? 'SINCRONIZAR'
+                : null,
+            onAccion: state.repo.admiteEscritura && !state.esDemostracion
                 ? () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => const SincronizacionScreen()))
                 : null,

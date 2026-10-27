@@ -250,11 +250,26 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
                     _solicitandoTramo ? 'Solicitando…' : 'Solicitar tramo',
                     enabled: !_solicitandoTramo,
                     onTap: _pedirTramo),
+                const SizedBox(height: 8),
+                const Text(
+                  'Un tramo reserva posiciones de asignación A/B solo para '
+                  'este teléfono. El servicio debe entregarlo antes de '
+                  'enrolar pacientes del estudio.',
+                  style: T.small,
+                ),
                 const SizedBox(height: 16),
               ],
               // Restricción CLAUDE.md §13. El flag lo controla la configuración
               // del estudio, no el código ni el investigador.
-              if (!config.consentimientoAprobadoPorCei) ...[
+              if (state.esDemostracion) ...[
+                const StatusBanner(
+                  texto: 'Flujo de prueba con datos ficticios. La asignación y '
+                      'el consentimiento son de demostración; nada se envía '
+                      'al estudio.',
+                  alineaArriba: true,
+                ),
+                const SizedBox(height: 16),
+              ] else if (!config.consentimientoAprobadoPorCei) ...[
                 const StatusBanner(
                   texto: 'La aprobación del centro o el consentimiento vigente '
                       'no están disponibles. El enrolamiento queda detenido.',
@@ -463,8 +478,11 @@ class _PanelAsignacion extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const SectionLabel('Asignación por aleatorización',
-                    color: T.body),
+                const Expanded(
+                  child: SectionLabel('Asignación por aleatorización',
+                      color: T.body),
+                ),
+                if (paciente != null) const SizedBox(width: 8),
                 if (paciente != null)
                   Text('posición ${paciente!.posicionSecuencia}',
                       style:
@@ -541,7 +559,8 @@ class _Elegibilidad extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            SectionLabel(puerta.titulo),
+            Expanded(child: SectionLabel(puerta.titulo)),
+            const SizedBox(width: 8),
             if (sinContestar > 0 && !bloqueada)
               MetaChip('QUEDAN $sinContestar', tono: MetaTone.aviso)
             else if (marcados.isEmpty)

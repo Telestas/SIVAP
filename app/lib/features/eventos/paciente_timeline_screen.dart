@@ -47,17 +47,20 @@ class PacienteTimelineScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(T.gutter, 12, T.gutter, 28),
           children: [
             StatusBanner(
-              texto: !state.repo.admiteEscritura
-                  ? 'Consulta del servidor · panel de solo lectura'
-                  : state.hayCola
-                      ? 'Guardado en el dispositivo · falta enviarlo'
-                      : 'Todo lo registrado está en el servidor',
+              texto: state.esDemostracion
+                  ? state.textoSync
+                  : !state.repo.admiteEscritura
+                      ? 'Consulta del servidor · panel de solo lectura'
+                      : state.hayCola
+                          ? 'Guardado en el dispositivo · falta enviarlo'
+                          : 'Todo lo registrado está en el servidor',
               tono: state.hayCola && state.repo.admiteEscritura
                   ? BannerTone.aviso
                   : BannerTone.ok,
-              accion:
-                  state.repo.admiteEscritura ? state.textoSyncCorto : null,
-              onAccion: state.repo.admiteEscritura
+              accion: state.repo.admiteEscritura && !state.esDemostracion
+                  ? state.textoSyncCorto
+                  : null,
+              onAccion: state.repo.admiteEscritura && !state.esDemostracion
                   ? () => Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => const SincronizacionScreen()))
                   : null,

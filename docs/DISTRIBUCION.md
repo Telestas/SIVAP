@@ -5,6 +5,32 @@
 **https://telestas.github.io/SIVAP/** — la página lee la última versión
 publicada y ofrece el APK. Comprobado que se descarga sin cuenta de GitHub.
 
+## Prueba del flujo sin Firebase
+
+En el acceso de la app, **Probar flujo sin conexión** abre una sesión separada
+con datos ficticios. Permite enrolar, guardar, registrar un consentimiento de
+prueba y capturar eventos. Usa una secuencia ficticia ya generada. Todo queda en
+memoria, no se sincroniza y se borra al salir de la prueba. Nunca introducir
+datos de pacientes reales en esta sesión.
+
+En la sesión del estudio, **Solicitar tramo** pide al servicio una reserva
+exclusiva de posiciones de la secuencia A/B para este dispositivo. La función
+remota aún no está publicada, por lo que el enrolamiento real sigue bloqueado.
+Tampoco se sustituye por una asignación local improvisada.
+
+## Acceso desde Cuba
+
+Se observó una respuesta HTML `403 Forbidden` de Identity Toolkit sin VPN,
+mientras la misma cuenta y configuración funcionan con VPN. Google indica que
+restringe algunos servicios de Cloud en Cuba:
+<https://docs.cloud.google.com/billing/docs/how-to/create-billing-account>.
+Esto apunta a una restricción por origen de la conexión, no a un problema de
+contraseña; no identifica por sí solo cuál servicio aplica la restricción. La
+app muestra un mensaje breve para ese caso. Una configuración de Firebase no
+puede convertir ese HTML 403 en una sesión válida. Hasta contar con un backend
+aprobado y accesible, el acceso real requiere una ruta de red que alcance los
+servicios de Firebase. La prueba local descrita arriba funciona sin esa ruta.
+
 ### Se publican dos APK, y hay que saber por qué
 
 | Archivo | Tamaño | Para quién |

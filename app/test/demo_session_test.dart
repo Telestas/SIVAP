@@ -8,6 +8,8 @@ import 'package:sivap/data/local/in_memory_study_repository.dart';
 import 'package:sivap/data/local/seed_data.dart';
 import 'package:sivap/data/remoto/cola_de_envio.dart';
 import 'package:sivap/features/consent/consent_screen.dart';
+import 'package:sivap/features/auth/login_screen.dart';
+import 'package:sivap/features/demo/demo_session.dart';
 
 void main() {
   testWidgets(
@@ -31,7 +33,9 @@ void main() {
     addTearDown(sesionReal.dispose);
     await tester.pumpWidget(raizDeLaApp(sesionReal));
 
-    await tester.tap(find.text('Probar flujo sin conexión'));
+    Navigator.of(tester.element(find.byType(LoginScreen))).push(
+      MaterialPageRoute(builder: (_) => const DemoSession()),
+    );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.textContaining('MODO PRUEBA'), findsOneWidget);
@@ -94,7 +98,8 @@ void main() {
 
     await tester.tap(find.text('Salir de prueba'));
     await tester.pumpAndSettle();
-    expect(find.text('Probar flujo sin conexión'), findsOneWidget);
+    expect(find.text('Probar flujo sin conexión'), findsNothing);
+    expect(find.byType(LoginScreen), findsOneWidget);
     expect(sesionReal.usuario, isNull);
   });
 

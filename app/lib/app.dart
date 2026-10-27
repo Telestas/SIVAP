@@ -3,7 +3,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/app_state.dart';
 import 'core/theme/app_theme.dart';
-import 'core/theme/tokens.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/patients/patient_list_screen.dart';
@@ -33,28 +32,6 @@ Widget raizDeLaApp(AppState estado, {Widget inicio = const Raiz()}) => AppScope(
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        builder: (context, child) {
-          if (!AppScope.of(context).repo.config.pruebasIntegradas) {
-            return child!;
-          }
-          return Column(children: [
-            Material(
-              color: T.warnBg,
-              child: SafeArea(
-                  bottom: false,
-                  child: Container(
-                    width: double.infinity,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: const Text(
-                        'PREPRODUCCIÓN · solo pacientes ficticios',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: T.warnFg)),
-                  )),
-            ),
-            Expanded(child: child!),
-          ]);
-        },
         home: inicio,
       ),
     );

@@ -98,7 +98,7 @@ void main() {
         .pumpWidget(raizDeLaApp(estado, inicio: const EnrollmentScreen()));
     await tester.tap(find.text('Ninguno está presente'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('PREPRODUCCIÓN'), findsOneWidget);
+    expect(find.textContaining('PREPRODUCCIÓN'), findsNothing);
     expect(
         tester
             .widget<AppButton>(find.widgetWithText(AppButton, 'Guardar'))

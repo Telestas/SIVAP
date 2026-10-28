@@ -83,8 +83,9 @@ poder existir en el proyecto. La vista `dataset_clinico` ya está en el esquema.
 ### 3. Autenticación real en la app móvil
 
 Android ya autentica con Firebase y toma función y centro del perfil
-aprovisionado. La base cifrada se vincula a un UID y una sesión validada puede
-restaurarse sin conexión. Falta comprobarlo en teléfono real y decidir cuánto
+aprovisionado mediante el proxy HTTPS de Cloudflare. La base cifrada se vincula
+a un UID y una sesión validada puede restaurarse sin conexión. Falta comprobar
+el flujo en un teléfono cubano sin VPN y decidir cuánto
 tiempo puede seguir vigente un perfil guardado sin red cuando sus permisos
 cambien en el servidor. iOS aún no tiene configuración Firebase registrada.
 

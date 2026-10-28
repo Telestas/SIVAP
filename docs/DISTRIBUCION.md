@@ -138,22 +138,27 @@ panel de Cloudflare Pages; no debe alojar otra copia de Flutter.
 
 ### Acceso móvil sin VPN
 
-El Android actual usa Firebase Auth y Cloud Firestore nativos. La sustitución de
-`window.fetch` que funciona en la web no afecta esos SDK. Dirigir únicamente el
-inicio de sesión a Cloudflare dejaría pendientes la renovación del token y las
-lecturas y escrituras de Firestore. El proxy web de Firestore atiende rutas REST
-y WebChannel; el SDK nativo usa otro transporte.
+Android usa ahora `FirebaseRestMovil` sobre `https://sivap.pages.dev`. El inicio
+de sesión, registro, verificación, recuperación, renovación del token, perfil,
+configuración, solicitudes de acceso, aprobación, reserva de tramos y envío de
+lotes pasan por Cloudflare Pages Functions. El SDK nativo ya no se inicializa en
+Android. Firebase sigue validando las credenciales; Firestore recibe el ID token
+del usuario y aplica las reglas de rol y centro existentes.
 
-La ruta compatible con Spark es un cliente móvil REST específico para Firebase:
-iniciar y renovar sesión por las funciones HTTPS de Cloudflare, usar el token
-Firebase del usuario en la API REST de Firestore y conservar las reglas del
-proyecto. Debe sustituir juntas las dependencias móviles de ambos SDK,
-incluyendo solicitudes de cuenta, perfil, configuración, tramos y sincronización.
-Las transacciones de tramos y los acuses de sincronización tienen que mantener
-su atomicidad e idempotencia. La base SQLite cifrada y la cola local siguen
-siendo la fuente de captura sin red. Antes de publicar otra APK, verificar con
-datos ficticios la renovación de sesión, pérdida de red, reintentos, reglas de
-centro, cegamiento, auditoría y rechazo de una reserva ya consumida.
+El token de renovación y el último perfil aprobado viven en Android Keystore.
+La base SQLite cifrada conserva la captura y la cola sin conexión. Los tramos
+se reclaman con una transacción que lee la reserva y crea el documento del
+dispositivo en un solo commit. Cada lote se confirma junto a su acuse, y una
+repetición consulta primero ese acuse. Firestore puede abortar una transacción
+en conflicto; el cliente reintenta la operación completa hasta tres veces.
+
+Las pruebas automáticas cubren el origen de las peticiones, la codificación
+Firestore, los tiempos del servidor, la reserva no transferible, el acuse
+idempotente y la aprobación atómica. Desde fuera de Cuba se comprobó que la
+ruta `documents:beginTransaction` publicada responde en JSON. Falta probar
+desde un teléfono cubano sin VPN el inicio y renovación de sesión, la lectura,
+la solicitud de tramo y la sincronización con datos ficticios. Esa comprobación
+de campo determina si Cloudflare resuelve el bloqueo también en Android.
 
 ### Se publican dos APK, y hay que saber por qué
 

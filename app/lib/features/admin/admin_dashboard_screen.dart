@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../sync/sincronizacion_screen.dart';
@@ -14,6 +15,7 @@ import '../../data/exportacion/descarga.dart';
 import '../../data/exportacion/consentimiento_archivable.dart';
 import '../../data/exportacion/xlsx_estudio.dart';
 import '../../data/remoto/firestore_study_repository.dart';
+import '../../data/remoto/firebase_rest_movil.dart';
 import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/patient.dart';
 import '../../domain/models/protocolo.dart';
@@ -741,6 +743,49 @@ class _PanelUsuarios extends StatefulWidget {
 class _PanelUsuariosState extends State<_PanelUsuarios> {
   bool _ocupado = false;
 
+  Future<void> _aprobarRest(SolicitudRest solicitud, Rol rol,
+      String codigoCentro, FirebaseRestMovil rest) async {
+    if (_ocupado) return;
+    setState(() => _ocupado = true);
+    try {
+      await rest.aprobarSolicitud(solicitud, rol.name, codigoCentro,
+          AppScope.read(context).usuarioActual.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('Acceso aprobado. La persona ya puede iniciar sesión.')));
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No se pudo aprobar la solicitud: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+  }
+
+  Future<void> _elegirRolRest(SolicitudRest solicitud, String codigoCentro,
+      FirebaseRestMovil rest) async {
+    final rol = await showDialog<Rol>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text('Aprobar a ${solicitud.datos['nombre']}'),
+        children: [
+          for (final opcion in Rol.values)
+            if (opcion != Rol.investigadorPrincipal)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, opcion),
+                child: Text(opcion.etiqueta),
+              ),
+        ],
+      ),
+    );
+    if (rol != null && mounted) {
+      await _aprobarRest(solicitud, rol, codigoCentro, rest);
+    }
+  }
+
   Future<void> _aprobar(QueryDocumentSnapshot<Map<String, dynamic>> solicitud,
       Rol rol, String codigoCentro) async {
     if (_ocupado) return;
@@ -833,6 +878,57 @@ class _PanelUsuariosState extends State<_PanelUsuarios> {
       return listado;
     }
     final codigo = state.usuarioActual.institucion.codigo;
+    final rest = state.sincronizacion.restMovil;
+    if (!kIsWeb && rest != null) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        FutureBuilder<List<SolicitudRest>>(
+          future: rest.consultarSolicitudes(codigo),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Text(
+                  'No se pudieron cargar las solicitudes: ${snapshot.error}');
+            }
+            if (!snapshot.hasData) return const LinearProgressIndicator();
+            final pendientes = snapshot.data!
+                .where((s) => s.datos['estado'] == 'pendiente')
+                .toList();
+            return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Solicitudes pendientes: ${pendientes.length}',
+                      style: const TextStyle(fontSize: 18)),
+                  const SizedBox(height: 8),
+                  for (final solicitud in pendientes)
+                    Card(
+                        child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${solicitud.datos['nombre']}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
+                          Text('${solicitud.datos['correo']}'),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FilledButton(
+                              onPressed: _ocupado
+                                  ? null
+                                  : () =>
+                                      _elegirRolRest(solicitud, codigo, rest),
+                              child: const Text('Aprobar'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                  const SizedBox(height: 20),
+                ]);
+          },
+        ),
+        listado,
+      ]);
+    }
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance

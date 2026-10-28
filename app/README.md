@@ -107,20 +107,18 @@ Demostración y producción son **archivos distintos** (`sivap_demo.db` y
 `lib/main.dart`. Así un paciente inventado no puede acabar nunca en el dataset
 del estudio.
 
-## Lo que este hito NO hace
+## Límites de la versión actual
 
-- **Sin backend ni sincronización**: el estado "en cola" se simula con un
-  interruptor para poder enseñar el comportamiento offline.
-- **Sin exportación**: el .xlsx se genera en el servidor (openpyxl), hito posterior.
 - **Los rangos clínicos van vacíos** a propósito, y hay una prueba que falla si
   alguien los rellena: los anteriores eran de paciente ambulatorio y en UCI
   producirían avisos falsos constantes. Ver `../docs/RANGOS_PENDIENTES.md`.
 - **La asignación real exige un tramo reservado por dispositivo.** La función
-  de Firebase reparte tramos exclusivos; sin tramo libre la app detiene el
-  enrolamiento. Falta desplegar y probar el ciclo en teléfonos reales.
-- **Android autentica con Firebase**: función y centro vienen del perfil
-  aprovisionado. La compilación actual sigue usando la base de demostración
-  hasta la aprobación clínica y la activación del estudio.
+  de Firebase requiere Blaze; en Spark la CLI administrativa prepara reservas
+  exclusivas que la app reclama en Firestore. Sin tramo libre la app detiene el
+  enrolamiento. Falta comprobar el ciclo en teléfonos cubanos sin VPN.
+- **Android autentica por Cloudflare con Firebase**: función y centro vienen
+  del perfil aprobado. La base local es SQLite cifrada y la captura clínica
+  sigue sujeta a la configuración y consentimiento aprobados.
 - **La semilla de aleatorización es de demostración** (`Seed.semillaAleatorizacion`).
   La del estudio real la fija el investigador principal una sola vez, antes del
   primer paciente, y va al acta. Cambiarla con pacientes ya enrolados invalida

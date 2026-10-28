@@ -11,8 +11,12 @@ import 'core/widgets/controls.dart';
 import 'data/local/abrir_almacen.dart';
 import 'data/local/almacen_local.dart';
 import 'data/remoto/autenticacion_firebase.dart';
+import 'data/remoto/autenticacion_remota.dart';
+import 'data/remoto/autenticacion_rest_movil.dart';
 import 'data/remoto/actualizaciones.dart';
-import 'data/remoto/configuracion_movil.dart';
+import 'data/remoto/configuracion_movil_rest.dart';
+import 'data/remoto/firebase_rest_movil.dart';
+import 'data/remoto/sincronizacion.dart';
 import 'data/remoto/configuracion_proxy_stub.dart'
     if (dart.library.js_interop) 'data/remoto/configuracion_proxy_web.dart';
 import 'data/remoto/firestore_study_repository.dart';
@@ -31,10 +35,9 @@ Future<void> main() async {
   runApp(const SivapApp());
 }
 
-/// Android y web son los clientes Firebase registrados. Escritorio conserva
-/// el modo local para desarrollo hasta que se registre su aplicación propia.
+/// La web usa el SDK Firebase; Android usa el proxy HTTPS de Cloudflare.
 Future<void> _inicializarFirebase() async {
-  if (!kIsWeb && defaultTargetPlatform != TargetPlatform.android) return;
+  if (!kIsWeb) return;
   await Firebase.initializeApp(options: FirebaseSivapOptions.actual);
   if (kIsWeb) configurarProxyFirestoreWeb();
 }
@@ -59,13 +62,17 @@ class _SivapAppState extends State<SivapApp> {
       }
       return _state = AppState(almacen);
     }
-    final autenticacion = AutenticacionFirebase();
+    final restMovil = kIsWeb ? null : FirebaseRestMovil();
+    final AutenticacionRemota autenticacion =
+        kIsWeb ? AutenticacionFirebase() : AutenticacionRestMovil(restMovil!);
     final state = AppState(
       almacen,
+      sincronizacion: Sincronizacion(almacen.repo, restMovil: restMovil),
       autenticarUsuario: autenticacion.entrar,
       cargarRepositorioRemoto: (investigador) async {
         if (!kIsWeb) {
-          return cargarConfiguracionMovil(almacen.repo, investigador);
+          return cargarConfiguracionMovilRest(
+              almacen.repo, investigador, restMovil!);
         }
         final repo = FirestoreStudyRepository(investigador: investigador);
         await repo.cargar();

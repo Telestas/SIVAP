@@ -3,9 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../domain/models/institucion.dart';
 import '../../domain/models/role.dart';
+import 'autenticacion_remota.dart';
 
 /// Acceso remoto. Una cuenta nueva no recibe funciones hasta su aprobación.
-class AutenticacionFirebase {
+class AutenticacionFirebase implements AutenticacionRemota {
   AutenticacionFirebase({FirebaseAuth? auth, FirebaseFirestore? firestore})
       : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance;
@@ -13,6 +14,7 @@ class AutenticacionFirebase {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
 
+  @override
   Future<void> crearCuenta(String correo, String contrasena) async {
     try {
       final credencial = await _auth.createUserWithEmailAndPassword(
@@ -29,6 +31,7 @@ class AutenticacionFirebase {
     }
   }
 
+  @override
   Future<void> solicitarAcceso(String correo, String contrasena, String nombre,
       String codigoCentro) async {
     try {
@@ -72,6 +75,7 @@ class AutenticacionFirebase {
     }
   }
 
+  @override
   Future<Investigador> entrar(String correo, String contrasena) async {
     try {
       final credencial = await _auth.signInWithEmailAndPassword(
@@ -87,6 +91,7 @@ class AutenticacionFirebase {
   }
 
   /// Devuelve el perfil de la sesión que Firebase restauró, si existe.
+  @override
   Future<Investigador?> restaurar() async {
     final usuario = _auth.currentUser;
     if (usuario == null) return null;
@@ -153,6 +158,7 @@ class AutenticacionFirebase {
     return perfil['institucion_codigo'] as String;
   }
 
+  @override
   Future<void> salir() => _auth.signOut();
 
   /// Solicita a Firebase el correo oficial de recuperación.
@@ -160,6 +166,7 @@ class AutenticacionFirebase {
   /// Firebase no confirma si la dirección existe, para no facilitar la
   /// enumeración de cuentas. La pantalla muestra por ello el mismo resultado
   /// en ambos casos.
+  @override
   Future<void> recuperarAcceso(String correo) async {
     try {
       await _auth.sendPasswordResetEmail(email: correo.trim());

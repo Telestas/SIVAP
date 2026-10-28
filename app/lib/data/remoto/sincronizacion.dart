@@ -12,9 +12,13 @@ import '../../domain/models/role.dart';
 import '../../domain/repositories/study_repository.dart';
 import 'cliente_api.dart';
 import 'cliente_firebase.dart';
+import 'cliente_firebase_rest.dart';
 import 'cliente_tramos_firestore.dart';
+import 'cliente_tramos_rest.dart';
 import 'cliente_remoto.dart';
 import 'autenticacion_firebase.dart';
+import 'autenticacion_rest_movil.dart';
+import 'firebase_rest_movil.dart';
 import 'cola_de_envio.dart';
 import 'lote.dart';
 
@@ -44,7 +48,9 @@ String? mensajeRespuestaTramo(http.Response respuesta) {
 /// acción que alguien decide, y que dice en qué quedó.
 class Sincronizacion extends ChangeNotifier {
   Sincronizacion(this._repo,
-      {ClienteApi Function(Uri)? construirCliente, this.soloLocal = false})
+      {ClienteApi Function(Uri)? construirCliente,
+      this.restMovil,
+      this.soloLocal = false})
       : _construirCliente =
             construirCliente ?? ((base) => ClienteApi(base: base)) {
     _cargar();
@@ -57,9 +63,11 @@ class Sincronizacion extends ChangeNotifier {
   final StudyRepository _repo;
   final ClienteApi Function(Uri) _construirCliente;
   final bool soloLocal;
+  final FirebaseRestMovil? restMovil;
 
   ClienteApi? _api;
   ClienteFirebase? _firebase;
+  ClienteFirebaseRest? _firebaseRest;
   Uri? _servidor;
   late String _dispositivoId;
 
@@ -71,21 +79,32 @@ class Sincronizacion extends ChangeNotifier {
   String get dispositivoId => _dispositivoId;
   bool get enCurso => _enCurso;
   bool get configurado => !soloLocal && (usaFirebase || _servidor != null);
-  bool get usaFirebase => !soloLocal && Firebase.apps.isNotEmpty;
+  bool get usaFirebase =>
+      !soloLocal && (restMovil != null || Firebase.apps.isNotEmpty);
   bool get haySesion => _clienteActivo?.haySesion ?? false;
   Sesion? get sesion => _sesion;
 
-  ClienteRemoto? get _clienteActivo => usaFirebase ? _firebase : _api;
+  ClienteRemoto? get _clienteActivo =>
+      usaFirebase ? (restMovil != null ? _firebaseRest : _firebase) : _api;
 
   /// La sesión principal del móvil ya autenticó este perfil. No se solicitan
   /// credenciales por segunda vez para enviar datos.
   void vincularFirebase(Investigador investigador) {
     if (!usaFirebase) return;
-    _firebase = ClienteFirebase(
-      investigadorId: investigador.id,
-      institucionCodigo: investigador.institucion.codigo,
-      roles: investigador.roles,
-    );
+    if (restMovil case final rest?) {
+      _firebaseRest = ClienteFirebaseRest(
+        rest: rest,
+        investigadorId: investigador.id,
+        institucionCodigo: investigador.institucion.codigo,
+        roles: investigador.roles,
+      );
+    } else {
+      _firebase = ClienteFirebase(
+        investigadorId: investigador.id,
+        institucionCodigo: investigador.institucion.codigo,
+        roles: investigador.roles,
+      );
+    }
     _sesion = Sesion(
       token: 'firebase',
       expiraEn: DateTime.now().toUtc().add(const Duration(hours: 1)),
@@ -98,7 +117,7 @@ class Sincronizacion extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Solicita un tramo exclusivo mediante una función privilegiada. Si el
+  /// Solicita un tramo exclusivo de una reserva administrativa. Si el
   /// aparato no tiene red, su tramo local sigue disponible; si se agotó, el
   /// repositorio impide enrolar.
   Future<String?> solicitarTramo() async {
@@ -113,8 +132,10 @@ class Sincronizacion extends ChangeNotifier {
     if (repo.pendienteDeEnvio().pacientes.isNotEmpty) {
       return 'Sincronice los pacientes pendientes antes de solicitar otro tramo.';
     }
-    final usuario = FirebaseAuth.instance.currentUser;
-    if (usuario == null || _sesion == null) {
+    final rest = restMovil;
+    final usuario = rest == null ? FirebaseAuth.instance.currentUser : null;
+    final uid = rest?.uid ?? usuario?.uid;
+    if (uid == null || _sesion == null) {
       return 'Abra sesión para solicitar un tramo.';
     }
     try {
@@ -123,18 +144,32 @@ class Sincronizacion extends ChangeNotifier {
           !perfil.roles.contains(Rol.investigadorPrincipal.name)) {
         return 'Su función no permite enrolar.';
       }
-      final dispositivo = FirebaseFirestore.instance
-          .collection('dispositivos')
-          .doc(_dispositivoId);
-      await dispositivo.set({
-        'autor_uid': usuario.uid,
-        'institucion_codigo': perfil.institucion,
-        'etiqueta': repo.ajuste(claveEtiqueta) ?? 'Aparato de campo',
-        'registrado_en': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true)).timeout(const Duration(seconds: 30));
+      if (rest != null) {
+        await rest.escribir(
+            'dispositivos/$_dispositivoId',
+            {
+              'autor_uid': uid,
+              'institucion_codigo': perfil.institucion,
+              'etiqueta': repo.ajuste(claveEtiqueta) ?? 'Aparato de campo',
+              'registrado_en': null,
+            },
+            marcaTiempo: true,
+            fusionar: true);
+      } else {
+        final dispositivo = FirebaseFirestore.instance
+            .collection('dispositivos')
+            .doc(_dispositivoId);
+        await dispositivo.set({
+          'autor_uid': uid,
+          'institucion_codigo': perfil.institucion,
+          'etiqueta': repo.ajuste(claveEtiqueta) ?? 'Aparato de campo',
+          'registrado_en': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true)).timeout(const Duration(seconds: 30));
+      }
       if (repo.ajuste('entrega_tramos') == 'reservas') {
-        final datos = await ClienteTramosFirestore()
-            .recoger(usuario.uid, _dispositivoId)
+        final datos = await (rest == null
+                ? ClienteTramosFirestore().recoger(uid, _dispositivoId)
+                : ClienteTramosRest(rest).recoger(uid, _dispositivoId))
             .timeout(const Duration(seconds: 30));
         repo.incorporarTramo(Tramo.desdeJson(datos),
             datos['etiqueta'] as String, _dispositivoId);
@@ -144,7 +179,11 @@ class Sincronizacion extends ChangeNotifier {
             : 'El tramo está agotado. La administración debe preparar '
                 'la siguiente reserva desde la CLI.';
       }
-      final token = await usuario.getIdToken();
+      if (rest != null) {
+        return 'La entrega de tramos no está configurada como reserva. '
+            'Consulte a la administración del estudio.';
+      }
+      final token = await usuario!.getIdToken();
       final proyecto = Firebase.app().options.projectId;
       final respuesta = await http
           .post(
@@ -278,6 +317,12 @@ class Sincronizacion extends ChangeNotifier {
     _enCurso = true;
     notifyListeners();
     try {
+      if (restMovil case final rest?) {
+        final investigador =
+            await AutenticacionRestMovil(rest).entrar(correo, contrasena);
+        vincularFirebase(investigador);
+        return null;
+      }
       final investigador =
           await AutenticacionFirebase().entrar(correo, contrasena);
       await FirebaseFirestore.instance
@@ -320,7 +365,11 @@ class Sincronizacion extends ChangeNotifier {
     _api?.olvidarSesion();
     _firebase?.olvidarSesion();
     _firebase = null;
-    if (usaFirebase) unawaited(FirebaseAuth.instance.signOut());
+    _firebaseRest?.olvidarSesion();
+    _firebaseRest = null;
+    if (restMovil == null && usaFirebase) {
+      unawaited(FirebaseAuth.instance.signOut());
+    }
     _sesion = null;
     notifyListeners();
   }
@@ -349,7 +398,8 @@ class Sincronizacion extends ChangeNotifier {
           repo: _repo,
           api: api,
           dispositivoId: _dispositivoId,
-          maxPacientesPorLote: api is ClienteFirebase ? 1 : null);
+          maxPacientesPorLote:
+              api is ClienteFirebase || api is ClienteFirebaseRest ? 1 : null);
       return _anotar(await cola.sincronizar());
     } finally {
       _enCurso = false;
@@ -367,6 +417,7 @@ class Sincronizacion extends ChangeNotifier {
   void dispose() {
     _api?.cerrar();
     _firebase?.cerrar();
+    _firebaseRest?.cerrar();
     super.dispose();
   }
 }

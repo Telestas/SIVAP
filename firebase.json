@@ -7,12 +7,24 @@
     "indexes": "firebase/firestore.indexes.json"
   },
   "hosting": {
-    "public": "app/build/web",
+    "public": "firebase/hosting_redirect",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
       "**/*.symbols"
+    ],
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "https://sivap.pages.dev/",
+        "type": 302
+      },
+      {
+        "source": "/index.html",
+        "destination": "https://sivap.pages.dev/",
+        "type": 302
+      }
     ],
     "headers": [
       {
@@ -25,34 +37,8 @@
         ]
       },
       {
-        "source": "/index.html",
-        "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
-      },
-      {
-        "source": "/",
-        "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
-      },
-      {
         "source": "/flutter_service_worker.js",
         "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
-      },
-      {
-        "source": "/flutter_bootstrap.js",
-        "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
-      },
-      {
-        "source": "/assets/**",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
-      },
-      {
-        "source": "/canvaskit/**",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
-      }
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
       }
     ]
   },

@@ -3,8 +3,9 @@
 Este directorio define el despliegue de Firebase del proyecto `sivap-f5060`.
 La app móvil conserva SQLite cifrado y la cola local; Firestore solo recibe una
 copia confirmada durante la sincronización. GitHub Pages sigue publicando la
-página de descarga del APK. Firebase Hosting, si se activa, sirve únicamente el
-panel web compilado en `app/build/web`.
+página de descarga del APK. El panel web se publica en Cloudflare Pages en
+<https://sivap.pages.dev/>. Firebase Hosting redirige la URL anterior hacia ese
+panel; Authentication y Firestore permanecen en el proyecto Firebase.
 
 ## Estado y límites
 
@@ -81,7 +82,7 @@ Tras crear la base y probar las reglas con Emulator Suite:
 firebase deploy --only firestore
 cd firebase/functions && npm install && cd ../..
 firebase deploy --only functions
-firebase deploy --only hosting
+firebase deploy --only hosting  # solo redirección a Cloudflare Pages
 ```
 
 El despliegue de `solicitarTramo` requiere el plan Blaze: Cloud Build y

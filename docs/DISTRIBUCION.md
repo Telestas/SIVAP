@@ -133,8 +133,27 @@ CanvasKit además del inicio de sesión.
 Añadir `sivap.pages.dev` a los dominios autorizados de Firebase Authentication
 y, si corresponde, a las restricciones de referencia de la clave web. Probar
 renovación de sesión, lecturas, escrituras y sincronización desde Cuba sin VPN
-antes de usarlo para el estudio. La URL de `web.app` seguirá usando
-Firebase Hosting y no resolverá el bloqueo.
+antes de usarlo para el estudio. La URL anterior de `web.app` redirige al
+panel de Cloudflare Pages; no debe alojar otra copia de Flutter.
+
+### Acceso móvil sin VPN
+
+El Android actual usa Firebase Auth y Cloud Firestore nativos. La sustitución de
+`window.fetch` que funciona en la web no afecta esos SDK. Dirigir únicamente el
+inicio de sesión a Cloudflare dejaría pendientes la renovación del token y las
+lecturas y escrituras de Firestore. El proxy web de Firestore atiende rutas REST
+y WebChannel; el SDK nativo usa otro transporte.
+
+La ruta compatible con Spark es un cliente móvil REST específico para Firebase:
+iniciar y renovar sesión por las funciones HTTPS de Cloudflare, usar el token
+Firebase del usuario en la API REST de Firestore y conservar las reglas del
+proyecto. Debe sustituir juntas las dependencias móviles de ambos SDK,
+incluyendo solicitudes de cuenta, perfil, configuración, tramos y sincronización.
+Las transacciones de tramos y los acuses de sincronización tienen que mantener
+su atomicidad e idempotencia. La base SQLite cifrada y la cola local siguen
+siendo la fuente de captura sin red. Antes de publicar otra APK, verificar con
+datos ficticios la renovación de sesión, pérdida de red, reintentos, reglas de
+centro, cegamiento, auditoría y rechazo de una reserva ya consumida.
 
 ### Se publican dos APK, y hay que saber por qué
 

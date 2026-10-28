@@ -72,9 +72,69 @@ el acceso correcto por VPN, esto apunta a una restricción por origen de la
 conexión, no a un problema de contraseña o de lista de API de la clave; no
 identifica por sí solo cuál servicio aplica la restricción. La app muestra un
 mensaje breve para ese caso. Una configuración de Firebase no puede convertir
-ese HTML 403 en una sesión válida. Hasta contar con un backend aprobado y
-accesible, el acceso real requiere una ruta de red que alcance los servicios
-de Firebase. La prueba local descrita arriba funciona sin esa ruta.
+ese HTML 403 en una sesión válida. El acceso real requiere una ruta de red que
+alcance los servicios de Firebase. La prueba local descrita arriba funciona sin
+esa ruta.
+
+En la web, Firefox mostró que la petición previa `OPTIONS` a
+`identitytoolkit.googleapis.com/v1/accounts:signInWithPassword` recibe `403`
+sin `Access-Control-Allow-Origin` desde Cuba. Por eso aparece también un error
+CORS: es una consecuencia de la respuesta 403, no una cabecera que podamos
+añadir desde Hosting. Desde otra red se comprobó que la misma petición `OPTIONS`
+recibe `200` con la cabecera CORS correcta y que un `POST` vacío, sin credenciales,
+recibe el error JSON esperado. Los avisos de WebGL, TrustedTypes y mapas de código
+no explican el fallo de autenticación.
+
+Para solicitar una investigación a Firebase Support, aportar la hora y zona
+horaria, URL del proyecto, método de acceso (web, Wi-Fi o datos móviles) y
+captura de la respuesta `OPTIONS` 403 sin compartir contraseñas ni tokens. Pedir
+que confirmen si Firebase Authentication y Firestore admiten el acceso desde las
+redes cubanas afectadas y si existe un ajuste oficial para habilitarlo. Hasta
+recibir esa respuesta, la VPN es la vía de pruebas que se ha comprobado en el
+teléfono. Cambiar `authDomain` o las cabeceras del sitio no modifica la llamada
+directa del SDK a Identity Toolkit. Hosting en Spark tampoco proporciona un
+proxy HTTPS arbitrario para esa llamada.
+
+### Ruta con Cloudflare Pages, como en Velanus
+
+El proyecto Velanus resolvió el bloqueo observado desde Cuba alojando la web en
+Cloudflare Pages y reenviando Firebase Authentication, renovación de sesión y
+Firestore desde Pages Functions del mismo dominio. El navegador habla con
+Cloudflare y las funciones hablan con Google. Firebase sigue validando cuentas,
+tokens y reglas; Cloudflare recibe las credenciales y los datos clínicos en
+tránsito. Esto exige revisar la autorización para ese intermediario antes de
+emplearlo con pacientes reales.
+
+SIVAP tiene preparada esa ruta en `functions/` y `app/web_assets/`. En un
+dominio `*.pages.dev`, el cliente web dirige Authentication y Secure Token al
+proxy y configura Firestore para ese mismo host; en Firebase Hosting conserva
+las llamadas directas. El proxy solo admite rutas y métodos del proyecto
+SIVAP, no almacena respuestas y no añade privilegios de administración.
+
+El proyecto Pages de pruebas es `sivap`; la URL publicada es
+<https://sivap.pages.dev/>. La primera publicación se verificó desde otra red:
+la web respondió `200`; Authentication devolvió `MISSING_EMAIL` JSON a una
+petición vacía, y Firestore devolvió su rechazo JSON normal a una consulta sin
+sesión. Una persona del equipo confirmó que pudo iniciar sesión y entrar al
+panel desde Cuba sin VPN el 28 de octubre de 2026. Aún falta comprobar desde
+esa red la renovación de sesión y las operaciones de lectura y escritura del
+flujo completo.
+
+Para repetir la publicación, preparar el andamiaje web con
+`tool/preparar_android.sh web`, compilar con
+`flutter build web --release --no-wasm-dry-run`, ejecutar
+`tool/preparar_pages.sh` desde `app/` y publicar `app/build/pages` con
+`wrangler pages deploy app/build/pages --project-name sivap --branch main`
+desde la raíz. El paquete de Pages omite las copias locales de CanvasKit porque
+Flutter ya lo descarga de `gstatic.com`; esto redujo la subida de 42 MB a
+menos de 6 MB en esta red. La comprobación desde Cuba debe incluir la carga de
+CanvasKit además del inicio de sesión.
+
+Añadir `sivap.pages.dev` a los dominios autorizados de Firebase Authentication
+y, si corresponde, a las restricciones de referencia de la clave web. Probar
+renovación de sesión, lecturas, escrituras y sincronización desde Cuba sin VPN
+antes de usarlo para el estudio. La URL de `web.app` seguirá usando
+Firebase Hosting y no resolverá el bloqueo.
 
 ### Se publican dos APK, y hay que saber por qué
 

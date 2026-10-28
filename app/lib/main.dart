@@ -13,6 +13,8 @@ import 'data/local/almacen_local.dart';
 import 'data/remoto/autenticacion_firebase.dart';
 import 'data/remoto/actualizaciones.dart';
 import 'data/remoto/configuracion_movil.dart';
+import 'data/remoto/configuracion_proxy_stub.dart'
+    if (dart.library.js_interop) 'data/remoto/configuracion_proxy_web.dart';
 import 'data/remoto/firestore_study_repository.dart';
 import 'firebase_options.dart';
 
@@ -34,6 +36,7 @@ Future<void> main() async {
 Future<void> _inicializarFirebase() async {
   if (!kIsWeb && defaultTargetPlatform != TargetPlatform.android) return;
   await Firebase.initializeApp(options: FirebaseSivapOptions.actual);
+  if (kIsWeb) configurarProxyFirestoreWeb();
 }
 
 class SivapApp extends StatefulWidget {

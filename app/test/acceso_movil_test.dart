@@ -41,6 +41,14 @@ void main() {
     expect(mensaje, isNot(contains('<html>')));
   });
 
+  test('el error de red web orienta ante el 403 observado en Cuba', () {
+    final mensaje =
+        AutenticacionFirebase.mensajeAutenticacion('network-request-failed');
+    expect(mensaje, contains('HTTP 403'));
+    expect(mensaje, contains('identitytoolkit.googleapis.com'));
+    expect(mensaje, contains('VPN'));
+  });
+
   test('el móvil toma el rol del perfil y vincula su base a una cuenta',
       () async {
     final repo = InMemoryStudyRepository();

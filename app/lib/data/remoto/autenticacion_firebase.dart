@@ -200,7 +200,10 @@ class AutenticacionFirebase {
         'wrong-password' ||
         'user-not-found' =>
           'Correo o contraseña incorrectos.',
-        'network-request-failed' => 'Sin conexión con Firebase.',
+        'network-request-failed' =>
+          'No se pudo conectar con Firebase. Si está en Cuba y el navegador '
+              'muestra HTTP 403 en identitytoolkit.googleapis.com, pruebe con '
+              'la VPN y vuelva a intentarlo.',
         'email-already-in-use' => 'El correo ya tiene una cuenta.',
         'weak-password' => 'La contraseña debe tener al menos seis caracteres.',
         'invalid-email' => 'El correo no tiene un formato válido.',

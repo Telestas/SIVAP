@@ -64,6 +64,9 @@ if [[ "$PLATAFORMAS" == *web* ]]; then
   # especialmente importante en redes de poco ancho de banda: una página en
   # blanco no permite distinguir una descarga lenta de un fallo.
   cp web_assets/index.html web/index.html
+  cp web_assets/firebase_proxy.js web/firebase_proxy.js
+  cp web_assets/_routes.json web/_routes.json
+  cp web_assets/_headers web/_headers
 
   sed -i \
     -e 's/"name": "sivap"/"name": "SIVAP"/' \
@@ -76,6 +79,9 @@ if [[ "$PLATAFORMAS" == *web* ]]; then
   grep -q '<title>SIVAP</title>' web/index.html
   grep -q 'flutter-first-frame' web/index.html
   grep -q 'href="favicon-sivap.png"' web/index.html
+  grep -q 'src="firebase_proxy.js"' web/index.html
+  test -f web/_routes.json
+  test -f web/_headers
   grep -q '"name": "SIVAP"' web/manifest.json
   test -f web/favicon-sivap.png
   test -f web/icons/Icon-512.png

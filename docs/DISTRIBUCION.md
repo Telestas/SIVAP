@@ -2,8 +2,9 @@
 
 ## Estado: funcionando
 
-**https://telestas.github.io/SIVAP/** — la página lee la última versión
-publicada y ofrece el APK. Comprobado que se descarga sin cuenta de GitHub.
+**https://sivap.pages.dev/descargar/** — la página comparte el dominio del
+panel y ofrece el APK de la última versión publicada. La URL antigua de GitHub
+Pages redirige a esta ruta.
 
 ## Prueba del flujo sin Firebase
 
@@ -159,6 +160,15 @@ ruta `documents:beginTransaction` publicada responde en JSON. Falta probar
 desde un teléfono cubano sin VPN el inicio y renovación de sesión, la lectura,
 la solicitud de tramo y la sincronización con datos ficticios. Esa comprobación
 de campo determina si Cloudflare resuelve el bloqueo también en Android.
+
+La versión 0.2.9 alcanzó el proxy, pero en el teléfono cubano informó un fallo
+de conexión antes de recibir HTTP; Chrome en ese mismo teléfono sí abre el panel
+y permite iniciar sesión sin VPN. La versión 0.2.10 cambia el transporte Android
+al motor de red Chromium/Cronet con HTTP/3, DNS del sistema y caché desactivada.
+Cronet se integra en la APK para funcionar sin descargar un proveedor desde
+Google Play Services. El error móvil distingue ahora fallos de DNS, TLS y
+conexión. Queda confirmar en el teléfono si esta ruta elimina la necesidad de
+VPN; el éxito de Chrome por sí solo no prueba el resultado de la APK.
 
 ### Se publican dos APK, y hay que saber por qué
 

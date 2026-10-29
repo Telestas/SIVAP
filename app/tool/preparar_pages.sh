@@ -8,6 +8,7 @@ test -f build/web/index.html
 test -f build/web/firebase_proxy.js
 test -f build/web/_routes.json
 test -f build/web/_headers
+test -f build/web/_redirects
 
 mkdir -p build/pages
 rsync -a --delete \
@@ -19,4 +20,11 @@ test -f build/pages/main.dart.js
 test -f build/pages/firebase_proxy.js
 test -f build/pages/_routes.json
 test -f build/pages/_headers
+test -f build/pages/_redirects
+mkdir -p build/pages/descargar
+cp ../web-descarga/index.html build/pages/descargar/index.html
+cp ../web-descarga/logo.png ../web-descarga/icono.png build/pages/descargar/
+cp -r ../web-descarga/fonts build/pages/descargar/
+sed -i 's|__REPO__|Telestas/SIVAP|g' build/pages/descargar/index.html
+test -f build/pages/descargar/index.html
 echo 'Web preparada para Cloudflare Pages en app/build/pages.'

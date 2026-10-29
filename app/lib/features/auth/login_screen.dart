@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'solicitar_acceso_screen.dart';
 import '../../core/app_state.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
 import '../../core/widgets/controls.dart';
+import '../../data/remoto/actualizaciones.dart';
 import '../../data/local/seed_data.dart';
 import '../../domain/models/role.dart';
 
@@ -29,6 +33,9 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
   bool _entrando = false;
   bool _recuperando = false;
+  late final Future<String> _versionInstalada = PackageInfo.fromPlatform()
+      .then((paquete) => paquete.version)
+      .catchError((Object _) => '');
 
   @override
   void initState() {
@@ -274,12 +281,30 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? 'Solicitando…'
                           : '¿No recibió el correo? Enviar recuperación'),
                     ),
+                    if (kIsWeb)
+                      TextButton(
+                        onPressed: () => launchUrl(
+                          Actualizaciones.paginaDescarga,
+                          mode: LaunchMode.externalApplication,
+                        ),
+                        child: const Text('Descargar la app para Android'),
+                      ),
                   ],
                   const SizedBox(height: 12),
-                  Text('v0.2.8 · ${config.definicionFormulario.version}',
+                  FutureBuilder<String>(
+                    future: _versionInstalada,
+                    builder: (context, version) => Text(
+                      [
+                        if (version.data case final actual?
+                            when actual.isNotEmpty)
+                          'v$actual',
+                        config.definicionFormulario.version,
+                      ].join(' · '),
                       textAlign: TextAlign.center,
                       style:
-                          T.label(size: 10.5, color: T.faint, tracking: 0.05)),
+                          T.label(size: 10.5, color: T.faint, tracking: 0.05),
+                    ),
+                  ),
                 ],
               ),
             ),

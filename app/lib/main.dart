@@ -14,7 +14,8 @@ import 'data/remoto/autenticacion_firebase.dart';
 import 'data/remoto/autenticacion_remota.dart';
 import 'data/remoto/autenticacion_rest_movil.dart';
 import 'data/remoto/actualizaciones.dart';
-import 'data/remoto/configuracion_movil_rest.dart';
+import 'data/remoto/configuracion_movil_rest_web.dart'
+    if (dart.library.io) 'data/remoto/configuracion_movil_rest.dart';
 import 'data/remoto/firebase_rest_movil.dart';
 import 'data/remoto/sincronizacion.dart';
 import 'data/remoto/configuracion_proxy_stub.dart'

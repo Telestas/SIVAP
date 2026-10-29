@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../sync/sincronizacion_screen.dart';
 import '../../core/app_state.dart';
@@ -15,6 +16,7 @@ import '../../data/exportacion/descarga.dart';
 import '../../data/exportacion/consentimiento_archivable.dart';
 import '../../data/exportacion/xlsx_estudio.dart';
 import '../../data/remoto/firestore_study_repository.dart';
+import '../../data/remoto/actualizaciones.dart';
 import '../../data/remoto/firebase_rest_movil.dart';
 import '../../domain/models/evento_clinico.dart';
 import '../../domain/models/patient.dart';
@@ -232,6 +234,16 @@ class _BarraLateral extends StatelessWidget {
                         fontSize: 10.5,
                         color: T.sidebarMuted)),
                 const SizedBox(height: 10),
+                if (kIsWeb) ...[
+                  GestureDetector(
+                    onTap: () => launchUrl(Actualizaciones.paginaDescarga,
+                        mode: LaunchMode.externalApplication),
+                    child: const Text('Descargar app Android',
+                        style:
+                            TextStyle(fontSize: 12.5, color: T.sidebarMuted)),
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 GestureDetector(
                   onTap: state.cerrarSesion,
                   child: const Text('Cerrar sesión',

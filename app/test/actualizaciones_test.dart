@@ -99,7 +99,7 @@ void main() {
     );
     await actualizaciones.buscar();
     expect(actualizaciones.hayNuevaVersion, isFalse);
-    expect(actualizaciones.error, contains('VPN'));
+    expect(actualizaciones.error, contains('Revise la conexión'));
     actualizaciones.dispose();
   });
 }

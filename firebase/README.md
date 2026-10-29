@@ -2,10 +2,11 @@
 
 Este directorio define el despliegue de Firebase del proyecto `sivap-f5060`.
 La app móvil conserva SQLite cifrado y la cola local; Firestore solo recibe una
-copia confirmada durante la sincronización. GitHub Pages sigue publicando la
-página de descarga del APK. El panel web se publica en Cloudflare Pages en
-<https://sivap.pages.dev/>. Firebase Hosting redirige la URL anterior hacia ese
-panel; Authentication y Firestore permanecen en el proyecto Firebase.
+copia confirmada durante la sincronización. Cloudflare Pages publica el panel
+en <https://sivap.pages.dev/> y la descarga del APK en
+<https://sivap.pages.dev/descargar/>. GitHub Pages redirige su antigua página de
+descarga; Firebase Hosting redirige su URL anterior al panel. Authentication y
+Firestore permanecen en el proyecto Firebase.
 
 ## Estado y límites
 
@@ -48,6 +49,28 @@ Para agregar otro centro se crea otro documento de institución y se aprovisiona
 sus perfiles con ese código; no hace falta recompilar la app. Las
 reglas requieren además que cada documento sincronizado incluya
 `institucion_codigo` y `autor_uid`.
+
+### Administración con comandos breves
+
+El operador del proyecto inicia sesión una vez con `firebase login`. La persona
+que recibirá el rol principal crea su cuenta desde la app y verifica el correo;
+el comando busca su UID automáticamente. Se ejecutan desde la raíz del repo:
+
+```bash
+node firebase/administrar.mjs crear-centro --proyecto sivap-f5060 --centro CODIGO --nombre 'Nombre visible'
+node firebase/administrar.mjs renombrar-centro --proyecto sivap-f5060 --centro CODIGO --nombre 'Nombre nuevo'
+node firebase/administrar.mjs asignar-principal --proyecto sivap-f5060 --correo persona@ejemplo.org --centro CODIGO
+node firebase/administrar.mjs cambiar-roles --proyecto sivap-f5060 --correo persona@ejemplo.org --roles reclutador,aplicador
+```
+
+`asignar-principal` toma el nombre de la solicitud pendiente; si la cuenta no
+solicitó acceso, añada `--nombre 'Nombre visible'`. Cierra la solicitud pendiente
+y registra el cambio en `auditoria_administrativa`. El centro recién creado tiene
+`cei_aprobado: false` y `habilitado_pruebas: false`: permite pedir acceso, pero
+no habilita captura clínica. `cambiar-roles` reemplaza los roles existentes y
+registra los anteriores y los nuevos. No admite acumular aplicador y evaluador
+de desenlaces, ni conceder o retirar el rol principal por esa vía. La persona
+debe cerrar y volver a abrir sesión para actualizar la interfaz de permisos.
 
 Antes del primer paciente, un operador autorizado carga fuera de Git:
 

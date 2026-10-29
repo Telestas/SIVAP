@@ -7,12 +7,15 @@ import 'package:http/http.dart' as http;
 import '../local/db/database_key.dart';
 import '../../domain/models/institucion.dart';
 import '../../domain/models/role.dart';
+import 'cliente_http_stub.dart' if (dart.library.io) 'cliente_http_io.dart';
+import 'diagnostico_red_stub.dart'
+    if (dart.library.io) 'diagnostico_red_io.dart';
 
 /// Transporte móvil por el mismo origen de Cloudflare que usa la web.
 /// Las reglas de Firestore siguen verificando el ID token de Firebase.
 class FirebaseRestMovil {
   FirebaseRestMovil({http.Client? cliente, AlmacenSesion? almacen})
-      : _cliente = cliente ?? http.Client(),
+      : _cliente = cliente ?? crearClienteHttp(),
         _almacen = almacen ?? const AlmacenSesionSeguro();
 
   static const origen = 'https://sivap.pages.dev';
@@ -64,10 +67,13 @@ class FirebaseRestMovil {
           await _cliente.send(solicitud).timeout(const Duration(seconds: 30));
       return await http.Response.fromStream(flujo)
           .timeout(const Duration(seconds: 30));
-    } on Object catch (error) {
-      if (error is FirebaseRestError) rethrow;
+    } on TimeoutException {
       throw const FirebaseRestError(
-          0, 'No se pudo conectar con SIVAP. Compruebe la conexión.');
+          0, 'La conexión a sivap.pages.dev tardó más de 30 segundos.');
+    } on Object catch (error) {
+      final mensaje = diagnosticoConexion(error);
+      if (mensaje == null) rethrow;
+      throw FirebaseRestError(0, mensaje);
     }
   }
 

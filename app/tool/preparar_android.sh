@@ -67,6 +67,7 @@ if [[ "$PLATAFORMAS" == *web* ]]; then
   cp web_assets/firebase_proxy.js web/firebase_proxy.js
   cp web_assets/_routes.json web/_routes.json
   cp web_assets/_headers web/_headers
+  cp web_assets/_redirects web/_redirects
 
   sed -i \
     -e 's/"name": "sivap"/"name": "SIVAP"/' \
@@ -82,6 +83,7 @@ if [[ "$PLATAFORMAS" == *web* ]]; then
   grep -q 'src="firebase_proxy.js"' web/index.html
   test -f web/_routes.json
   test -f web/_headers
+  test -f web/_redirects
   grep -q '"name": "SIVAP"' web/manifest.json
   test -f web/favicon-sivap.png
   test -f web/icons/Icon-512.png

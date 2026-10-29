@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'cliente_http_stub.dart' if (dart.library.io) 'cliente_http_io.dart';
 
 typedef LeerVersionInstalada = Future<String> Function();
 typedef AbrirDescarga = Future<bool> Function(Uri uri);
@@ -15,15 +16,15 @@ class Actualizaciones extends ChangeNotifier {
     http.Client? cliente,
     LeerVersionInstalada? leerVersionInstalada,
     AbrirDescarga? abrirDescarga,
-  })  : _cliente = cliente ?? http.Client(),
+  })  : _cliente = cliente ?? crearClienteHttp(),
         _clientePropio = cliente == null,
         _leerVersionInstalada = leerVersionInstalada ?? _versionDelPaquete,
         _abrirDescarga = abrirDescarga ?? _abrirEnNavegador;
 
-  static final Uri _releases = Uri.parse(
-      'https://api.github.com/repos/Telestas/SIVAP/releases?per_page=20');
+  static final Uri _releases =
+      Uri.parse('https://sivap.pages.dev/api/versiones');
   static final Uri paginaDescarga =
-      Uri.parse('https://telestas.github.io/SIVAP/');
+      Uri.parse('https://sivap.pages.dev/descargar/');
 
   final http.Client _cliente;
   final bool _clientePropio;
@@ -73,7 +74,7 @@ class Actualizaciones extends ChangeNotifier {
       error = null;
     } on Object {
       error = 'No se pudo comprobar la versión. Revise la conexión e inténtelo '
-          'de nuevo. Si está en Cuba, puede necesitar la VPN.';
+          'de nuevo.';
     }
   }
 

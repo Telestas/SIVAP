@@ -1,13 +1,16 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:sivap/data/remoto/cliente_firebase_rest.dart';
 import 'package:sivap/data/remoto/cliente_tramos_rest.dart';
 import 'package:sivap/data/remoto/autenticacion_rest_movil.dart';
+import 'package:sivap/data/remoto/diagnostico_red_io.dart';
 import 'package:sivap/data/remoto/firebase_rest_movil.dart';
 import 'package:sivap/data/remoto/lote.dart';
 import 'package:sivap/domain/models/role.dart';
-import 'dart:convert';
 
 class _AlmacenFalso implements AlmacenSesion {
   final datos = <String, String>{};
@@ -194,6 +197,11 @@ void main() {
         rest.entrar('a@b.c', 'clave'),
         throwsA(isA<FirebaseRestError>()
             .having((e) => e.mensaje, 'mensaje', contains('HTTP 403'))));
+  });
+
+  test('un fallo de DNS se distingue de un fallo de contraseña', () {
+    expect(diagnosticoConexion(const SocketException('Failed host lookup')),
+        contains('DNS'));
   });
 
   test('renovación de sesión usa el proxy y conserva el token nuevo', () async {

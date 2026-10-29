@@ -49,7 +49,7 @@ banda para descargar el SDK de Flutter:
 gh workflow run verificar.yml && gh run watch
 ```
 
-Página de descarga del APK: **https://telestas.github.io/SIVAP/**
+Página de descarga del APK: **https://sivap.pages.dev/descargar/**
 
 ## Las reglas que todo cambio debe respetar
 

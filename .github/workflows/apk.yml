@@ -86,8 +86,10 @@ jobs:
           VERSION: ${{ steps.version.outputs.numero }}
         run: |
           flutter build apk --release --split-per-abi \
+            --dart-define=cronetHttpNoPlay=true \
             --build-name="$VERSION" --build-number="${{ github.run_number }}"
           flutter build apk --release \
+            --dart-define=cronetHttpNoPlay=true \
             --build-name="$VERSION" --build-number="${{ github.run_number }}"
 
           mkdir -p build/entrega
@@ -275,7 +277,7 @@ jobs:
               && echo 'llavero del estudio' \
               || echo '⚠️ clave de depuración')
             texto=$(printf '✅ <b>SIVAP %s</b> publicada\n\n' "$VERSION")
-            texto="$texto$(printf 'Descarga: https://telestas.github.io/SIVAP/\n')"
+            texto="$texto$(printf 'Descarga: https://sivap.pages.dev/descargar/\n')"
             texto="$texto$(printf 'Tamaño: %s · Firma: %s\n\n' "$ARM64" "$firma")"
             texto="$texto$(printf '<code>%s</code>\n' "$SHA")"
             texto="$texto$(printf '<i>Pruebas operativas. La captura de pacientes reales permanece bloqueada.</i>')"

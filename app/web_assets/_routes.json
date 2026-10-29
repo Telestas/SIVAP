@@ -1,5 +1,5 @@
 {
   "version": 1,
-  "include": ["/api/firebase/*", "/v1/*", "/google.firestore.v1.Firestore/*"],
+  "include": ["/api/firebase/*", "/api/versiones", "/v1/*", "/google.firestore.v1.Firestore/*"],
   "exclude": []
 }

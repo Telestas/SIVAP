@@ -6,6 +6,11 @@
 <title>SIVAP — Descargar la app</title>
 <meta name="description" content="Descarga de SIVAP, aplicación de campo del ensayo LIVERE.">
 <meta name="robots" content="noindex">
+<script>
+if (location.hostname === 'telestas.github.io') {
+  location.replace('https://sivap.pages.dev/descargar/');
+}
+</script>
 <link rel="icon" type="image/png" href="icono.png">
 <style>
 /* Tipografía empaquetada, no traída de un CDN: la conexión desde el hospital
@@ -328,7 +333,9 @@ function formatoFecha(iso) {
 
 // Se pide la lista completa para incluir versiones antiguas de prueba y se
 // toma la primera, que es la más reciente.
-fetch(`https://api.github.com/repos/${REPO}/releases?per_page=1`)
+fetch(location.hostname === 'sivap.pages.dev'
+  ? '/api/versiones'
+  : `https://api.github.com/repos/${REPO}/releases?per_page=1`)
   .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
   .then(([release]) => {
     if (!release) return Promise.reject('sin releases');

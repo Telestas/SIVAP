@@ -72,6 +72,14 @@ registra los anteriores y los nuevos. No admite acumular aplicador y evaluador
 de desenlaces, ni conceder o retirar el rol principal por esa vía. La persona
 debe cerrar y volver a abrir sesión para actualizar la interfaz de permisos.
 
+El correo es el identificador de acceso: el nombre visible del perfil no es un
+usuario único. Una cuenta nueva registra `pendiente_verificacion` al tocar
+«Continuar» una vez. El investigador principal la ve en el panel, pero las reglas
+no permiten aprobarla hasta que el titular verifique el correo. La app comprueba
+el estado al volver a primer plano y periódicamente mientras la pantalla de alta
+está abierta; si se cerró, la siguiente entrada con la cuenta actualiza la
+solicitud a `pendiente` antes de mostrar el estado de aprobación.
+
 Antes del primer paciente, un operador autorizado carga fuera de Git:
 
 - `instituciones/{codigo}` con `nombre` y `cei_aprobado: true` solo para los

@@ -32,6 +32,27 @@ async function tokenOperador() {
   return tokens.access_token;
 }
 
+/** Localiza una cuenta por correo usando la misma sesión del operador. */
+export async function buscarCuenta(proyecto, correo) {
+  const token = await tokenOperador();
+  const respuesta = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/projects/${encodeURIComponent(proyecto)}/accounts:query`,
+    {
+      method: 'POST',
+      headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
+      body: JSON.stringify({expression: [{email: correo.trim()}], limit: '1'}),
+      signal: AbortSignal.timeout(30000),
+    },
+  );
+  if (!respuesta.ok) throw new Error(`Authentication ${respuesta.status}: no se pudo consultar la cuenta.`);
+  const datos = await respuesta.json();
+  const cuenta = datos.userInfo?.[0];
+  if (!cuenta || cuenta.email?.toLowerCase() !== correo.trim().toLowerCase()) {
+    throw new Error('No existe una cuenta de Authentication con ese correo.');
+  }
+  return {...cuenta, uid: cuenta.localId};
+}
+
 export class AdministracionFirestore {
   constructor(proyecto) {
     this.raiz = `projects/${proyecto}/databases/(default)/documents`;
@@ -332,8 +353,7 @@ async function main() {
     console.log(JSON.stringify(await operacion(db, opciones['--centro'], opciones['--nombre'])));
   } else {
     if (!opciones['--correo']) throw new Error('Falta --correo.');
-    const {findUser} = require('firebase-tools/lib/gcp/auth');
-    const cuenta = await findUser(proyecto, opciones['--correo'].trim());
+    const cuenta = await buscarCuenta(proyecto, opciones['--correo']);
     if (accion === 'asignar-principal') {
       if (!opciones['--centro']) throw new Error('Falta --centro.');
       console.log(JSON.stringify(await asignarPrincipal(

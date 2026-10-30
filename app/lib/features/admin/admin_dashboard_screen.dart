@@ -904,9 +904,25 @@ class _PanelUsuariosState extends State<_PanelUsuarios> {
             final pendientes = snapshot.data!
                 .where((s) => s.datos['estado'] == 'pendiente')
                 .toList();
+            final sinVerificar = snapshot.data!
+                .where((s) => s.datos['estado'] == 'pendiente_verificacion')
+                .toList();
             return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                      'Esperando verificación de correo: ${sinVerificar.length}',
+                      style: const TextStyle(fontSize: 18)),
+                  const SizedBox(height: 8),
+                  for (final solicitud in sinVerificar)
+                    Card(
+                      child: ListTile(
+                        title: Text('${solicitud.datos['nombre']}'),
+                        subtitle: Text('${solicitud.datos['correo']}'),
+                        trailing: const Text('Sin verificar'),
+                      ),
+                    ),
+                  const SizedBox(height: 20),
                   Text('Solicitudes pendientes: ${pendientes.length}',
                       style: const TextStyle(fontSize: 18)),
                   const SizedBox(height: 8),
@@ -956,9 +972,24 @@ class _PanelUsuariosState extends State<_PanelUsuarios> {
           final pendientes = snapshot.data!.docs
               .where((d) => d.data()['estado'] == 'pendiente')
               .toList();
+          final sinVerificar = snapshot.data!.docs
+              .where((d) => d.data()['estado'] == 'pendiente_verificacion')
+              .toList();
           return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text('Esperando verificación de correo: ${sinVerificar.length}',
+                    style: const TextStyle(fontSize: 18)),
+                const SizedBox(height: 8),
+                for (final solicitud in sinVerificar)
+                  Card(
+                    child: ListTile(
+                      title: Text('${solicitud.data()['nombre']}'),
+                      subtitle: Text('${solicitud.data()['correo']}'),
+                      trailing: const Text('Sin verificar'),
+                    ),
+                  ),
+                const SizedBox(height: 20),
                 Text('Solicitudes pendientes: ${pendientes.length}',
                     style: const TextStyle(fontSize: 18)),
                 const SizedBox(height: 8),

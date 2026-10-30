@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:sivap/data/remoto/cliente_firebase_rest.dart';
 import 'package:sivap/data/remoto/cliente_tramos_rest.dart';
 import 'package:sivap/data/remoto/autenticacion_rest_movil.dart';
+import 'package:sivap/data/remoto/autenticacion_firebase.dart';
 import 'package:sivap/data/remoto/diagnostico_red_io.dart';
 import 'package:sivap/data/remoto/firebase_rest_movil.dart';
 import 'package:sivap/data/remoto/lote.dart';
@@ -54,8 +55,64 @@ class _RestFalso extends FirebaseRestMovil {
   }
 }
 
+class _RestSolicitudFalso extends FirebaseRestMovil {
+  bool verificada = false;
+  int correos = 0;
+  Map<String, Object?>? solicitud;
+
+  @override
+  String? get uid => 'uid-prueba';
+
+  @override
+  Future<void> entrar(String correo, String contrasena) async {}
+
+  @override
+  Future<Map<String, dynamic>> datosCuenta() async => {
+        'email': 'persona@example.org',
+        'emailVerified': verificada,
+      };
+
+  @override
+  Future<Map<String, dynamic>?> leer(String ruta) async =>
+      ruta.startsWith('solicitudes_acceso/') ? solicitud : null;
+
+  @override
+  Future<void> enviarCorreoVerificacion() async {
+    correos++;
+  }
+
+  @override
+  Future<void> escribir(String ruta, Map<String, Object?> datos,
+      {bool crear = false,
+      bool marcaTiempo = false,
+      bool fusionar = false}) async {
+    solicitud = {...?solicitud, ...datos};
+  }
+
+  @override
+  Future<void> salir() async {}
+}
+
 void main() {
   const prefijo = 'projects/sivap-f5060/databases/(default)/documents/';
+
+  test('una sola solicitud espera verificación y se promueve sin reenviar',
+      () async {
+    final rest = _RestSolicitudFalso();
+    final acceso = AutenticacionRestMovil(rest);
+    await expectLater(
+      acceso.solicitarAcceso(
+          'persona@example.org', 'clave-prueba', 'Persona', 'C01'),
+      throwsA(isA<VerificacionPendiente>()),
+    );
+    expect(rest.solicitud?['estado'], 'pendiente_verificacion');
+    expect(rest.correos, 1);
+    rest.verificada = true;
+    await acceso.solicitarAcceso(
+        'persona@example.org', 'clave-prueba', 'Persona', 'C01');
+    expect(rest.solicitud?['estado'], 'pendiente');
+    expect(rest.correos, 1);
+  });
 
   test('Firestore REST conserva tipos, listas y mapas', () {
     final codificado = FirebaseRestMovil.camposDocumento({
@@ -143,6 +200,11 @@ void main() {
               'expiresIn': '3600',
             }),
             200,
+            headers: {'content-type': 'application/json'});
+      }
+      if (ruta.endsWith('solicitudes_acceso/uid')) {
+        return http.Response(
+            jsonEncode({'error': {'status': 'NOT_FOUND'}}), 404,
             headers: {'content-type': 'application/json'});
       }
       if (ruta.endsWith('investigadores/uid')) {

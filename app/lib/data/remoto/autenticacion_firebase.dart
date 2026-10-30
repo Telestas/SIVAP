@@ -17,9 +17,8 @@ class AutenticacionFirebase implements AutenticacionRemota {
   @override
   Future<void> crearCuenta(String correo, String contrasena) async {
     try {
-      final credencial = await _auth.createUserWithEmailAndPassword(
+      await _auth.createUserWithEmailAndPassword(
           email: correo.trim(), password: contrasena);
-      await credencial.user!.sendEmailVerification();
     } on FirebaseAuthException catch (error) {
       if (error.code == 'email-already-in-use') {
         throw const CuentaYaExiste();
@@ -41,28 +40,37 @@ class AutenticacionFirebase implements AutenticacionRemota {
       await usuario.reload();
       final actual = _auth.currentUser!;
       await actual.getIdToken(true);
-      if (!actual.emailVerified) {
-        await actual.sendEmailVerification();
-        throw const AccesoFirebaseRechazado(
-            'Verifique su correo y vuelva a solicitar acceso. Enviamos un nuevo enlace.');
-      }
       if ((await _firestore.collection('investigadores').doc(actual.uid).get())
           .exists) {
         throw const AccesoFirebaseRechazado('Esta cuenta ya está aprobada.');
       }
       final referencia =
           _firestore.collection('solicitudes_acceso').doc(actual.uid);
-      if ((await referencia.get()).exists) {
-        throw const AccesoFirebaseRechazado(
-            'Su solicitud ya fue registrada. Espere la decisión del investigador principal.');
+      final anterior = await referencia.get();
+      if (anterior.exists) {
+        if (anterior.data()?['institucion_codigo'] != codigoCentro.trim() ||
+            anterior.data()?['nombre'] != nombre.trim()) {
+          throw const AccesoFirebaseRechazado(
+              'Este correo ya tiene una solicitud con otros datos. '
+              'Consulte al investigador principal de su centro.');
+        }
+        if (anterior.data()?['estado'] == 'pendiente_verificacion' &&
+            actual.emailVerified) {
+          await referencia.update({'estado': 'pendiente'});
+        } else if (!actual.emailVerified) {
+          throw const VerificacionPendiente();
+        }
+        return;
       }
+      if (!actual.emailVerified) await actual.sendEmailVerification();
       await referencia.set({
         'correo': actual.email,
         'nombre': nombre.trim(),
         'institucion_codigo': codigoCentro.trim(),
-        'estado': 'pendiente',
+        'estado': actual.emailVerified ? 'pendiente' : 'pendiente_verificacion',
         'solicitado_en': FieldValue.serverTimestamp(),
       });
+      if (!actual.emailVerified) throw const VerificacionPendiente();
     } on FirebaseAuthException catch (error) {
       throw AccesoFirebaseRechazado(
           mensajeAutenticacion(error.code, detalle: error.message));
@@ -80,6 +88,7 @@ class AutenticacionFirebase implements AutenticacionRemota {
     try {
       final credencial = await _auth.signInWithEmailAndPassword(
           email: correo.trim(), password: contrasena);
+      await _promoverSolicitudVerificada(credencial.user!);
       return await _leerPerfil(credencial.user!);
     } on FirebaseAuthException catch (error) {
       throw AccesoFirebaseRechazado(
@@ -87,6 +96,19 @@ class AutenticacionFirebase implements AutenticacionRemota {
     } on FirebaseException catch (error) {
       throw AccesoFirebaseRechazado(
           error.message ?? 'No se pudo leer el perfil.');
+    }
+  }
+
+  Future<void> _promoverSolicitudVerificada(User usuario) async {
+    await usuario.reload();
+    final actual = _auth.currentUser;
+    if (actual == null || !actual.emailVerified) return;
+    await actual.getIdToken(true);
+    final referencia =
+        _firestore.collection('solicitudes_acceso').doc(actual.uid);
+    final solicitud = await referencia.get();
+    if (solicitud.data()?['estado'] == 'pendiente_verificacion') {
+      await referencia.update({'estado': 'pendiente'});
     }
   }
 
@@ -245,4 +267,13 @@ class AccesoFirebaseRechazado implements Exception {
 /// Permite continuar el mismo formulario con una cuenta ya registrada.
 class CuentaYaExiste implements Exception {
   const CuentaYaExiste();
+}
+
+/// La solicitud está registrada y visible, pero todavía no es aprobable.
+class VerificacionPendiente implements Exception {
+  const VerificacionPendiente();
+  @override
+  String toString() => 'Enviamos la verificación al correo. La solicitud ya '
+      'aparece en el panel; al volver a la app comprobamos el correo y la '
+      'pasamos a aprobación automáticamente.';
 }

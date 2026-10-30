@@ -25,19 +25,29 @@ class AutenticacionRestMovil implements AutenticacionRemota {
     try {
       await rest.entrar(correo, contrasena);
       final cuenta = await rest.datosCuenta();
-      if (cuenta['emailVerified'] != true) {
-        await rest.enviarCorreoVerificacion();
-        throw const AccesoFirebaseRechazado(
-            'Verifique su correo y vuelva a solicitar acceso. Enviamos un nuevo enlace.');
-      }
+      final verificada = cuenta['emailVerified'] == true;
       final uid = rest.uid!;
       if (await rest.leer('investigadores/$uid') != null) {
         throw const AccesoFirebaseRechazado('Esta cuenta ya está aprobada.');
       }
-      if (await rest.leer('solicitudes_acceso/$uid') != null) {
-        throw const AccesoFirebaseRechazado(
-            'Su solicitud ya fue registrada. Espere la decisión del investigador principal.');
+      final anterior = await rest.leer('solicitudes_acceso/$uid');
+      if (anterior != null) {
+        if (anterior['institucion_codigo'] != codigoCentro.trim() ||
+            anterior['nombre'] != nombre.trim()) {
+          throw const AccesoFirebaseRechazado(
+              'Este correo ya tiene una solicitud con otros datos. '
+              'Consulte al investigador principal de su centro.');
+        }
+        if (anterior['estado'] == 'pendiente_verificacion' && verificada) {
+          await rest.escribir(
+              'solicitudes_acceso/$uid', {'estado': 'pendiente'},
+              fusionar: true);
+        } else if (!verificada) {
+          throw const VerificacionPendiente();
+        }
+        return;
       }
+      if (!verificada) await rest.enviarCorreoVerificacion();
       // El tiempo del servidor es obligatorio para cumplir las reglas.
       await rest.escribir(
           'solicitudes_acceso/$uid',
@@ -45,11 +55,12 @@ class AutenticacionRestMovil implements AutenticacionRemota {
             'correo': cuenta['email'] as String,
             'nombre': nombre.trim(),
             'institucion_codigo': codigoCentro.trim(),
-            'estado': 'pendiente',
+            'estado': verificada ? 'pendiente' : 'pendiente_verificacion',
             'solicitado_en': null,
           },
           crear: true,
           marcaTiempo: true);
+      if (!verificada) throw const VerificacionPendiente();
     } on FirebaseRestError catch (error) {
       throw AccesoFirebaseRechazado(error.estado == 403
           ? 'No se pudo registrar la solicitud. Compruebe el código del centro.'
@@ -63,6 +74,16 @@ class AutenticacionRestMovil implements AutenticacionRemota {
   Future<Investigador> entrar(String correo, String contrasena) async {
     try {
       await rest.entrar(correo, contrasena);
+      final cuenta = await rest.datosCuenta();
+      if (cuenta['emailVerified'] == true) {
+        final uid = rest.uid!;
+        final solicitud = await rest.leer('solicitudes_acceso/$uid');
+        if (solicitud?['estado'] == 'pendiente_verificacion') {
+          await rest.escribir(
+              'solicitudes_acceso/$uid', {'estado': 'pendiente'},
+              fusionar: true);
+        }
+      }
       return await _leerPerfil();
     } on FirebaseRestError catch (error) {
       throw AccesoFirebaseRechazado(error.mensaje);

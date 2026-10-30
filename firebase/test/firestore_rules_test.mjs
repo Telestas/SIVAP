@@ -15,6 +15,7 @@ import {
   query,
   runTransaction,
   setDoc,
+  updateDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
@@ -125,20 +126,38 @@ test('una cuenta verificada solicita acceso sin obtener permisos clínicos', asy
   }));
 });
 
-test('correo sin verificar y centro inexistente no pueden solicitar acceso', async () => {
+test('el correo sin verificar queda visible, pero no puede aprobarse aún', async () => {
   await sembrarPerfil('principal', ['investigadorPrincipal']);
   const datos = {
     correo: 'nuevo@ejemplo.test', nombre: 'Persona de prueba',
-    institucion_codigo: 'centro-demo', estado: 'pendiente',
+    institucion_codigo: 'centro-demo', estado: 'pendiente_verificacion',
     solicitado_en: serverTimestamp(),
   };
   const sinVerificar = entorno.authenticatedContext('nuevo', {
     email: 'nuevo@ejemplo.test', email_verified: false,
   }).firestore();
-  await assertFails(setDoc(doc(sinVerificar, 'solicitudes_acceso', 'nuevo'), datos));
+  const solicitud = doc(sinVerificar, 'solicitudes_acceso', 'nuevo');
+  await assertSucceeds(setDoc(solicitud, datos));
+  await assertFails(updateDoc(solicitud, {estado: 'pendiente'}));
+  const principal = entorno.authenticatedContext('principal').firestore();
+  const lote = writeBatch(principal);
+  lote.set(doc(principal, 'investigadores', 'nuevo'), {
+    nombre: datos.nombre, correo: datos.correo,
+    institucion_codigo: datos.institucion_codigo, roles: ['reclutador'],
+    aprobado_por: 'principal', aprobado_en: serverTimestamp(),
+  });
+  lote.update(doc(principal, 'solicitudes_acceso', 'nuevo'), {
+    estado: 'aprobado', rol_aprobado: 'reclutador',
+    aprobado_por: 'principal', aprobado_en: serverTimestamp(),
+  });
+  await assertFails(lote.commit());
   const verificado = entorno.authenticatedContext('nuevo', {
     email: 'nuevo@ejemplo.test', email_verified: true,
   }).firestore();
+  await assertSucceeds(updateDoc(doc(verificado, 'solicitudes_acceso', 'nuevo'),
+    {estado: 'pendiente'}));
+  await assertFails(updateDoc(doc(verificado, 'solicitudes_acceso', 'nuevo'),
+    {nombre: 'Nombre alterado'}));
   await assertFails(setDoc(doc(verificado, 'solicitudes_acceso', 'nuevo'), {
     ...datos, institucion_codigo: 'centro-inexistente',
   }));

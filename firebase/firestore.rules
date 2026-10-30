@@ -111,7 +111,6 @@ service cloud.firestore {
           (esPrincipal() && mismaInstitucionExistente()));
       allow list: if esPrincipal() && mismaInstitucionExistente();
       allow create: if autenticado() && uid == request.auth.uid &&
-          request.auth.token.email_verified == true &&
           !perfilExiste() &&
           request.resource.data.keys().hasAll([
             'correo', 'nombre', 'institucion_codigo', 'estado', 'solicitado_en'
@@ -124,8 +123,16 @@ service cloud.firestore {
           request.resource.data.nombre.size() <= 120 &&
           request.resource.data.institucion_codigo is string &&
           exists(/databases/$(database)/documents/instituciones/$(request.resource.data.institucion_codigo)) &&
-          request.resource.data.estado == 'pendiente' &&
+          request.resource.data.estado ==
+              (request.auth.token.email_verified == true
+                  ? 'pendiente' : 'pendiente_verificacion') &&
           request.resource.data.solicitado_en == request.time;
+      allow update: if autenticado() && uid == request.auth.uid &&
+          request.auth.token.email_verified == true &&
+          !perfilExiste() &&
+          resource.data.estado == 'pendiente_verificacion' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']) &&
+          request.resource.data.estado == 'pendiente';
       allow update: if esPrincipal() && uid != request.auth.uid &&
           mismaInstitucionExistente() && resource.data.estado == 'pendiente' &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([

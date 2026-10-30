@@ -316,7 +316,7 @@ void main() {
     expect(find.text('Ya tengo cuenta'), findsNothing);
   });
 
-  testWidgets('una cuenta nueva pide verificar antes de enviar solicitud',
+  testWidgets('una cuenta nueva registra solicitud con un solo toque',
       (tester) async {
     lienzo(tester, alto: 850);
     var solicitudes = 0;
@@ -331,6 +331,7 @@ void main() {
       crearCuentaRemota: (_, __) async {},
       solicitarAccesoRemoto: (_, __, ___, ____) async {
         solicitudes++;
+        if (solicitudes == 1) throw const VerificacionPendiente();
       },
     );
     addTearDown(estado.dispose);
@@ -343,8 +344,13 @@ void main() {
     await tester.enterText(find.byType(TextField).at(3), 'C01');
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
-    expect(solicitudes, 0);
-    expect(find.textContaining('Verifique el correo'), findsOneWidget);
+    expect(solicitudes, 1);
+    expect(find.textContaining('Enviamos la verificación'), findsOneWidget);
+    expect(find.text('Esperando verificación'), findsOneWidget);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(solicitudes, 2);
+    expect(find.textContaining('Solicitud enviada'), findsOneWidget);
   });
 
   testWidgets('el panel estrecho deja entrar a Usuarios y roles',

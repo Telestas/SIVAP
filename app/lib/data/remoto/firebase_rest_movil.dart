@@ -147,11 +147,7 @@ class FirebaseRestMovil {
       'returnSecureToken': true
     });
     await _guardarSesion(datos);
-    try {
-      await enviarCorreoVerificacion();
-    } finally {
-      await salir();
-    }
+    await salir();
   }
 
   Future<void> _guardarSesion(Map<String, dynamic> datos) async {

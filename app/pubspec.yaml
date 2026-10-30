@@ -3,7 +3,7 @@ description: >-
   SIVAP — captura de datos de un estudio de cohorte clínico.
   App Flutter offline-first para investigadores de campo.
 publish_to: none
-version: 0.2.10
+version: 0.2.11
 
 environment:
   sdk: ">=3.4.0 <4.0.0"

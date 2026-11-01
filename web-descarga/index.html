@@ -276,6 +276,28 @@ code {
 // El repositorio se sustituye al desplegar (ver pages.yml).
 const REPO = '__REPO__';
 const paginaReleases = `https://github.com/${REPO}/releases`;
+const respaldo = {
+  tag_name: 'v0.2.12',
+  published_at: '2026-11-01T01:29:11Z',
+  body: [
+    '| `sivap-0.2.12-arm64.apk` | `4a21e02c06d4d15b27def435ea83a2dd270cabfef02fa8717a583ae9e9bc6e96` |',
+    '| `sivap-0.2.12-universal.apk` | `a732d05b824c44cfd69c74cd52582819e22072f15f2df3239e949de0a3594427` |',
+  ].join('\n'),
+  assets: [
+    {
+      name: 'sivap-0.2.12-arm64.apk',
+      size: 33557729,
+      browser_download_url:
+        'https://github.com/Telestas/SIVAP/releases/download/v0.2.12/sivap-0.2.12-arm64.apk',
+    },
+    {
+      name: 'sivap-0.2.12-universal.apk',
+      size: 91594877,
+      browser_download_url:
+        'https://github.com/Telestas/SIVAP/releases/download/v0.2.12/sivap-0.2.12-universal.apk',
+    },
+  ],
+};
 
 const $ = (id) => document.getElementById(id);
 
@@ -313,17 +335,13 @@ function pedirVersiones() {
           r.ok ? r.json() : Promise.reject(r.status)));
 }
 
-pedirVersiones()
-  .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-  .then(([release]) => {
-    if (!release) return Promise.reject('sin releases');
-
+function mostrarVersion(release) {
     const apks = (release.assets || []).filter((a) => a.name.endsWith('.apk'));
     // El de arm64 es el recomendado: pesa un tercio y vale para casi cualquier
     // teléfono de los últimos años.
     const principal = apks.find((a) => a.name.includes('arm64')) || apks[0];
     const universal = apks.find((a) => a.name.includes('universal'));
-    if (!principal) return Promise.reject('sin apk');
+    if (!principal) return;
 
     $('descarga').href = principal.browser_download_url;
     $('descarga').setAttribute('download', principal.name);
@@ -345,12 +363,17 @@ pedirVersiones()
       $('tamano-universal').textContent = formatoTamano(universal.size);
       $('alternativa').hidden = false;
     }
+}
+
+// La página queda lista para descargar aun cuando una consulta temporal a
+// Cloudflare o GitHub no responda. La consulta posterior reemplaza este
+// respaldo cuando haya una versión más reciente.
+mostrarVersion(respaldo);
+pedirVersiones()
+  .then(([release]) => {
+    if (release) mostrarVersion(release);
   })
-  .catch(() => {
-    for (const id of ['version', 'fecha', 'tamano', 'sha']) {
-      $(id).textContent = 'ver la página de la versión';
-    }
-  });
+  .catch(() => {});
 </script>
 </body>
 </html>

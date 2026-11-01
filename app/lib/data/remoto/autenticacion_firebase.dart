@@ -254,7 +254,7 @@ class PerfilNoAprovisionado implements Exception {
   const PerfilNoAprovisionado();
   @override
   String toString() =>
-      'Esta cuenta no tiene un perfil aprobado. Pulse «Solicitar acceso o crear cuenta».';
+      'Esta cuenta no tiene un perfil aprobado. Pulse «Crear una cuenta nueva».';
 }
 
 class AccesoFirebaseRechazado implements Exception {

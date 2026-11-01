@@ -25,3 +25,31 @@ test('publica solo metadatos de APK necesarios para la descarga', async () => {
     globalThis.fetch = anterior;
   }
 });
+
+test('conserva una respuesta reciente para no agotar GitHub', async () => {
+  const anteriorFetch = globalThis.fetch;
+  const anteriorCaches = globalThis.caches;
+  let llamadas = 0;
+  const almacen = new Map();
+  globalThis.fetch = async () => {
+    llamadas++;
+    return Response.json([]);
+  };
+  globalThis.caches = {default: {
+    match: async (clave) => almacen.get(clave.url),
+    put: async (clave, valor) => almacen.set(clave.url, valor),
+  }};
+  const contexto = {
+    request: new Request('https://sivap.pages.dev/api/versiones'),
+    waitUntil: (promesa) => promesa,
+  };
+  try {
+    await onRequestGet(contexto);
+    const respuesta = await onRequestGet(contexto);
+    assert.equal(respuesta.status, 200);
+    assert.equal(llamadas, 1);
+  } finally {
+    globalThis.fetch = anteriorFetch;
+    globalThis.caches = anteriorCaches;
+  }
+});

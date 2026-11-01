@@ -170,6 +170,14 @@ Google Play Services. El error móvil distingue ahora fallos de DNS, TLS y
 conexión. Queda confirmar en el teléfono si esta ruta elimina la necesidad de
 VPN; el éxito de Chrome por sí solo no prueba el resultado de la APK.
 
+En la prueba con v0.2.11, Chrome sí abrió y autenticó el panel en el mismo
+teléfono y red cubana sin VPN, mientras la APK mostró un error genérico de
+conexión anterior a HTTP. La variante v0.2.12 desactiva QUIC en Cronet para
+probar TCP y muestra los códigos de red de Cronet si vuelve a fallar. Una prueba
+en ese teléfono debe confirmar tanto el acceso sin VPN como la lectura del
+perfil; el código mostrado permite investigar el transporte sin compartir
+correo, contraseña ni token.
+
 ### Se publican dos APK, y hay que saber por qué
 
 | Archivo | Tamaño | Para quién |

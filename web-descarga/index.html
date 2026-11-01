@@ -47,10 +47,6 @@ if (location.hostname === 'telestas.github.io') {
   --line: #dcdfe3;
   --line-soft: #e0e2e5;
   --accent: #17615a;
-  --warn-bg: #fdf1da;
-  --warn-line: #eed9ac;
-  --warn-fg: #7a5710;
-  --warn-dot: #c98a1a;
   --ok-bg: #e6f1ea;
   --ok-line: #c6ddcf;
   --ok-fg: #2f6b46;
@@ -103,30 +99,6 @@ h1 {
   color: var(--secondary);
   text-wrap: pretty;
 }
-
-/* Banda de estado: el mismo elemento que usa la app para decir en qué
-   condiciones está trabajando. */
-.banda {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  border-radius: 8px;
-  padding: 13px 14px;
-  font-size: 13px;
-  line-height: 1.5;
-  margin-bottom: 24px;
-  background: var(--warn-bg);
-  border: 1px solid var(--warn-line);
-  color: var(--warn-fg);
-}
-.banda .punto {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--warn-dot);
-  margin-top: 6px;
-  flex: none;
-}
-.banda strong { font-weight: 600; }
 
 .tarjeta {
   background: var(--card);
@@ -255,15 +227,6 @@ code {
     con la base de datos del dispositivo cifrada.
   </p>
 
-  <div class="banda">
-    <span class="punto" aria-hidden="true"></span>
-    <span>
-      <strong>Versión para pruebas.</strong><br>
-      Utilice únicamente pacientes ficticios para comprobar el funcionamiento
-      de la app antes de su uso clínico.
-    </span>
-  </div>
-
   <div class="contenido">
   <div class="tarjeta">
     <a class="boton" id="descarga" href="#" rel="noopener">Descargar para Android</a>
@@ -333,9 +296,24 @@ function formatoFecha(iso) {
 
 // Se pide la lista completa para incluir versiones antiguas de prueba y se
 // toma la primera, que es la más reciente.
-fetch(location.hostname === 'sivap.pages.dev'
+const urlGitHub = `https://api.github.com/repos/${REPO}/releases?per_page=1`;
+const urlVersiones = location.hostname === 'sivap.pages.dev'
   ? '/api/versiones'
-  : `https://api.github.com/repos/${REPO}/releases?per_page=1`)
+  : urlGitHub;
+
+// Cloudflare conserva una copia de cinco minutos. Si la función no puede
+// consultar GitHub, el navegador lo intenta directamente, que también permite
+// descargar la versión publicada sin dejar la página sin datos.
+function pedirVersiones() {
+  return fetch(urlVersiones)
+    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    .catch(() => urlVersiones === urlGitHub
+      ? Promise.reject('sin versiones')
+      : fetch(urlGitHub).then((r) =>
+          r.ok ? r.json() : Promise.reject(r.status)));
+}
+
+pedirVersiones()
   .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
   .then(([release]) => {
     if (!release) return Promise.reject('sin releases');

@@ -275,6 +275,8 @@ void main() {
     expect(find.bySemanticsLabel('Logo de SIVAP'), findsOneWidget);
     expect(find.widgetWithText(TextField, 'correo@institucion.cu'),
         findsOneWidget);
+    expect(find.text('Crear una cuenta nueva'), findsOneWidget);
+    expect(find.text('Solicitar acceso o crear cuenta'), findsNothing);
   });
 
   testWidgets('el mismo formulario solicita acceso para una cuenta existente',

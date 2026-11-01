@@ -271,7 +271,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? null
                           : () => Navigator.of(context).push(MaterialPageRoute(
                               builder: (_) => const SolicitarAccesoScreen())),
-                      child: const Text('Solicitar acceso o crear cuenta'),
+                      child: const Text('Crear una cuenta nueva'),
                     ),
                     const SizedBox(height: 8),
                     TextButton(
@@ -293,17 +293,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
                   FutureBuilder<String>(
                     future: _versionInstalada,
-                    builder: (context, version) => Text(
-                      [
-                        if (version.data case final actual?
-                            when actual.isNotEmpty)
-                          'v$actual',
-                        config.definicionFormulario.version,
-                      ].join(' · '),
-                      textAlign: TextAlign.center,
-                      style:
-                          T.label(size: 10.5, color: T.faint, tracking: 0.05),
-                    ),
+                    builder: (context, version) {
+                      final actual = version.data;
+                      return Text(
+                        actual != null && actual.isNotEmpty ? 'v$actual' : '',
+                        textAlign: TextAlign.center,
+                        style:
+                            T.label(size: 10.5, color: T.faint, tracking: 0.05),
+                      );
+                    },
                   ),
                 ],
               ),

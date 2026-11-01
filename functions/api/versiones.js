@@ -1,15 +1,21 @@
+const URL_VERSIONES =
+  'https://api.github.com/repos/Telestas/SIVAP/releases?per_page=20';
+
 /** Versiones públicas para la página de descarga y la app móvil. */
-export const onRequestGet = async () => {
+export const onRequestGet = async (contexto = {}) => {
+  const cache = typeof caches === 'undefined' ? null : caches.default;
+  const clave = new Request(
+    contexto.request?.url ?? 'https://sivap.pages.dev/api/versiones',
+  );
+  const guardada = await cache?.match(clave);
+  if (guardada) return guardada;
+
   try {
-    const respuesta = await fetch(
-      'https://api.github.com/repos/Telestas/SIVAP/releases?per_page=20',
-      {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'User-Agent': 'SIVAP-Distribucion',
-        },
+    const respuesta = await fetch(URL_VERSIONES, {
+      headers: {
+        Accept: 'application/vnd.github+json',
       },
-    );
+    });
     if (!respuesta.ok) {
       return Response.json({error: 'Versiones no disponibles.'},
         {status: 502, headers: {'Cache-Control': 'no-store'}});
@@ -28,9 +34,11 @@ export const onRequestGet = async () => {
           browser_download_url: asset.browser_download_url,
         })),
     }));
-    return Response.json(publicas, {
+    const salida = Response.json(publicas, {
       headers: {'Cache-Control': 'public, max-age=300'},
     });
+    if (cache != null) await cache.put(clave, salida.clone());
+    return salida;
   } catch {
     return Response.json({error: 'Versiones no disponibles.'},
       {status: 502, headers: {'Cache-Control': 'no-store'}});

@@ -122,7 +122,7 @@ class _SolicitarAccesoScreenState extends State<SolicitarAccesoScreen>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Crear cuenta o solicitar acceso')),
+        appBar: AppBar(title: const Text('Crear una cuenta nueva')),
         body: Center(
             child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),

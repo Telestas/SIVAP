@@ -204,7 +204,10 @@ void main() {
       }
       if (ruta.endsWith('solicitudes_acceso/uid')) {
         return http.Response(
-            jsonEncode({'error': {'status': 'NOT_FOUND'}}), 404,
+            jsonEncode({
+              'error': {'status': 'NOT_FOUND'}
+            }),
+            404,
             headers: {'content-type': 'application/json'});
       }
       if (ruta.endsWith('investigadores/uid')) {
@@ -264,6 +267,15 @@ void main() {
   test('un fallo de DNS se distingue de un fallo de contraseña', () {
     expect(diagnosticoConexion(const SocketException('Failed host lookup')),
         contains('DNS'));
+  });
+
+  test('el diagnóstico de Cronet distingue DNS y HTTP/3 sin datos de cuenta',
+      () {
+    expect(diagnosticoCronet(1, -105), contains('DNS'));
+    expect(diagnosticoCronet(10, -356), contains('HTTP/3'));
+    expect(diagnosticoCronet(6, -118), contains('tiempo de espera'));
+    expect(diagnosticoCronet(11, -7), contains('11/-7'));
+    expect(diagnosticoCronet(11, -7), isNot(contains('key=')));
   });
 
   test('renovación de sesión usa el proxy y conserva el token nuevo', () async {

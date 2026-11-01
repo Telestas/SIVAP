@@ -1,13 +1,9 @@
 import 'dart:io';
 
-import 'package:cronet_http/cronet_http.dart' as cronet;
 import 'package:http/http.dart' as http;
 
 /// Mensajes breves que no incluyen URL con clave, cuerpo ni credenciales.
 String? diagnosticoConexion(Object error) {
-  if (error is cronet.NetworkException) {
-    return diagnosticoCronet(error.errorCode, error.cronetInternalErrorCode);
-  }
   final texto =
       error is http.ClientException ? error.message : error.toString();
   if (error is SocketException || error is http.ClientException) {
@@ -22,6 +18,20 @@ String? diagnosticoConexion(Object error) {
       return 'Falló la conexión segura con sivap.pages.dev (TLS). '
           'Compruebe la fecha y hora del teléfono.';
     }
+    if (detalle.contains('connection reset')) {
+      final codigo = error is SocketException ? error.osError?.errorCode : null;
+      final sufijo = codigo == null ? '' : ' Código de sistema: $codigo.';
+      return 'La conexión con sivap.pages.dev se cerró antes de recibir '
+          'respuesta (TCP reset).$sufijo';
+    }
+    if (detalle.contains('connection closed before full header was received')) {
+      return 'La conexión con sivap.pages.dev se cerró antes de recibir '
+          'la respuesta HTTP.';
+    }
+    if (error is SocketException && error.osError != null) {
+      return 'El teléfono no pudo conectar con sivap.pages.dev. '
+          'Código de sistema: ${error.osError!.errorCode}.';
+    }
     return 'El teléfono no pudo conectar con sivap.pages.dev. '
         'Compruebe si Chrome puede abrir el panel sin VPN.';
   }
@@ -30,17 +40,4 @@ String? diagnosticoConexion(Object error) {
         'Compruebe la fecha y hora del teléfono.';
   }
   return null;
-}
-
-/// El código de Cronet distingue el fallo sin exponer la URL ni la cuenta.
-String diagnosticoCronet(int codigo, int codigoInterno) {
-  final detalle = switch (codigo) {
-    1 => 'El teléfono no pudo resolver sivap.pages.dev (DNS).',
-    2 => 'Android informa que no tiene conexión a Internet.',
-    3 => 'La red del teléfono cambió durante el acceso.',
-    4 || 6 => 'La conexión con sivap.pages.dev agotó el tiempo de espera.',
-    10 => 'Falló la conexión HTTP/3 con sivap.pages.dev.',
-    _ => 'El teléfono no pudo conectar con sivap.pages.dev.',
-  };
-  return '$detalle Código de red: $codigo/$codigoInterno.';
 }

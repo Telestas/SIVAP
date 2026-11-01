@@ -86,10 +86,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.numero }}
         run: |
           flutter build apk --release --split-per-abi \
-            --dart-define=cronetHttpNoPlay=true \
             --build-name="$VERSION" --build-number="${{ github.run_number }}"
           flutter build apk --release \
-            --dart-define=cronetHttpNoPlay=true \
             --build-name="$VERSION" --build-number="${{ github.run_number }}"
 
           mkdir -p build/entrega

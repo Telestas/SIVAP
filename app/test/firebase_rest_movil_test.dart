@@ -269,13 +269,25 @@ void main() {
         contains('DNS'));
   });
 
-  test('el diagnóstico de Cronet distingue DNS y HTTP/3 sin datos de cuenta',
-      () {
-    expect(diagnosticoCronet(1, -105), contains('DNS'));
-    expect(diagnosticoCronet(10, -356), contains('HTTP/3'));
-    expect(diagnosticoCronet(6, -118), contains('tiempo de espera'));
-    expect(diagnosticoCronet(11, -7), contains('11/-7'));
-    expect(diagnosticoCronet(11, -7), isNot(contains('key=')));
+  test('un reset TCP muestra el código sin exponer URL ni credenciales', () {
+    const error = SocketException(
+      'Connection reset by peer: key=secreto',
+      osError: OSError('Connection reset by peer', 104),
+    );
+    final mensaje = diagnosticoConexion(error)!;
+    expect(mensaje, contains('TCP reset'));
+    expect(mensaje, contains('104'));
+    expect(mensaje, isNot(contains('secreto')));
+  });
+
+  test('un error de socket conserva el código del sistema sin detalles', () {
+    const error = SocketException(
+      'Network is unreachable: key=secreto',
+      osError: OSError('Network is unreachable', 101),
+    );
+    final mensaje = diagnosticoConexion(error)!;
+    expect(mensaje, contains('101'));
+    expect(mensaje, isNot(contains('secreto')));
   });
 
   test('renovación de sesión usa el proxy y conserva el token nuevo', () async {

@@ -178,6 +178,15 @@ en ese teléfono debe confirmar tanto el acceso sin VPN como la lectura del
 perfil; el código mostrado permite investigar el transporte sin compartir
 correo, contraseña ni token.
 
+En v0.2.12, el teléfono cubano sin VPN informó `8/-101` con Cronet. El código
+interno `-101` indica que la conexión se cerró antes de recibir una respuesta
+HTTP. La variante v0.2.13 vuelve a `dart:io`/`IOClient` en Android y muestra
+un diagnóstico específico si ocurre un reset TCP, con el código del sistema
+cuando esté disponible. La v0.2.9 ya había presentado un fallo genérico con
+esta familia de transporte; por eso esta prueba sirve para comparar el fallo,
+pero no garantiza el acceso sin VPN. Instalar sobre la versión anterior con la
+misma firma y probar el inicio de sesión sin VPN en el mismo teléfono y red.
+
 ### Se publican dos APK, y hay que saber por qué
 
 | Archivo | Tamaño | Para quién |

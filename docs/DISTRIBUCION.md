@@ -187,6 +187,13 @@ esta familia de transporte; por eso esta prueba sirve para comparar el fallo,
 pero no garantiza el acceso sin VPN. Instalar sobre la versión anterior con la
 misma firma y probar el inicio de sesión sin VPN en el mismo teléfono y red.
 
+La v0.2.13 volvió a mostrar un cierre de conexión (`ECONNRESET`, código 104)
+sin VPN. La v0.2.14 añade en la pantalla de acceso un botón de diagnóstico
+que puede usarse sin iniciar sesión. Comprueba DNS, TCP, TLS y un GET a
+`/api/versiones` sin cuenta, contraseña ni token. El resultado indica la etapa
+que falla y el código de sistema cuando existe; no identifica por sí solo qué
+equipo de la ruta cerró la conexión.
+
 ### Se publican dos APK, y hay que saber por qué
 
 | Archivo | Tamaño | Para quién |

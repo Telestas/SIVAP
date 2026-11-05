@@ -1,10 +1,18 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cronet_http/cronet_http.dart' as cronet;
 import 'package:http/http.dart' as http;
+
+import 'cliente_http_io.dart';
+import 'diagnostico_transporte.dart';
 
 /// Mensajes breves que no incluyen URL con clave, cuerpo ni credenciales.
 String? diagnosticoConexion(Object error) {
+  if (error is cronet.NetworkException) {
+    return 'Falló la conexión con sivap.pages.dev. '
+        'Código de red: ${error.errorCode}/${error.cronetInternalErrorCode}.';
+  }
   final texto =
       error is http.ClientException ? error.message : error.toString();
   if (error is SocketException || error is http.ClientException) {
@@ -51,7 +59,7 @@ Future<String> diagnosticarConexionMovil({
   Future<void> Function()? resolver,
   Future<void> Function()? conectar,
   Future<void> Function()? verificarTls,
-  Future<int> Function()? consultar,
+  Future<String> Function()? consultarRutaApp,
 }) async {
   final etapas = <String>[];
   for (final (nombre, prueba) in [
@@ -64,16 +72,16 @@ Future<String> diagnosticarConexionMovil({
       etapas.add('$nombre OK');
     } on Object catch (error) {
       etapas.add('$nombre falla (${_codigoDiagnostico(error)})');
-      return etapas.join(' · ');
+      break;
     }
   }
   try {
-    final estado = await (consultar ?? _consultarDiagnostico)();
-    etapas.add('GET HTTP $estado');
+    final rutaApp = await (consultarRutaApp ?? _consultarDiagnostico)();
+    return 'Ruta app: $rutaApp.\nTCP de Dart: ${etapas.join(' · ')}';
   } on Object catch (error) {
-    etapas.add('GET falla (${_codigoDiagnostico(error)})');
+    final fallo = diagnosticoConexion(error) ?? _codigoDiagnostico(error);
+    return 'Ruta app: $fallo\nTCP de Dart: ${etapas.join(' · ')}';
   }
-  return etapas.join(' · ');
 }
 
 String _codigoDiagnostico(Object error) {
@@ -108,15 +116,16 @@ Future<void> _verificarTlsDiagnostico() async {
   }
 }
 
-Future<int> _consultarDiagnostico() async {
-  final cliente = HttpClient()..connectionTimeout = _esperaDiagnostico;
+Future<String> _consultarDiagnostico() async {
+  final cliente = crearClienteHttp();
+  final cancelacion = Completer<void>();
+  final reloj = Timer(const Duration(seconds: 15), cancelacion.complete);
   try {
-    final solicitud = await cliente
-        .getUrl(Uri.https(_hostDiagnostico, '/api/versiones'))
-        .timeout(_esperaDiagnostico);
-    final respuesta = await solicitud.close().timeout(_esperaDiagnostico);
-    return respuesta.statusCode;
+    return await consultarTransporte(cliente, cancelacion: cancelacion.future);
+  } on http.RequestAbortedException {
+    throw TimeoutException('Diagnóstico de transporte');
   } finally {
-    cliente.close(force: true);
+    reloj.cancel();
+    cliente.close();
   }
 }

@@ -1,11 +1,18 @@
 import 'dart:io';
 
+import 'package:cronet_http/cronet_http.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/io_client.dart';
 
-/// Usa sockets de dart:io para comparar la ruta TCP con Cronet en Android.
-/// HttpClient no mantiene una caché persistente de respuestas clínicas.
+/// Indica HTTP/3 desde el primer acceso, sin esperar un Alt-Svc recibido por TCP.
+/// La caché permanece desactivada para sesiones y datos clínicos.
 http.Client crearClienteHttp() {
   if (!Platform.isAndroid) return http.Client();
-  return IOClient(HttpClient()..userAgent = 'SIVAP-Android');
+  final motor = CronetEngine.build(
+    cacheMode: CacheMode.disabled,
+    enableQuic: true,
+    useBuiltInDnsResolver: true,
+    quicHints: [('sivap.pages.dev', 443, 443)],
+    userAgent: 'SIVAP-Android',
+  );
+  return CronetClient.fromCronetEngine(motor, closeEngine: true);
 }

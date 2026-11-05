@@ -4,7 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sivap/data/remoto/diagnostico_red_io.dart';
 
 void main() {
-  test('el diagnóstico detiene las pruebas en la etapa que falla', () async {
+  test('un fallo TLS de Dart no impide probar la ruta real de la app',
+      () async {
     final llamadas = <String>[];
     final resultado = await diagnosticarConexionMovil(
       resolver: () async => llamadas.add('DNS'),
@@ -16,25 +17,28 @@ void main() {
           osError: OSError('Connection reset by peer', 104),
         );
       },
-      consultar: () async {
-        llamadas.add('GET');
-        return 200;
+      consultarRutaApp: () async {
+        llamadas.add('APP');
+        return 'HTTP 200 · HTTP/3 · TLS 1.3 · SNI cifrado';
       },
     );
 
-    expect(llamadas, ['DNS', 'TCP', 'TLS']);
-    expect(resultado, 'DNS OK · TCP OK · TLS falla (sistema 104)');
+    expect(llamadas, ['DNS', 'TCP', 'TLS', 'APP']);
+    expect(resultado, contains('Ruta app: HTTP 200 · HTTP/3'));
+    expect(resultado, contains('TCP de Dart: DNS OK · TCP OK · TLS falla'));
     expect(resultado, isNot(contains('secreto')));
   });
 
-  test('la petición sin credenciales informa el estado HTTP', () async {
+  test('el diagnóstico distingue el fallo HTTP del transporte de la app',
+      () async {
     final resultado = await diagnosticarConexionMovil(
       resolver: () async {},
       conectar: () async {},
       verificarTls: () async {},
-      consultar: () async => 200,
+      consultarRutaApp: () async => 'HTTP 502',
     );
 
-    expect(resultado, 'DNS OK · TCP OK · TLS OK · GET HTTP 200');
+    expect(resultado,
+        'Ruta app: HTTP 502.\nTCP de Dart: DNS OK · TCP OK · TLS OK');
   });
 }

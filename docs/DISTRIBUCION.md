@@ -194,6 +194,37 @@ que puede usarse sin iniciar sesión. Comprueba DNS, TCP, TLS y un GET a
 que falla y el código de sistema cuando existe; no identifica por sí solo qué
 equipo de la ruta cerró la conexión.
 
+La prueba de campo de v0.2.14 informó `DNS OK · TCP OK · TLS falla (sistema
+104)` sin VPN. Con VPN permitió iniciar sesión y el diagnóstico llegó a
+`GET HTTP 502`. El primer resultado sitúa el cierre durante la negociación
+TLS de esa prueba, pero no identifica su origen. Las etapas usan conexiones
+separadas; no prueban que la petición de acceso haya seguido la misma ruta.
+Conviene comparar en Chrome, sin VPN, únicamente los campos `sni`, `http` y
+`tls` de `https://sivap.pages.dev/cdn-cgi/trace`, sin copiar IP ni otros campos.
+
+El `502` se reprodujo desde otra red en `/api/versiones`. La función omitía
+`User-Agent` al consultar GitHub: se comprobó que GitHub devuelve `403` sin
+esa cabecera y acepta la consulta identificada como `SIVAP-versiones`. Se
+añade esa identificación en Pages Functions. Este ajuste requiere publicar
+Cloudflare Pages; no requiere otra APK y no corrige el cierre TLS sin VPN.
+
+La comparación posterior en Chrome sin VPN informó `http=http/3`,
+`tls=TLSv1.3` y `sni=encrypted`. Esto confirma que el navegador usa QUIC y ECH
+en la conexión que funciona; no aísla cuál de esas diferencias evita el cierre.
+La v0.2.15 prueba Cronet integrado con QUIC habilitado, DNS interno y una
+indicación explícita `quicHints` para `sivap.pages.dev:443`. Las variantes
+anteriores permitían QUIC sin esa indicación, por lo que podían necesitar
+recibir primero un `Alt-Svc` por una conexión TCP. La indicación permite
+intentar QUIC desde el primer acceso; no garantiza su negociación ni ECH.
+
+El diagnóstico consulta `/cdn-cgi/trace` con la misma configuración HTTP que
+usa la app, sin credenciales ni redirecciones, y devuelve solo protocolo,
+versión TLS y estado SNI. Los demás campos, incluida la IP, no se muestran
+ni guardan. La prueba TCP/TLS de Dart se identifica aparte y su fallo ya no
+impide consultar la ruta de la app. El diagnóstico no depende de GitHub.
+Probar en el teléfono sin VPN tanto el acceso como el resultado de «Ruta app»;
+las pruebas locales no confirman que la red cubana permita este transporte.
+
 ### Se publican dos APK, y hay que saber por qué
 
 | Archivo | Tamaño | Para quién |

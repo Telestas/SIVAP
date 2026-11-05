@@ -2,6 +2,26 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {onRequestGet} from '../api/versiones.js';
 
+test('identifica SIVAP ante GitHub aunque el cliente no envíe User-Agent', async () => {
+  const anterior = globalThis.fetch;
+  globalThis.fetch = async (url, opciones) => {
+    assert.match(url, /^https:\/\/api\.github\.com\//);
+    const cabeceras = new Headers(opciones.headers);
+    if (!cabeceras.get('User-Agent')) return new Response(null, {status: 403});
+    assert.equal(cabeceras.get('User-Agent'), 'SIVAP-versiones');
+    return Response.json([]);
+  };
+  try {
+    const respuesta = await onRequestGet({
+      request: new Request('https://sivap.pages.dev/api/versiones'),
+    });
+    assert.equal(respuesta.status, 200);
+    assert.deepEqual(await respuesta.json(), []);
+  } finally {
+    globalThis.fetch = anterior;
+  }
+});
+
 test('publica solo metadatos de APK necesarios para la descarga', async () => {
   const anterior = globalThis.fetch;
   globalThis.fetch = async () => Response.json([{

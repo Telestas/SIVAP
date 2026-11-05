@@ -225,6 +225,13 @@ impide consultar la ruta de la app. El diagnóstico no depende de GitHub.
 Probar en el teléfono sin VPN tanto el acceso como el resultado de «Ruta app»;
 las pruebas locales no confirman que la red cubana permita este transporte.
 
+La prueba de campo de v0.2.15 confirmó acceso móvil sin VPN. La consulta con
+el transporte de la app devolvió `HTTP 200 · HTTP/3 · TLS 1.3 · SNI visible`,
+mientras la prueba independiente por TCP de Dart siguió fallando con el código
+104. Ese fallo de TCP no impide el acceso que ya funciona por HTTP/3. En
+v0.2.16 se retira el botón de diagnóstico y el código temporal de sondeo; se
+conservan los mensajes de error de red del acceso normal.
+
 ### Se publican dos APK, y hay que saber por qué
 
 | Archivo | Tamaño | Para quién |

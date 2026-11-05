@@ -276,7 +276,7 @@ void main() {
     expect(find.widgetWithText(TextField, 'correo@institucion.cu'),
         findsOneWidget);
     expect(find.text('Crear una cuenta nueva'), findsOneWidget);
-    expect(find.text('Diagnosticar conexión'), findsOneWidget);
+    expect(find.text('Diagnosticar conexión'), findsNothing);
     expect(find.text('Solicitar acceso o crear cuenta'), findsNothing);
   });
 

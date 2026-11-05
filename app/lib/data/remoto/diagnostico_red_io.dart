@@ -1,11 +1,7 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:cronet_http/cronet_http.dart' as cronet;
 import 'package:http/http.dart' as http;
-
-import 'cliente_http_io.dart';
-import 'diagnostico_transporte.dart';
 
 /// Mensajes breves que no incluyen URL con clave, cuerpo ni credenciales.
 String? diagnosticoConexion(Object error) {
@@ -49,83 +45,4 @@ String? diagnosticoConexion(Object error) {
         'Compruebe la fecha y hora del teléfono.';
   }
   return null;
-}
-
-const _hostDiagnostico = 'sivap.pages.dev';
-const _esperaDiagnostico = Duration(seconds: 6);
-
-/// Comprueba etapas de red sin enviar cuenta, contraseña ni token.
-Future<String> diagnosticarConexionMovil({
-  Future<void> Function()? resolver,
-  Future<void> Function()? conectar,
-  Future<void> Function()? verificarTls,
-  Future<String> Function()? consultarRutaApp,
-}) async {
-  final etapas = <String>[];
-  for (final (nombre, prueba) in [
-    ('DNS', resolver ?? _resolverDiagnostico),
-    ('TCP', conectar ?? _conectarDiagnostico),
-    ('TLS', verificarTls ?? _verificarTlsDiagnostico),
-  ]) {
-    try {
-      await prueba();
-      etapas.add('$nombre OK');
-    } on Object catch (error) {
-      etapas.add('$nombre falla (${_codigoDiagnostico(error)})');
-      break;
-    }
-  }
-  try {
-    final rutaApp = await (consultarRutaApp ?? _consultarDiagnostico)();
-    return 'Ruta app: $rutaApp.\nTCP de Dart: ${etapas.join(' · ')}';
-  } on Object catch (error) {
-    final fallo = diagnosticoConexion(error) ?? _codigoDiagnostico(error);
-    return 'Ruta app: $fallo\nTCP de Dart: ${etapas.join(' · ')}';
-  }
-}
-
-String _codigoDiagnostico(Object error) {
-  if (error is TimeoutException) return 'tiempo agotado';
-  if (error is SocketException) {
-    final codigo = error.osError?.errorCode;
-    return codigo == null ? 'socket' : 'sistema $codigo';
-  }
-  if (error is HandshakeException || error is TlsException) return 'TLS';
-  return 'sin respuesta';
-}
-
-Future<void> _resolverDiagnostico() async {
-  await InternetAddress.lookup(_hostDiagnostico).timeout(_esperaDiagnostico);
-}
-
-Future<void> _conectarDiagnostico() async {
-  final socket =
-      await Socket.connect(_hostDiagnostico, 443, timeout: _esperaDiagnostico);
-  socket.destroy();
-}
-
-Future<void> _verificarTlsDiagnostico() async {
-  final socket =
-      await Socket.connect(_hostDiagnostico, 443, timeout: _esperaDiagnostico);
-  try {
-    final seguro = await SecureSocket.secure(socket, host: _hostDiagnostico)
-        .timeout(_esperaDiagnostico);
-    seguro.destroy();
-  } finally {
-    socket.destroy();
-  }
-}
-
-Future<String> _consultarDiagnostico() async {
-  final cliente = crearClienteHttp();
-  final cancelacion = Completer<void>();
-  final reloj = Timer(const Duration(seconds: 15), cancelacion.complete);
-  try {
-    return await consultarTransporte(cliente, cancelacion: cancelacion.future);
-  } on http.RequestAbortedException {
-    throw TimeoutException('Diagnóstico de transporte');
-  } finally {
-    reloj.cancel();
-    cliente.close();
-  }
 }

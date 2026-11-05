@@ -14,6 +14,8 @@ export const onRequestGet = async (contexto = {}) => {
     const respuesta = await fetch(URL_VERSIONES, {
       headers: {
         Accept: 'application/vnd.github+json',
+        // GitHub rechaza las peticiones que no identifican la aplicación.
+        'User-Agent': 'SIVAP-versiones',
       },
     });
     if (!respuesta.ok) {

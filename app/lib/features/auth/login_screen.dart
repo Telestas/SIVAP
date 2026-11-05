@@ -9,8 +9,6 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/chips.dart';
 import '../../core/widgets/controls.dart';
 import '../../data/remoto/actualizaciones.dart';
-import '../../data/remoto/diagnostico_red_stub.dart'
-    if (dart.library.io) '../../data/remoto/diagnostico_red_io.dart';
 import '../../data/local/seed_data.dart';
 import '../../domain/models/role.dart';
 
@@ -33,9 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _clave = TextEditingController();
   Investigador _seleccionado = Seed.investigadores.first;
   String? _error;
-  String? _diagnostico;
   bool _entrando = false;
-  bool _diagnosticando = false;
   bool _recuperando = false;
   late final Future<String> _versionInstalada = PackageInfo.fromPlatform()
       .then((paquete) => paquete.version)
@@ -90,7 +86,6 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _entrando = true;
         _error = null;
-        _diagnostico = null;
       });
       try {
         await state.iniciarSesionRemota(
@@ -156,20 +151,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return 'La cuenta no tiene permiso para leer los datos del estudio.';
     }
     return mensaje;
-  }
-
-  Future<void> _diagnosticarRed() async {
-    setState(() {
-      _diagnosticando = true;
-      _diagnostico = null;
-    });
-    final resultado = await diagnosticarConexionMovil();
-    if (mounted) {
-      setState(() {
-        _diagnostico = resultado;
-        _diagnosticando = false;
-      });
-    }
   }
 
   @override
@@ -257,21 +238,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (_error != null) ...[
                     const SizedBox(height: 12),
                     StatusBanner(texto: _error!, alineaArriba: true),
-                  ],
-
-                  if (!kIsWeb && remoto) ...[
-                    TextButton(
-                      onPressed: _entrando || _diagnosticando
-                          ? null
-                          : _diagnosticarRed,
-                      child: Text(_diagnosticando
-                          ? 'Comprobando conexión…'
-                          : 'Diagnosticar conexión'),
-                    ),
-                    if (_diagnostico != null)
-                      StatusBanner(
-                          texto: 'Diagnóstico: $_diagnostico',
-                          alineaArriba: true),
                   ],
 
                   if (!remoto) ...[
